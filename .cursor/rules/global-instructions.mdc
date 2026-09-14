@@ -1,0 +1,311 @@
+---
+description: Instruções globais do usuário (espelho de ~/.claude/CLAUDE.md + rules/), geradas por /cursor-init
+alwaysApply: true
+---
+<!-- GERADO por /cursor-init — NÃO editar manualmente. Editar a fonte (~/.claude/CLAUDE.md ou ~/.claude/rules/) e rodar /cursor-init de novo. -->
+<!-- source-hash: e9a1f0634ffa683885136c448b919ac669d050a54bd88ed9d44491d4e6877652 -->
+
+## Fonte: C:\Users\luan2\.claude\CLAUDE.md
+
+# Global user instructions
+
+> **Arquivo unico** â€” edite aqui (ou via hard link: `~/.claude/CLAUDE.md`, `_ai/AGENTS.md`, `~/.cursor/AGENTS.md`).  
+> Apos editar: rode `_ai/sync-global-instructions.ps1` e cole `_ai/cursor-user-rules.txt` em **Cursor Settings > Rules > User Rules**.  
+> O mesmo script gera `~/.codex/AGENTS.md` (este arquivo + `~/.claude/rules/*.md`) e espelha `~/.claude/skills/` em `~/.codex/skills/`. Nunca editar o lado Codex â€” e sobrescrito a cada run.
+
+## Port registry (evitar conflitos entre projetos)
+Rodo vÃ¡rios projetos nesta mÃ¡quina, entÃ£o conflitos de porta sÃ£o frequentes. O arquivo `C:\_pastas-disco-c\repositorios-c\Portas Usadas no PC.txt` lista todas as portas usadas em todos os projetos. Regras:
+- Sempre que for rodar algo que nunca rodou antes, ou buscar uma porta livre, **ler este arquivo primeiro**.
+- Para projeto novo, escolher uma porta que **nÃ£o** esteja em uso no arquivo e **atualizar o arquivo** com a nova entrada (porta + descriÃ§Ã£o do projeto).
+- Manter o arquivo como fonte Ãºnica de verdade das portas ocupadas.
+
+## PreferÃªncias de cÃ³digo
+
+### Escrever pensando em revisÃ£o humana posterior
+Implementar sempre com a leitura/revisÃ£o de um humano em mente, nÃ£o sÃ³ "funciona":
+- Preferir cÃ³digo explÃ­cito a "esperto"/compacto â€” nada de one-liner denso ou encadeamento longo de mÃ©todos difÃ­cil de acompanhar.
+- NÃ£o misturar refactor com feature no mesmo trecho/diff â€” dificulta o revisor separar comportamento novo de reorganizaÃ§Ã£o.
+- Nomear de forma que o revisor nÃ£o precise pular pro cÃ³digo pra entender o quÃª â€” o nome jÃ¡ conta a histÃ³ria.
+- Estruturar em ordem lÃ³gica de leitura (top-down: o que importa primeiro, detalhe depois) â€” evitar forÃ§ar o revisor a pular entre funÃ§Ã£o A e funÃ§Ã£o B pra montar o fluxo mental.
+
+### VariÃ¡vel de ambiente sÃ³ pra dado sensÃ­vel
+Ao implementar, criar variÃ¡vel de ambiente automaticamente **sÃ³** pra proteger dado sensÃ­vel (API token, senha, secret, chave de API etc).
+
+Pra variÃ¡vel que sÃ³ define **comportamento/configuraÃ§Ã£o** de uma funcionalidade (feature flag, timeout, nome de rota, limite numÃ©rico, etc â€” nÃ£o Ã© segredo) â€” a princÃ­pio **nÃ£o** criar env var. Deixar hard coded numa constante nomeada. Depois de implementar, perguntar ao usuÃ¡rio se quer promover aquela constante pra variÃ¡vel de ambiente tambÃ©m. Nunca criar a env var de saÃ­da por conta prÃ³pria nesse caso.
+
+Resumo: dado sensÃ­vel â†’ sempre env var, sem perguntar. ConfiguraÃ§Ã£o de comportamento â†’ hard coded numa constante, perguntar depois se quer virar env var.
+
+### DRY â€” reutilizar antes de duplicar (com limite)
+Antes de implementar, pensar no que dÃ¡ pra reutilizar dentro do trabalho atual â€” mas com escopo e limite claros, pra nÃ£o virar abstraÃ§Ã£o prematura (contradiria a diretriz geral de nÃ£o desenhar pra requisito hipotÃ©tico e preferir 3 linhas repetidas a abstraÃ§Ã£o cedo demais).
+
+- **Escopo**: vale dentro da implementaÃ§Ã£o atual (mesma feature/tarefa). NÃ£o caÃ§ar duplicaÃ§Ã£o em cÃ³digo legado nÃ£o tocado, nem prever reuso futuro especulativo ("pode ser que outro lugar precise disso um dia").
+- **Regra dos 3 strikes**: 2 ocorrÃªncias parecidas pode ficar duplicado (ainda nÃ£o Ã© padrÃ£o claro). 3+ ocorrÃªncias idÃªnticas/quase-idÃªnticas dentro da mesma implementaÃ§Ã£o â†’ aÃ­ sim extrair.
+- **Antes de criar do zero**: checar rapidamente (grep/busca) se jÃ¡ existe helper/util equivalente no projeto, pra nÃ£o recriar o que jÃ¡ existe.
+- Ao extrair por DRY, aplicar o mesmo critÃ©rio de nome por responsabilidade conceitual jÃ¡ definido na regra de funÃ§Ãµes grandes acima.
+
+### Logs â€” usar a skill /logs sempre que implementar
+Sempre que for implementar ou alterar lÃ³gica de negÃ³cio, fluxo de erro, ou I/O (nÃ£o apenas quando pedido explicitamente), rodar/aplicar a skill global `/logs` no trecho tocado â€” adiciona logs com logger buscando equilÃ­brio entre debugabilidade e excesso. NÃ£o esperar o usuÃ¡rio pedir a cada vez. NÃ£o aplicar em mudanÃ§a mecÃ¢nica/estilo (rename, formataÃ§Ã£o, ajuste de config, mudanÃ§a de 1 linha sem lÃ³gica nova).
+
+### Evitar arquivos grandes / god objects
+NÃ£o Ã© regra obrigatÃ³ria, mas atenÃ§Ã£o constante: arquivo passando de ~200-250 linhas Ã© warning â€” parar e avaliar se estÃ¡ violando responsabilidade Ãºnica / virando god object. Pode haver cenÃ¡rio legÃ­timo pra arquivo maior (ex: muitas configs, dados estÃ¡ticos, geraÃ§Ã£o automÃ¡tica) â€” nesse caso seguir, mas com consciÃªncia, nÃ£o por padrÃ£o.
+
+Se decidir dividir em arquivos menores, seguir a estrutura de pastas/arquivos jÃ¡ usada no projeto (nÃ£o inventar convenÃ§Ã£o nova) â€” olhar como o projeto jÃ¡ organiza mÃ³dulos/domÃ­nios antes de propor a divisÃ£o.
+
+Isso vale tambÃ©m pra classes estÃ¡ticas (regra abaixo): concentrar tudo de um domÃ­nio numa Ãºnica classe estÃ¡tica nÃ£o Ã© desculpa pra ignorar o limite â€” se crescer demais, dividir por sub-domÃ­nio em arquivos separados, mesma estrutura de pastas do projeto.
+
+### Um componente / uma classe por arquivo
+
+Complemento direto da regra acima: alÃ©m do tamanho, o critÃ©rio Ã© **quantas coisas nomeadas o arquivo exporta**. Arquivo com dois componentes React, ou com uma classe `Service` e uma `Utils` juntas, jÃ¡ Ã© god object mesmo com 80 linhas â€” o revisor nÃ£o sabe pelo nome do arquivo o que tem dentro, e o import puxa contexto que nÃ£o pediu.
+
+O nome do arquivo deve prever o conteÃºdo: `user-card.tsx` tem `UserCard`, `invoice-calculator.ts` tem `InvoiceCalculator`. Se o arquivo precisa de nome genÃ©rico (`components.tsx`, `helpers.ts`) pra caber tudo que tem dentro, ele jÃ¡ estÃ¡ errado.
+
+**React** â€” cada componente no seu arquivo, incluindo o subcomponente que nasceu "sÃ³ pra organizar o JSX daqui":
+
+```tsx
+// Evitar â€” dois componentes exportÃ¡veis no mesmo arquivo
+export function UserCard({ user }: Props) { ... }
+export function UserCardSkeleton() { ... }
+
+// Preferir
+// user-card.tsx          -> UserCard
+// user-card-skeleton.tsx -> UserCardSkeleton
+```
+
+**Classes** (TypeScript, e qualquer linguagem que permita vÃ¡rias classes por arquivo) â€” uma classe exportada por arquivo:
+
+```ts
+// Evitar â€” Service e Utils no mesmo arquivo
+export class InvoiceService { ... }
+export class InvoiceUtils { ... }
+
+// Preferir
+// invoice-service.ts -> InvoiceService
+// invoice-utils.ts   -> InvoiceUtils
+```
+
+ExceÃ§Ãµes â€” pode ficar junto quando:
+- **Tipo/interface/enum/constante** do prÃ³prio componente ou da prÃ³pria classe. NÃ£o sÃ£o "outra coisa", sÃ£o a assinatura dele.
+- **Componente ou classe privada ao arquivo, nÃ£o exportada**, curta (~10-15 linhas), usada sÃ³ ali e sem vida prÃ³pria â€” extrair criaria indireÃ§Ã£o sem ganho.
+- **ConvenÃ§Ã£o estabelecida no projeto** que jÃ¡ faz diferente (ex: componente + variantes num arquivo sÃ³, padrÃ£o de biblioteca de UI). ConsistÃªncia com o projeto vence a preferÃªncia.
+- **Linguagem que nÃ£o permite arquivo separado** por classe aninhada/interna (inner class que sÃ³ existe dentro da externa).
+
+Vale pra cÃ³digo novo e pra arquivo onde jÃ¡ estou mexendo. NÃ£o sair quebrando arquivo legado que nÃ£o faz parte da tarefa.
+
+Contrapeso: a regra de pasta abaixo continua valendo â€” dividir em mais arquivos nÃ£o Ã© licenÃ§a pra despejar 20 arquivos soltos na mesma pasta. Um componente por arquivo **e** subpasta por sub-domÃ­nio.
+
+### Evitar muitos arquivos soltos na mesma pasta
+Mesma lÃ³gica de responsabilidade Ãºnica, um nÃ­vel acima: em nÃ­vel de pasta. Pasta passando de ~10-12 arquivos soltos Ã© warning â€” parar e avaliar se ali jÃ¡ existem sub-domÃ­nios distintos pedindo subpasta.
+
+Sinal mais forte que a contagem: **prefixo repetido nos nomes**. VÃ¡rios arquivos comeÃ§ando com o mesmo prefixo (`search-*`, `knowledge-*`, `block-*`) Ã© a prÃ³pria pasta pedindo pra existir â€” o prefixo jÃ¡ Ã© o nome da subpasta. Ao criar subpasta, o prefixo redundante sai do nome do arquivo (`search/fts.ts`, nÃ£o `search/search-fts.ts`).
+
+```
+# Evitar (pasta chapada, prefixo repetido no nome)
+knowledge/
+  block-embedding-writer.ts
+  block-patch-applier.ts
+  block-snapshot.ts
+  knowledge-search.ts
+  knowledge-write.ts
+  search-constants.ts
+  search-fts.ts
+  search-hnsw.ts
+  ...
+
+# Preferir (subpasta por sub-domÃ­nio, prefixo virou pasta)
+knowledge/
+  block/
+    embedding-writer.ts
+    patch-applier.ts
+    snapshot.ts
+  search/
+    constants.ts
+    fts.ts
+    hnsw.ts
+  knowledge-search.ts
+  knowledge-write.ts
+```
+
+Como escolher a divisÃ£o:
+- **Primeiro**: seguir a estrutura de pastas jÃ¡ usada no projeto (mesma regra da divisÃ£o de arquivos grandes acima) â€” se o projeto jÃ¡ organiza por feature, ou por camada, ou por domÃ­nio, usar isso. NÃ£o inventar convenÃ§Ã£o nova.
+- Se nÃ£o houver estrutura definida, agrupar por **sub-domÃ­nio/conceito** (`search/`, `ingest/`, `block/`), nÃ£o por tipo genÃ©rico (`utils/`, `helpers/`, `misc/`, `others/`) â€” pasta por tipo genÃ©rico sÃ³ move o problema.
+
+Sem exagerar (o oposto tambÃ©m Ã© ruim):
+- NÃ£o criar subpasta pra 1-2 arquivos â€” hierarquia sem ganho, sÃ³ aumenta o caminho.
+- NÃ£o empilhar nÃ­veis: mais de ~3 nÃ­veis de aninhamento a partir da raiz do mÃ³dulo geralmente Ã© sinal de over-engineering.
+- NÃ£o reorganizar pasta legada que nÃ£o estÃ¡ sendo tocada sÃ³ por causa dessa regra â€” vale pra cÃ³digo novo e pra pasta onde jÃ¡ estou mexendo (mesmo critÃ©rio das outras regras). Se a reorganizaÃ§Ã£o for grande, propor ao usuÃ¡rio antes em vez de mover arquivos por conta prÃ³pria.
+
+### Evitar funÃ§Ãµes/mÃ©todos gigantes com muitas responsabilidades
+Mesma lÃ³gica de responsabilidade Ãºnica, em nÃ­vel de funÃ§Ã£o. FunÃ§Ã£o passando de ~20-30 linhas Ã© sinal de alerta â€” parar e avaliar se estÃ¡ fazendo mais de uma coisa.
+
+CritÃ©rio pra extrair: por **responsabilidade conceitual**, nÃ£o por contagem de linha. Extrair quando o bloco tem nome prÃ³prio (validaÃ§Ã£o, cÃ¡lculo, mapeamento, formataÃ§Ã£o) â€” ex: mÃ©todo principal chama `validateInput()` em vez de ter toda a validaÃ§Ã£o solta no corpo.
+
+Sem exagerar: nÃ£o extrair bloco de 2-3 linhas usado uma Ãºnica vez que nÃ£o ganha clareza nenhuma virando funÃ§Ã£o separada â€” isso Ã© indireÃ§Ã£o sem benefÃ­cio, forÃ§a o revisor a pular entre funÃ§Ã£o A e funÃ§Ã£o B pra entender o fluxo (o oposto do que a regra de legibilidade acima pede). ExtraÃ§Ã£o sÃ³ compensa quando dÃ¡ nome a um conceito que sozinho jÃ¡ explica o que aquele trecho faz.
+
+### Classes com mÃ©todos estÃ¡ticos ao invÃ©s de funÃ§Ãµes soltas
+Em linguagens que permitem funÃ§Ãµes soltas fora de classes (Python, JavaScript, TypeScript, etc.), preferir sempre organizar em classes com mÃ©todos estÃ¡ticos por arquivo, ao invÃ©s de funÃ§Ãµes soltas exportadas diretamente.
+
+Exemplo (TypeScript):
+```ts
+// Evitar
+export function formatDate(d: Date): string { ... }
+export function parseDate(s: string): Date { ... }
+
+// Preferir
+export class DateUtils {
+  static formatDate(d: Date): string { ... }
+  static parseDate(s: string): Date { ... }
+}
+```
+Aplicar a cÃ³digo novo. NÃ£o Ã© obrigatÃ³rio refatorar cÃ³digo legado sÃ³ por isso, a menos que jÃ¡ esteja mexendo naquele arquivo.
+
+ExceÃ§Ãµes â€” nÃ£o aplicar a:
+- Componentes (React, Vue etc.) â€” continuam funÃ§Ã£o solta.
+- Callbacks/arrow functions inline, closures locais, `main()`/entry point do script.
+- Barrel/re-export (`export { x } from './y'`).
+- FunÃ§Ã£o interna nÃ£o exportada, privada ao arquivo â€” pode continuar solta.
+
+ConvenÃ§Ã£o de nome da classe: `<DomÃ­nio>Utils` (ex: `DateUtils`, `StringUtils`) quando for utilitÃ¡rio genÃ©rico; nome do domÃ­nio/serviÃ§o quando fizer mais sentido (ex: `InvoiceCalculator`).
+
+Se o projeto jÃ¡ segue um padrÃ£o estabelecido diferente (ex: codebase funcional puro, sem classes em lugar nenhum), consistÃªncia com o projeto existente vence a preferÃªncia pessoal â€” nÃ£o introduzir classe isolada num cÃ³digo 100% funcional sÃ³ por essa regra.
+
+### Evitar ifs aninhados â€” early return
+Preferir early return a ifs aninhados. Ao invÃ©s de:
+```ts
+function execucao() {
+  if (condition) {
+    // corpo aninhado
+  }
+}
+```
+Preferir (guard clause, adaptar sintaxe conforme a linguagem):
+```ts
+function execucao() {
+  if (!condition) return;
+  // corpo direto, sem aninhar
+}
+```
+
+Caso com mÃºltiplas condiÃ§Ãµes aninhadas â€” ao invÃ©s de:
+```ts
+if (condition) {
+  if (condition2) {
+    execucao();
+  }
+}
+```
+Preferir:
+```ts
+if (!condition) return;
+if (condition2) execucao();
+```
+Vale para qualquer nÃ­vel de aninhamento evitÃ¡vel â€” inclusive dentro de loops (`continue` no lugar de `if` aninhado) e error handling (retornar/lanÃ§ar cedo em vez de encapsular o caminho feliz num `if`). Como limite prÃ¡tico: ~2 nÃ­veis de `if`. Chegando a 3+ nÃ­veis, o problema jÃ¡ nÃ£o Ã© indentaÃ§Ã£o â€” Ã© a funÃ§Ã£o fazendo coisas demais; reestruturar (early return, extrair funÃ§Ã£o, inverter condiÃ§Ã£o) em vez de indentar mais um nÃ­vel.
+
+NÃ£o aplicar quando os dois ramos (`if`/`else`) carregam lÃ³gica relevante e simÃ©trica â€” guard clause serve pra cortar caminho de saÃ­da antecipada, nÃ£o pra forÃ§ar early-return num `if/else` onde ambos os lados importam igualmente.
+
+Quando early return nÃ£o cabe justamente por isso (os dois ramos importam), a saÃ­da ainda nÃ£o Ã© aninhar â€” Ã© dar nome a cada caminho e retornar:
+```ts
+// Evitar
+if (hasPermission) {
+  if (isOwner) {
+    // corpo A
+  } else {
+    // corpo B
+  }
+}
+
+// Preferir
+if (!hasPermission) return denyAccess();
+if (isOwner) return grantFullAccess();
+return grantReadAccess();
+```
+
+Cadeia longa de `if`/`else if` comparando o mesmo valor contra vÃ¡rias opÃ§Ãµes â†’ substituir por lookup table / `switch` / dict de handlers, conforme o idioma da linguagem:
+```ts
+// Evitar
+if (type === 'pdf') return renderPdf(doc);
+else if (type === 'docx') return renderDocx(doc);
+else if (type === 'xlsx') return renderXlsx(doc);
+// ...mais 6 ramos
+
+// Preferir
+const renderers = { pdf: renderPdf, docx: renderDocx, xlsx: renderXlsx };
+const renderer = renderers[type];
+if (!renderer) throw new Error(`Tipo nÃ£o suportado: ${type}`);
+return renderer(doc);
+```
+Vale a partir de ~4 ramos. Com 2-3 ramos, `if`/`else if` direto Ã© mais legÃ­vel que a indireÃ§Ã£o da tabela.
+
+### Extrair condiÃ§Ã£o complexa do if para variÃ¡vel nomeada
+Evitar condiÃ§Ã£o grande/composta direto dentro do `if (...)`. Adaptar sintaxe conforme a linguagem (ex: variÃ¡vel tipada em TS, `bool` nomeado em Python/Java/C#, etc.). Ao invÃ©s de:
+```ts
+if (objeto.propriedade.outraPropriedade && !condition || anotherCondition) {
+  execucao();
+}
+```
+Preferir extrair em variÃ¡vel(is) nomeada(s) na linha anterior:
+```ts
+const isConditionMet = objeto.propriedade.outraPropriedade && !condition || anotherCondition;
+if (isConditionMet) {
+  execucao();
+}
+```
+Se a condiÃ§Ã£o combina sub-partes com significados distintos, extrair cada uma antes de combinar, para ficar auto-explicativo:
+```ts
+const hasPermission = objeto.propriedade.outraPropriedade;
+const isBlocked = condition;
+const isOverride = anotherCondition;
+const isConditionMet = (hasPermission && !isBlocked) || isOverride;
+if (isConditionMet) {
+  execucao();
+}
+```
+Nome da variÃ¡vel deve descrever o significado da condiÃ§Ã£o (`isConditionMet`, `hasPermission`, `canProceed`), nÃ£o repetir a lÃ³gica.
+
+Aplicar sÃ³ a condiÃ§Ã£o **composta** (2+ operadores lÃ³gicos `&&`/`||`, ou acesso encadeado tipo `a.b.c`). CondiÃ§Ã£o simples jÃ¡ nomeada (ex: `if (isActive)`) nÃ£o precisa de extraÃ§Ã£o â€” seria ruÃ­do.
+
+### Evitar chamada de funÃ§Ã£o dentro de outra chamada de funÃ§Ã£o
+Vale para **qualquer linguagem** â€” os exemplos estÃ£o em TS sÃ³ por conveniÃªncia; adaptar a sintaxe de declaraÃ§Ã£o conforme a linguagem (`const`/`let` em TS/JS, atribuiÃ§Ã£o simples em Python/Ruby, `var`/tipo explÃ­cito em Go/Java/C#, `let` em Rust, etc.).
+
+NÃ£o passar o retorno de uma chamada direto como argumento de outra chamada. Extrair o resultado intermediÃ¡rio numa variÃ¡vel nomeada na linha anterior. Ao invÃ©s de:
+```ts
+const value = await this.redis.getString(this.key(guestId));
+```
+Preferir:
+```ts
+const key = this.key(guestId);
+const value = await this.redis.getString(key);
+```
+Vale igual dentro de `if`, `while`, `return` e afins â€” a chamada sai da condiÃ§Ã£o e vira variÃ¡vel nomeada antes:
+```ts
+// Evitar
+if (isExpired(parseDate(record.createdAt))) { ... }
+
+// Preferir
+const createdAt = parseDate(record.createdAt);
+const isRecordExpired = isExpired(createdAt);
+if (isRecordExpired) { ... }
+```
+O nome da variÃ¡vel deve dizer o que o valor **Ã©** (`key`, `createdAt`, `isRecordExpired`), nÃ£o repetir o nome da funÃ§Ã£o que o produziu.
+
+NÃ£o aplicar a:
+- Callback/lambda passado como argumento (`items.map(item => item.id)`, `arr.filter(isActive)`, `sorted(xs, key=len)`) â€” nÃ£o Ã© resultado de chamada aninhada.
+- Encadeamento fluente de mÃ©todos sobre o mesmo objeto (`items.filter(...).map(...)`, `stream().filter().collect()`), desde que curto e legÃ­vel.
+- ConstruÃ§Ã£o/wrapper trivial de 1 argumento onde a variÃ¡vel intermediÃ¡ria nÃ£o ganha nome Ãºtil (ex: `console.log(JSON.stringify(obj))`, `print(str(x))`, `new Error(formatMessage(e))`).
+- Idioma consagrado da linguagem onde o aninhamento Ã© a forma natural de escrever (ex: `len(list(x))` em Python, `String.valueOf(...)` em Java, macro/`?` em Rust) â€” consistÃªncia com a linguagem vence a regra.
+
+## RTK token-saver
+RTK is configured machine-wide as a global Bash PreToolUse hook (via a PowerShell wrapper at `C:\Users\luan2\.claude\rtk-hook-claude.ps1`). If RTK misbehaves (counter `rtk gain` not incrementing, commands not compressing, `rtk` not found, hook errors) â€” read `C:\Users\luan2\.claude\rtk-token-saver-setup.md` for the full setup, root causes, and fix before touching the config.
+
+
+## Fonte: C:\Users\luan2\.claude\rules\context7.md
+
+Use Context7 MCP to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service â€” even well-known ones like React, Next.js, Prisma, Express, Tailwind, Django, or Spring Boot. This includes API syntax, configuration, version migration, library-specific debugging, setup instructions, and CLI tool usage. Use even when you think you know the answer â€” your training data may not reflect recent changes. Prefer this over web search for library docs.
+
+Do not use for: refactoring, writing scripts from scratch, debugging business logic, code review, or general programming concepts.
+
+## Steps
+
+1. Always start with `resolve-library-id` using the library name and the user's question, unless the user provides an exact library ID in `/org/project` format
+2. Pick the best match (ID format: `/org/project`) by: exact name match, description relevance, code snippet count, source reputation (High/Medium preferred), and benchmark score (higher is better). If results don't look right, try alternate names or queries (e.g., "next.js" not "nextjs", or rephrase the question). Use version-specific IDs when the user mentions a version
+3. `query-docs` with the selected library ID and the user's full question (not single words), scoped to a single concept. If the question spans multiple distinct concepts (e.g. routing and auth and caching), make a separate `query-docs` call per concept with the same library ID, unless the question is about how the concepts interact â€” combined queries dilute ranking and return shallow results for each topic
+4. Answer using the fetched docs

@@ -1,0 +1,31 @@
+version: 1
+format: md
+lang: pt-BR
+chunk_size: micro
+context_watch: suggest
+flowchart: on
+context: true
+implementer: subagent
+scribe: subagent
+tasks_format: md
+tasks_autocontinue: on
+parallel: off
+chunk_order: inside-out
+tests: off
+code_review: on
+data_model: on
+auto_commit: suggest-only
+flow_storage: mcp
+mcp: on
+tasks_storage: mcp
+state_storage: mcp
+created: 2026-09-14
+
+mcp_record:
+  symbols: true
+  diff: true
+  context: true
+  explain: true
+  scenarios: true
+  code_review: true
+  data_model: true

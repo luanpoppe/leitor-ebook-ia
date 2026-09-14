@@ -1,0 +1,19 @@
+id: bootstrap-mvp
+title: Fundação do monorepo e infraestrutura local
+created: 2026-09-14
+format: md
+lang: pt-BR
+chunk_size: micro
+features:
+  - slug: scaffold-monorepo
+    title: Scaffold do monorepo
+    summary: Bootstrap pnpm com backend NestJS e frontend Next.js a partir dos templates
+  - slug: infra-local
+    title: Infraestrutura local
+    summary: Docker Compose com PostgreSQL/pgvector, Redis e MinIO
+  - slug: backend-core
+    title: Backend base
+    summary: Módulos NestJS base com Prisma, BullMQ e integração @luanpoppe/ai
+  - slug: frontend-core
+    title: Frontend base
+    summary: Shell Next.js com layout, TanStack Query e cliente API

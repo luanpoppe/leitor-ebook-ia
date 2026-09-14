@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sdd": {
+      "command": "node",
+      "args": ["C:/Users/luan2/.sdd/mcp/server.js"]
+    }
+  }
+}
