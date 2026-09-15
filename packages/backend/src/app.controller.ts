@@ -1,0 +1,15 @@
+import { Controller, Get, Redirect } from '@nestjs/common';
+
+@Controller()
+export class AppController {
+  @Get()
+  @Redirect('/api', 302)
+  redirectRoot(): void {
+    return;
+  }
+
+  @Get('health')
+  health() {
+    return { status: 'ok' };
+  }
+}

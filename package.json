@@ -1,0 +1,8 @@
+{
+  "name": "leitor-ebook-ia",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @leitor-ebook-ia/backend --filter @leitor-ebook-ia/frontend --parallel run dev"
+  }
+}
