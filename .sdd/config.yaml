@@ -14,7 +14,7 @@ chunk_order: inside-out
 tests: off
 code_review: on
 data_model: on
-auto_commit: suggest-only
+auto_commit: full
 flow_storage: mcp
 mcp: on
 tasks_storage: mcp
