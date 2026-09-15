@@ -5,3 +5,4 @@
 ## Áreas / funcionalidades
 
 - [scaffold-monorepo](./scaffold-monorepo.md) — monorepo pnpm, backend NestJS, frontend Next.js
+- [infra-local](./infra-local.md) — Docker Compose (Postgres pgvector, Redis, MinIO), `.env` e scripts `pnpm docker:up`/`down`
