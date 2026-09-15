@@ -8,7 +8,7 @@ Primeira mudança do leitor de ebooks com IA. O objetivo é ter um monorepo pnpm
 
 ## Decisões macro
 
-- **Monorepo pnpm**: estrutura a partir do template em `luan-templates/pnpm`, com backend NestJS (`sync-backend-from-nestjs`) e frontend Next.js Tailwind (`sync-frontend-from-nextjs-ts-tailwind`). **Por quê**: reutilizar scripts de sync existentes. **Alternativa descartada**: criar monorepo do zero.
+- **Monorepo pnpm**: estrutura a partir do template em `luan-templates/pnpm`, com backend NestJS e frontend Next.js Tailwind populados via **sync one-shot local** (scripts do template executados uma vez e removidos — não versionados). **Por quê**: reutilizar scaffold existente sem manter tooling de sync no repo. **Alternativa descartada**: criar monorepo do zero.
 - **ORM Prisma**: acesso a dados no backend NestJS. **Por quê**: DX e migrações simples.
 - **Sem autenticação nesta mudança**: modo usuário único/dev. **Por quê**: reduz escopo da fundação; auth entra numa mudança futura.
 - **IA via `@luanpoppe/ai` + OpenRouter**: biblioteca npm do usuário como camada de provedor. **Por quê**: reutilizar abstração existente; nesta mudança só prepara integração (config/módulo), sem chat RAG.

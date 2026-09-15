@@ -4,7 +4,7 @@
 
 ## Resumo
 
-Bootstrap do monorepo pnpm do projeto `leitor-ebook-ia`, copiando a estrutura raiz do template pnpm e populando `packages/backend` (NestJS) e `packages/frontend` (Next.js + Tailwind) via scripts de sync existentes.
+Bootstrap do monorepo pnpm do projeto `leitor-ebook-ia`, com `packages/backend` (NestJS) e `packages/frontend` (Next.js + Tailwind) populados via sync one-shot local dos templates `luan-templates` — scripts de sync **não são versionados** no repositório.
 
 ## Requirements
 
@@ -18,25 +18,27 @@ Bootstrap do monorepo pnpm do projeto `leitor-ebook-ia`, copiando a estrutura ra
 
 ### REQ-2: Estrutura raiz do monorepo
 
-- **Entrada** template raiz em `luan-templates/pnpm` (`package.json`, `pnpm-workspace.yaml`, `tsconfig.json`, pasta `scripts/`)
+- **Entrada** template raiz em `luan-templates/pnpm` (`package.json`, `pnpm-workspace.yaml`)
 - **Saída** raiz do projeto com os mesmos arquivos adaptados ao nome `leitor-ebook-ia`
 - **E** `pnpm-workspace.yaml` declara `packages/*`
+- **E** script `dev` sobe backend e frontend em paralelo via filtros `@leitor-ebook-ia/backend` e `@leitor-ebook-ia/frontend`
 
 ### REQ-3: Pacotes sincronizados dos templates
 
-- **Entrada** execução dos scripts `sync-backend-from-nestjs.ts` e `sync-frontend-from-nextjs-ts-tailwind.ts` via `tsx`
-- **Saída** `packages/backend` populado a partir de `luan-templates/nestjs`
-- **E** `packages/frontend` populado a partir de `luan-templates/frontend/nextjs-ts-tailwind`
+- **Entrada** sync one-shot local a partir de `luan-templates/nestjs` e `luan-templates/frontend/nextjs-ts-tailwind`
+- **Saída** `packages/backend` populado com scaffold NestJS
+- **E** `packages/frontend` populado com scaffold Next.js + Tailwind
 - **E** campo `name` de cada `package.json` ajustado para `@leitor-ebook-ia/backend` e `@leitor-ebook-ia/frontend`
 
-### REQ-4: Scripts de sync com caminhos fixos
+### REQ-4: Sync one-shot sem scripts versionados
 
-- **Entrada** scripts `sync-backend-from-nestjs.ts` e `sync-frontend-from-nextjs-ts-tailwind.ts` com caminhos absolutos para `C:\_pastas-disco-c\repositorios-c\pessoal\luan-templates\...`
-- **Saída** templates copiados para `packages/backend` e `packages/frontend` via `tsx`
-- **Erro** diretório fonte inexistente → script encerra com código 1 e mensagem indicando o caminho esperado
+- **Entrada** scripts de sync do template `luan-templates/pnpm` executados localmente com caminhos absolutos fixos para `C:\_pastas-disco-c\repositorios-c\pessoal\luan-templates\...`
+- **Saída** templates copiados para `packages/backend` e `packages/frontend`
+- **E** pasta `scripts/` removida após a execução — não entra em nenhum commit do repositório
 
 ## Edge cases
 
 - `node_modules` e `dist` dos templates fonte não são copiados (skip dirs dos scripts de sync)
 - Backend NestJS escuta na porta `3026`  ||  frontend Next.js na porta `3027` (conforme `Portas Usadas no PC.txt`)
+- Backend expõe `GET /health` com `{ status: "ok" }`  ||  stub `POST /users` do template removido
 - Páginas de auth do template frontend (`signup`, `profile`) permanecem no scaffold  ||  remoção fica para `frontend-core`
