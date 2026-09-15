@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @leitor-ebook-ia/backend --filter @leitor-ebook-ia/frontend --parallel run dev"
+    "dev": "pnpm --filter @leitor-ebook-ia/backend --filter @leitor-ebook-ia/frontend --parallel run dev",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
   }
 }
