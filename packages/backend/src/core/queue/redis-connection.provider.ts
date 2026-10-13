@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { Redis, type RedisOptions } from 'ioredis';
 import { EnvService } from '../env.service';
 
@@ -46,3 +46,26 @@ export const redisConnectionProvider = {
     return connection;
   },
 };
+
+/**
+ * Fecha a conexão Redis compartilhada no shutdown da aplicação.
+ * `null` (REDIS_URL ausente) não tem o que fechar.
+ */
+@Injectable()
+export class RedisConnectionLifecycle implements OnModuleDestroy {
+  constructor(
+    @Inject(REDIS_CONNECTION)
+    private readonly connection: RedisConnection,
+  ) {}
+
+  async onModuleDestroy(): Promise<void> {
+    if (!this.connection) return;
+
+    try {
+      await this.connection.quit();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`Falha ao fechar conexão Redis: ${message}`);
+    }
+  }
+}
