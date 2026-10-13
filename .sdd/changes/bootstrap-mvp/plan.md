@@ -19,7 +19,7 @@ Primeira mudança do leitor de ebooks com IA. O objetivo é ter um monorepo pnpm
 
 1. **scaffold-monorepo** — Bootstrap do monorepo pnpm com `packages/backend` (NestJS) e `packages/frontend` (Next.js).
 2. **infra-local** — Docker Compose para PostgreSQL/pgvector, Redis e MinIO com variáveis de ambiente documentadas.
-3. **backend-core** — Módulos base NestJS: config, health, Prisma, BullMQ e wiring inicial de `@luanpoppe/ai`.
+3. **backend-core** — Módulos base NestJS: config, health, Prisma, BullMQ, client MinIO e wiring inicial de `@luanpoppe/ai`.
 4. **frontend-core** — Shell Next.js com layout, TanStack Query e cliente HTTP para a API.
 
 ## Escopo
