@@ -7,9 +7,4 @@ export class AppController {
   redirectRoot(): void {
     return;
   }
-
-  @Get('health')
-  health() {
-    return { status: 'ok' };
-  }
 }
