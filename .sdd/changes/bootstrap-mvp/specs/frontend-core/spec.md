@@ -16,11 +16,11 @@ Shell do frontend Next.js: layout raiz (Tailwind + toaster) com o provider do Ta
 - **E** a home renderiza o shell
 - **E** o build (`next build`) passa sem erro
 
-### REQ-2: Cliente HTTP configurado pela URL da API
+### REQ-2: Env validada e cliente HTTP configurado
 
 - **Entrada** `NEXT_PUBLIC_API_URL=http://localhost:3026`
-- **Saída** instância axios com `baseURL` = essa URL, exportada para os módulos consumirem
-- **Erro** `NEXT_PUBLIC_API_URL` ausente → o cliente sobe sem `baseURL`  ||  nenhuma requisição é feita nesta feature
+- **Saída** `src/env.ts` valida a env com zod no load e exporta `env`  ||  `src/utils/http.ts` cria a instância axios com `baseURL` = essa URL
+- **Erro** `NEXT_PUBLIC_API_URL` ausente ou inválida → a validação lança no load (fail-fast)  ||  a app falha cedo em vez de subir sem `baseURL`
 
 ### REQ-3: Provider do TanStack Query no layout
 
@@ -42,7 +42,7 @@ Shell do frontend Next.js: layout raiz (Tailwind + toaster) com o provider do Ta
 
 ## Edge cases
 
-- `NEXT_PUBLIC_API_URL` ausente no build → o cliente fica sem `baseURL`; como a home não faz requisição, nada quebra em runtime  ||  vira erro só quando existir um consumidor.
+- `NEXT_PUBLIC_API_URL` ausente ou inválida → `src/env.ts` lança no load (fail-fast); a página/build falha cedo, em vez de subir com `baseURL` indefinida.
 - Porta `3027` já em uso → `pnpm dev` falha com erro explícito de bind.
 - Devtools do Query não entram no bundle de produção (montados só quando não for produção).
 
