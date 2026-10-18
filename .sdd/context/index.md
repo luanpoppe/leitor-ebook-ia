@@ -7,3 +7,4 @@
 - [scaffold-monorepo](./scaffold-monorepo.md) — monorepo pnpm, backend NestJS, frontend Next.js
 - [infra-local](./infra-local.md) — Docker Compose (Postgres pgvector, Redis, MinIO), `.env` e scripts `pnpm docker:up`/`down`
 - [backend-core](./backend-core.md) — módulos NestJS base: config tipada, Prisma 7, BullMQ/Redis, IA, MinIO e health/readiness.
+- [frontend-core](./frontend-core.md) — shell Next.js: layout + TanStack Query, cliente axios com env validada (zod), home placeholder
