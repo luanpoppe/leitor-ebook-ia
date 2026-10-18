@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { Providers } from "./providers";
+// Import por efeito colateral: garante que a validação da env rode no load do
+// layout (servidor), falhando o build cedo se NEXT_PUBLIC_API_URL faltar/for inválida.
+import "@/env";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
