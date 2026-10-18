@@ -1,0 +1,31 @@
+id: ingestao-ebooks
+title: Ingestão de ebooks
+created: 2026-10-18
+format: md
+lang: pt-BR
+chunk_size: micro
+features:
+  - slug: minio-local
+    title: MinIO local
+    summary: Destravar a imagem MinIO local e validar o bucket ebooks
+  - slug: catalogo-ebooks
+    title: Catálogo de ebooks
+    summary: Domínio e persistência de books, chapters e chunks (embedding vector) e ciclo de status
+  - slug: armazenamento-arquivos
+    title: Armazenamento de arquivos
+    summary: Operações de objeto no MinIO (subir, baixar, remover) no bucket ebooks
+  - slug: extracao-conteudo
+    title: Extração de conteúdo
+    summary: Parsers EPUB, PDF e TXT/Markdown para capítulos e texto normalizado
+  - slug: chunking-embeddings
+    title: Chunking e embeddings
+    summary: Divisão do texto em chunks e geração de embeddings no pgvector
+  - slug: pipeline-ingestao
+    title: Pipeline de ingestão
+    summary: Fila BullMQ e worker que orquestra armazenamento, extração, embeddings e status
+  - slug: api-ebooks
+    title: API de ebooks
+    summary: Endpoints de upload, status e listagem de ebooks
+  - slug: frontend-ebooks
+    title: Frontend de ebooks
+    summary: Tela de upload e acompanhamento de status da ingestão

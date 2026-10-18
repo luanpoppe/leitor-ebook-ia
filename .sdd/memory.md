@@ -19,3 +19,4 @@
 - Bucket MinIO `ebooks`: **entrypoint customizado no mesmo container** (`docker/minio/entrypoint.sh`), sem serviço init separado.
 - IA via **`@luanpoppe/ai`** com OpenRouter como provedor default.
 - Sem autenticação na fundação — modo usuário único/dev até mudança futura.
+- Ao instalar/atualizar a lib **`@luanpoppe/ai`**, usar sempre a **versão mais recente** (pedido do usuário, 2026-10-18).
