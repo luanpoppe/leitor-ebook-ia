@@ -32,13 +32,13 @@ services:
       start_period: 5s
 
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     restart: unless-stopped
     ports:
       - "${MINIO_API_PORT}:9000"
       - "${MINIO_CONSOLE_PORT}:9001"
     volumes:
-      - minio:/data
+      - minio:/bitnami/minio/data
       - ./docker/minio/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     environment:
@@ -47,6 +47,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_DATA_DIR: /bitnami/minio/data
     healthcheck:
       test:
         [
