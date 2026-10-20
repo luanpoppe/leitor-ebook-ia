@@ -7,3 +7,65 @@ generator client {
   output       = "../src/generated/prisma"
   moduleFormat = "cjs"
 }
+
+enum BookFormat {
+  EPUB @map("epub")
+  PDF  @map("pdf")
+  TXT  @map("txt")
+  MD   @map("md")
+
+  @@map("book_format")
+}
+
+enum BookStatus {
+  PENDING    @map("pending")
+  PROCESSING @map("processing")
+  READY      @map("ready")
+  FAILED     @map("failed")
+
+  @@map("book_status")
+}
+
+model Book {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  title        String
+  format       BookFormat
+  sizeBytes    Int        @map("size_bytes")
+  hash         String     @unique @db.VarChar(64)
+  storageKey   String     @map("storage_key")
+  status       BookStatus @default(PENDING)
+  errorMessage String?    @map("error_message")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  chapters Chapter[]
+
+  @@index([createdAt(sort: Desc), id(sort: Desc)], map: "books_created_at_idx")
+  @@map("books")
+}
+
+model Chapter {
+  id       String @id @default(uuid(7)) @db.Uuid
+  bookId   String @map("book_id") @db.Uuid
+  position Int
+  text     String
+
+  book   Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chunks Chunk[]
+
+  @@unique([bookId, position])
+  @@map("chapters")
+}
+
+model Chunk {
+  id        String                    @id @default(uuid(7)) @db.Uuid
+  chapterId String                    @map("chapter_id") @db.Uuid
+  position  Int
+  text      String
+  embedding Unsupported("vector(1536)")
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, position])
+  @@map("chunks")
+}
