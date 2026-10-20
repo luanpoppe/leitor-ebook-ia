@@ -98,5 +98,6 @@ Erro: nenhum heading/linha reconhecida → 1 capítulo com o texto todo.
 ## Contratos expostos
 
 - `Book` ganha `author` (nullable) e `cover_storage_key` (nullable) — migração nova; schema em `packages/backend/prisma/schema.prisma`.
-- `FileStorageService` ganha um `put` genérico (chave + `Content-Type`) para a capa — provisório até o chunk.
-- `ContentExtractor` e `ContentExtractionError` (novos; provisório até o chunk).
+- `FileStorageService.putObject` — `packages/backend/src/storage/file-storage.service.ts:FileStorageService.putObject`.
+- `ContentExtractor.extract` — `packages/backend/src/extraction/content-extractor.ts:ContentExtractor.extract`.
+- `ContentExtractionError` — `packages/backend/src/extraction/content.types.ts:ContentExtractionError`.
