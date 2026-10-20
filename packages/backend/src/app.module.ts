@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
 import { CoreModule } from './core/core.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { FileStorageModule } from './storage/file-storage.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { CatalogModule } from './catalog/catalog.module';
     }),
     CoreModule,
     CatalogModule,
+    FileStorageModule,
   ],
   controllers: [AppController],
 })
