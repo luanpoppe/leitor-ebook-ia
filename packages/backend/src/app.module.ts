@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { CoreModule } from './core/core.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { FileStorageModule } from './storage/file-storage.module';
+import { ContentExtractionModule } from './extraction/content-extraction.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { FileStorageModule } from './storage/file-storage.module';
     CoreModule,
     CatalogModule,
     FileStorageModule,
+    ContentExtractionModule,
   ],
   controllers: [AppController],
 })
