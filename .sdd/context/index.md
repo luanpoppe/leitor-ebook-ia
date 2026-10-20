@@ -12,3 +12,4 @@
 - [catalogo-ebooks](./catalogo-ebooks.md) — tabelas books/chapters/chunks (embedding pgvector), EbookRepository com dedupe por hash e reprocessamento transacional
 - [armazenamento-arquivos](./armazenamento-arquivos.md) — FileStorageService sobre o MinIO: chave `<hash>.<ext>`, streams, URL pré-assinada e remoção idempotente
 - [extracao-conteudo](./extracao-conteudo.md) — ContentExtractor por formato (EPUB/PDF/TXT/MD), parsers de capítulo, normalização de texto e capa em `covers/<hash>.<ext>`
+- [chunking-embeddings](./chunking-embeddings.md) — TextChunker, EmbeddingService e ContentIndexingService: trechos de ~1.000 chars, vetores de 1536 no pgvector e retomada só dos faltantes

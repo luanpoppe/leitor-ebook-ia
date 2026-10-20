@@ -13,7 +13,7 @@ O modelo de domínio e a persistência da ingestão: o registro do ebook com o c
 - `chapters`: posição 1-based e texto; FK em cascata para `books`; `UNIQUE(book_id, position)`.
 - `chunks`: posição, texto e `embedding vector(1536)` **nulável** (NULL = trecho persistido ainda sem vetor, desde o chunking); FK em cascata para `chapters`; `UNIQUE(chapter_id, position)`; índice HNSW com `vector_cosine_ops`.
 - `EbookRepository` (`src/catalog/ebook.repository.ts`): só o book — `create` (P2002 → `DuplicateEbookError` com o id existente), `findById`, `findByHash`, `list` (`createdAt desc, id desc`) e `updateStatus` (mensagem só em `failed`).
-- `EbookContentRepository` (`src/catalog/ebook-content.repository.ts`): o conteúdo — `replaceContent` transacional e a retomada dos embeddings (`findChunksWithoutEmbedding`, `countChunksWithoutEmbedding`, `updateChunkEmbeddings`). Tipos em `ebook-content.types.ts`.
+- `EbookContentRepository` (`src/catalog/ebook-content.repository.ts`): o conteúdo — `replaceContent` transacional e a retomada dos embeddings (`findChunksWithoutEmbedding`, `countChunksWithoutEmbedding`, `updateChunkEmbeddings`), mais `countChunks` (total de chunks do livro) — usado pela retomada para distinguir "tudo vetorizado" de "livro sem chunks". Tipos em `ebook-content.types.ts`.
 - `replaceContent`: trava a linha do book (`SELECT ... FOR UPDATE`), apaga os capítulos (cascade leva os chunks) e regrava; sem capítulos, sintetiza um na posição 1 com `fullText`; chunks entram por SQL bruto.
 - `updateChunkEmbeddings`: um `UPDATE ... FROM (VALUES ...)` por lote, com guarda `embedding IS NULL` — repetir a chamada não sobrescreve vetor já gravado.
 - `CatalogModule` provê e exporta o repositório; o `PrismaService` vem do `CoreModule` global.
