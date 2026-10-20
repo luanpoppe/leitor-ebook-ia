@@ -23,6 +23,8 @@ export interface ReplaceContentInput {
   fullText?: string;
   fullTextChunks?: ReplaceContentChunkInput[];
   title?: string;
+  author?: string | null;
+  coverStorageKey?: string | null;
   status?: BookStatus;
   errorMessage?: string | null;
 }

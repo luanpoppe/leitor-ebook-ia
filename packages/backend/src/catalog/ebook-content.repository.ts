@@ -73,6 +73,16 @@ export class EbookContentRepository {
     );
   }
 
+  /**
+   * Número de capítulos já gravados. Zero é o sinal de que a extração ainda
+   * não aconteceu; a retomada só indexa quando já existe conteúdo.
+   */
+  async countChapters(bookId: string): Promise<number> {
+    this.assertUuidOrNotFound(bookId);
+
+    return this.prisma.chapter.count({ where: { bookId } });
+  }
+
   private async updateBookMetadata(
     tx: Prisma.TransactionClient,
     bookId: string,
@@ -83,6 +93,14 @@ export class EbookContentRepository {
     const trimmedTitle = input.title?.trim();
     const hasTitle = Boolean(trimmedTitle);
     if (hasTitle) data.title = trimmedTitle;
+
+    if (input.author !== undefined) {
+      data.author = input.author?.trim() || null;
+    }
+
+    if (input.coverStorageKey !== undefined) {
+      data.coverStorageKey = input.coverStorageKey ?? null;
+    }
 
     if (input.status !== undefined) {
       data.status = input.status;
