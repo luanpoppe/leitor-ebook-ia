@@ -10,9 +10,23 @@ export const MINIO_CLIENT = Symbol('MINIO_CLIENT');
 
 export type MinioClient = Client | null;
 
+/**
+ * Bucket usado quando `MINIO_BUCKET` está ausente ou vazio. Compartilhado com
+ * o health check para que readiness e upload consultem o mesmo bucket.
+ */
+export const DEFAULT_MINIO_BUCKET = 'ebooks';
+
 const logger = new Logger('MinioClient');
 
 const DEFAULT_MINIO_PORT = 9000;
+
+/**
+ * Sem configurar, o SDK assume 64 MiB como limiar de multipart e bufferiza
+ * em memória (`readAsBuffer`) todo arquivo menor que isso. Com o mínimo
+ * aceito pelo S3 (5 MiB), arquivos acima desse tamanho já vão por
+ * multipart/stream.
+ */
+const MINIO_PART_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Desmonta a URL de `MINIO_ENDPOINT` (ex.: `http://localhost:9000`) nas
@@ -33,6 +47,7 @@ function buildClientOptions(
     useSSL,
     accessKey,
     secretKey,
+    partSize: MINIO_PART_SIZE_BYTES,
   };
 }
 

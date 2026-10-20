@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EnvService } from '../env.service';
 import { PrismaService } from '../prisma.service';
 import { REDIS_CONNECTION, type RedisConnection } from '../queue/redis-connection.provider';
-import { MINIO_CLIENT, type MinioClient } from '../storage/storage.provider';
+import { MINIO_CLIENT, DEFAULT_MINIO_BUCKET, type MinioClient } from '../storage/storage.provider';
 
 /**
  * Teto de tempo de cada sondagem. Configuração de comportamento (não é
@@ -127,13 +127,13 @@ export class HealthService {
     }
 
     const { MINIO_BUCKET } = this.env.getEnvs();
+    // String vazia cai no mesmo default do upload; sem isso o readiness
+    // validaria só a conectividade e diria "ok" mesmo sem o bucket existir.
+    const bucket = MINIO_BUCKET || DEFAULT_MINIO_BUCKET;
+    const bucketExists = await this.minio.bucketExists(bucket);
 
-    if (MINIO_BUCKET) {
-      await this.minio.bucketExists(MINIO_BUCKET);
-      return;
-    }
+    if (bucketExists) return;
 
-    // Sem bucket configurado, valida apenas a conectividade com o storage.
-    await this.minio.listBuckets();
+    throw new Error(`Bucket do storage não encontrado: ${bucket}`);
   }
 }

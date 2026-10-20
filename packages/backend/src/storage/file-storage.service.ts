@@ -3,6 +3,7 @@ import type { Client } from 'minio';
 import type { Readable } from 'node:stream';
 import { EnvService } from '../core/env.service';
 import {
+  DEFAULT_MINIO_BUCKET,
   MINIO_CLIENT,
   type MinioClient,
 } from '../core/storage/storage.provider';
@@ -19,8 +20,6 @@ export interface PutObjectInput {
   hash: string;
   format: BookFormat;
 }
-
-const DEFAULT_BUCKET = 'ebooks';
 
 const PRESIGNED_URL_EXPIRES_IN_SECONDS = 3600;
 
@@ -42,13 +41,24 @@ const FORMAT_CONTENT_TYPE: Record<BookFormat, string> = {
 
 interface SdkError {
   code?: string;
-  status?: number;
-  statusCode?: number;
+}
+
+interface StreamFailureGuard {
+  promise: Promise<never>;
+  dispose: () => void;
 }
 
 @Injectable()
 export class FileStorageService {
   private readonly logger = new Logger(FileStorageService.name);
+
+  /**
+   * Serializa gravações da mesma storageKey. O SDK do MinIO reaproveita o
+   * `uploadId` quando o mesmo objeto é enviado em paralelo e o segundo envio
+   * falha com `NoSuchUpload`. O mutex vale apenas dentro deste processo —
+   * múltiplas instâncias ainda podem disputar a mesma chave.
+   */
+  private readonly putLocks = new Map<string, Promise<unknown>>();
 
   constructor(
     @Inject(MINIO_CLIENT) private readonly client: MinioClient,
@@ -56,18 +66,16 @@ export class FileStorageService {
   ) {}
 
   async put(input: PutObjectInput): Promise<string> {
-    this.assertValidHash(input.hash);
+    const hash = input.hash.trim().toLowerCase();
+    this.assertValidHash(hash);
+    this.assertValidSize(input.size);
     const client = this.requireClient();
 
-    const storageKey = this.buildStorageKey(input.hash, input.format);
-    const contentType = this.contentTypeFor(input.format);
+    const storageKey = this.buildStorageKey(hash, input.format);
 
-    await client.putObject(this.bucket, storageKey, input.stream, input.size, {
-      'Content-Type': contentType,
-    });
-
-    this.logger.log(`Objeto gravado no storage: ${storageKey}`);
-    return storageKey;
+    return this.withPutLock(storageKey, () =>
+      this.writeObject(client, storageKey, input),
+    );
   }
 
   async get(storageKey: string): Promise<Readable> {
@@ -107,13 +115,114 @@ export class FileStorageService {
     try {
       await client.removeObject(this.bucket, storageKey);
     } catch (error) {
-      // Alguns backends S3 respondem 404 para remoção de chave inexistente;
-      // a operação continua idempotente nesse caso.
+      // Remover chave inexistente é idempotente. Erros de bucket (ex.:
+      // NoSuchBucket) precisam propagar: mascarar como "não encontrado"
+      // esconderia um storage mal configurado.
       if (this.isNotFoundError(error)) return;
       this.rethrowWithLog(error, storageKey);
     }
 
     this.logger.log(`Objeto removido do storage: ${storageKey}`);
+  }
+
+  private async writeObject(
+    client: Client,
+    storageKey: string,
+    input: PutObjectInput,
+  ): Promise<string> {
+    const contentType = this.contentTypeFor(input.format);
+    const metadata = { 'Content-Type': contentType };
+
+    try {
+      await this.runUpload(
+        client,
+        storageKey,
+        input.stream,
+        input.size,
+        metadata,
+      );
+    } catch (error) {
+      this.logWriteFailure(error, storageKey);
+      throw error;
+    }
+
+    this.logger.log(`Objeto gravado no storage: ${storageKey}`);
+    return storageKey;
+  }
+
+  /**
+   * Executa o upload corrida contra uma promise que rejeita quando o stream
+   * de entrada falha. Sem isso, o `putObject` do SDK fica pendente (ou deixa
+   * o erro do stream subir sem handler) em arquivos grandes o suficiente
+   * para ir por multipart.
+   */
+  private async runUpload(
+    client: Client,
+    storageKey: string,
+    stream: Readable,
+    size: number,
+    metadata: Record<string, string>,
+  ): Promise<void> {
+    const streamFailure = this.guardStreamFailure(stream);
+
+    try {
+      const upload = client.putObject(
+        this.bucket,
+        storageKey,
+        stream,
+        size,
+        metadata,
+      );
+
+      await Promise.race([upload, streamFailure.promise]);
+    } finally {
+      streamFailure.dispose();
+    }
+  }
+
+  private guardStreamFailure(stream: Readable): StreamFailureGuard {
+    let rejectFailure: (error: Error) => void = () => undefined;
+
+    const promise = new Promise<never>((_, reject) => {
+      rejectFailure = reject;
+    });
+
+    const failUpload = (reason: string): void => {
+      rejectFailure(
+        new StorageUnavailableError(
+          `Falha no stream de upload: ${reason}.`,
+        ),
+      );
+    };
+
+    const onError = (error: Error): void => failUpload(error.message);
+    const onAborted = (): void => failUpload('stream abortado');
+
+    stream.on('error', onError);
+    stream.on('aborted', onAborted);
+
+    const dispose = (): void => {
+      stream.removeListener('error', onError);
+      stream.removeListener('aborted', onAborted);
+    };
+
+    return { promise, dispose };
+  }
+
+  private async withPutLock<T>(
+    storageKey: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.putLocks.get(storageKey) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(operation);
+    this.putLocks.set(storageKey, current);
+
+    try {
+      return await current;
+    } finally {
+      const isLatestOperation = this.putLocks.get(storageKey) === current;
+      if (isLatestOperation) this.putLocks.delete(storageKey);
+    }
   }
 
   private async assertObjectExists(
@@ -141,8 +250,7 @@ export class FileStorageService {
   }
 
   private rethrowWithLog(error: unknown, storageKey: string): never {
-    const normalizedError =
-      error instanceof Error ? error : new Error(String(error));
+    const normalizedError = this.toError(error);
 
     this.logger.error(
       `Falha ao acessar o objeto ${storageKey} no storage: ${normalizedError.message}`,
@@ -152,16 +260,29 @@ export class FileStorageService {
     throw normalizedError;
   }
 
+  private logWriteFailure(error: unknown, storageKey: string): void {
+    const normalizedError = this.toError(error);
+
+    this.logger.error(
+      `Falha ao gravar o objeto ${storageKey}: ${normalizedError.message}`,
+      normalizedError.stack,
+    );
+  }
+
+  private toError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  /**
+   * Apenas códigos de "objeto ausente" contam como não encontrado. Um 404
+   * genérico (ou `NoSuchBucket`) deve propagar para não virar 404 de livro
+   * nem sucesso silencioso no `remove`.
+   */
   private isNotFoundError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
 
     const sdkError = error as SdkError;
-    const isKnownCode =
-      sdkError.code === 'NoSuchKey' || sdkError.code === 'NotFound';
-    const isHttpNotFound =
-      sdkError.statusCode === 404 || sdkError.status === 404;
-
-    return isKnownCode || isHttpNotFound;
+    return sdkError.code === 'NoSuchKey' || sdkError.code === 'NotFound';
   }
 
   private assertValidHash(hash: string): void {
@@ -169,6 +290,17 @@ export class FileStorageService {
 
     throw new InvalidStorageInputError(
       `Hash inválido para o storage: "${hash}". Esperado SHA-256 em hexadecimal (64 caracteres).`,
+    );
+  }
+
+  private assertValidSize(size: number): void {
+    // O SDK do MinIO entra em loop síncrono em `calculatePartSize` quando o
+    // tamanho não é finito, congelando o event loop antes de qualquer I/O.
+    const isValidSize = Number.isFinite(size) && size > 0;
+    if (isValidSize) return;
+
+    throw new InvalidStorageInputError(
+      `Tamanho inválido para o storage: ${size}. Esperado um número finito e maior que zero.`,
     );
   }
 
@@ -200,6 +332,6 @@ export class FileStorageService {
   }
 
   private get bucket(): string {
-    return this.env.getEnvs().MINIO_BUCKET ?? DEFAULT_BUCKET;
+    return this.env.getEnvs().MINIO_BUCKET || DEFAULT_MINIO_BUCKET;
   }
 }
