@@ -4,6 +4,7 @@ import {
   type PDFDocumentProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { ContentExtractionError } from '../content.types';
+import { StreamUtils } from '../stream-utils';
 import type { PdfOutlineEntry } from './pdf-outline';
 
 /**
@@ -19,6 +20,9 @@ const LOAD_OPTIONS = {
 
 const CORRUPTED_FILE_MESSAGE =
   'Não foi possível abrir o arquivo PDF. O arquivo pode estar corrompido.';
+const PASSWORD_PROTECTED_MESSAGE = 'PDF protegido por senha.';
+const MAX_PDF_BYTES = 128 * 1024 * 1024;
+const PDF_SIZE_MESSAGE = 'PDF maior que o limite suportado.';
 
 interface PdfInfo {
   Title?: unknown;
@@ -49,14 +53,22 @@ export class PdfDocument {
   private constructor(private readonly document: PDFDocumentProxy) {}
 
   static async open(stream: Readable): Promise<PdfDocument> {
-    const buffer = await PdfDocument.readStreamToBuffer(stream);
+    const buffer = await StreamUtils.readToBuffer(
+      stream,
+      MAX_PDF_BYTES,
+      PDF_SIZE_MESSAGE,
+    );
     const data = new Uint8Array(buffer);
 
     try {
       const loadingTask = getDocument({ data, ...LOAD_OPTIONS });
       const document = await loadingTask.promise;
       return new PdfDocument(document);
-    } catch {
+    } catch (error) {
+      if (PdfDocument.isPasswordError(error)) {
+        throw new ContentExtractionError(PASSWORD_PROTECTED_MESSAGE);
+      }
+
       throw new ContentExtractionError(CORRUPTED_FILE_MESSAGE);
     }
   }
@@ -180,17 +192,7 @@ export class PdfDocument {
     return trimmedValue.length > 0 ? trimmedValue : undefined;
   }
 
-  private static async readStreamToBuffer(stream: Readable): Promise<Buffer> {
-    const chunks: Buffer[] = [];
-
-    for await (const chunk of stream) {
-      const chunkValue: unknown = chunk;
-      const chunkBuffer = Buffer.isBuffer(chunkValue)
-        ? chunkValue
-        : Buffer.from(chunkValue as Uint8Array);
-      chunks.push(chunkBuffer);
-    }
-
-    return Buffer.concat(chunks);
+  private static isPasswordError(error: unknown): boolean {
+    return error instanceof Error && error.name === 'PasswordException';
   }
 }

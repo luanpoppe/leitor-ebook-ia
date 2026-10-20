@@ -5,6 +5,7 @@ import {
   type ExtractedChapter,
   type ExtractionResult,
 } from './content.types';
+import { StreamUtils } from './stream-utils';
 import { TextNormalizer } from './text-normalizer';
 
 const MARKDOWN_HEADING = /^#{1,6}\s+\S/;
@@ -12,7 +13,10 @@ const CHAPTER_TITLE =
   /^(?:cap[ií]tulo|cap\.?|chapter|ch\.?)\s+(?:\d+|[ivxlcdm]+)\b/i;
 const LEADING_DECORATION = /^[\s#*_]+/;
 const TRAILING_DECORATION = /[\s#*_]+$/;
+const FENCE_DELIMITER = /^(?:```|~~~)/;
 const NO_TEXT_MESSAGE = 'O arquivo não contém texto extraível.';
+const MAX_TXT_BYTES = 64 * 1024 * 1024;
+const TXT_SIZE_MESSAGE = 'Arquivo de texto maior que o limite suportado.';
 
 /**
  * Extrai o conteúdo de TXT/Markdown puro. Não há sumário nem metadados no
@@ -22,8 +26,12 @@ const NO_TEXT_MESSAGE = 'O arquivo não contém texto extraível.';
 @Injectable()
 export class TxtParser {
   async parse(stream: Readable): Promise<ExtractionResult> {
-    const buffer = await TxtParser.readStreamToBuffer(stream);
-    const rawText = TxtParser.decodeUtf8(buffer);
+    const buffer = await StreamUtils.readToBuffer(
+      stream,
+      MAX_TXT_BYTES,
+      TXT_SIZE_MESSAGE,
+    );
+    const rawText = TxtParser.decodeText(buffer);
     const chapterTexts = this.splitIntoChapterTexts(rawText);
 
     const rawChapters = this.toChapters(chapterTexts);
@@ -43,16 +51,26 @@ export class TxtParser {
   /**
    * O texto do marcador não entra no capítulo: ele só delimita onde o capítulo
    * começa. O que vem antes do primeiro marcador é sumário/front matter e é
-   * descartado.
+   * descartado. Linhas dentro de bloco cercado (```/~~~) são código, não título.
    */
   private splitIntoChapterTexts(rawText: string): string[] {
     const lines = rawText.split('\n');
     const chapterTexts: string[] = [];
     let currentChapterLines: string[] = [];
     let foundMarker = false;
+    let insideFence = false;
 
     for (const line of lines) {
-      const isMarker = TxtParser.isChapterMarker(line);
+      const trimmedLine = line.trim();
+      const isFenceDelimiter = FENCE_DELIMITER.test(trimmedLine);
+
+      if (isFenceDelimiter) {
+        insideFence = !insideFence;
+        if (foundMarker) currentChapterLines.push(line);
+        continue;
+      }
+
+      const isMarker = !insideFence && TxtParser.isChapterMarker(line);
 
       if (!isMarker) {
         if (foundMarker) currentChapterLines.push(line);
@@ -106,21 +124,33 @@ export class TxtParser {
     return chapters.map((chapter) => chapter.text).join('\n\n');
   }
 
-  private static decodeUtf8(buffer: Buffer): string {
-    return buffer.toString('utf8').replace(/^\uFEFF/, '');
+  private static decodeText(buffer: Buffer): string {
+    const text = TxtParser.decodeBuffer(buffer);
+
+    return text.replace(/^\uFEFF/, '');
   }
 
-  private static async readStreamToBuffer(stream: Readable): Promise<Buffer> {
-    const chunks: Buffer[] = [];
+  /**
+   * UTF-16 é reconhecido pelo BOM; sem BOM, tenta UTF-8 e cai para latin1
+   * quando aparecem caracteres de substituição (comum em acervo antigo).
+   */
+  private static decodeBuffer(buffer: Buffer): string {
+    const isLittleEndianBom = buffer[0] === 0xff && buffer[1] === 0xfe;
+    if (isLittleEndianBom) return buffer.toString('utf16le');
 
-    for await (const chunk of stream) {
-      const chunkValue: unknown = chunk;
-      const chunkBuffer = Buffer.isBuffer(chunkValue)
-        ? chunkValue
-        : Buffer.from(chunkValue as Uint8Array);
-      chunks.push(chunkBuffer);
-    }
+    const isBigEndianBom = buffer[0] === 0xfe && buffer[1] === 0xff;
+    if (isBigEndianBom) return TxtParser.decodeBigEndianUtf16(buffer);
 
-    return Buffer.concat(chunks);
+    const utf8Text = buffer.toString('utf8');
+    const hasReplacementChar = utf8Text.includes('\uFFFD');
+    return hasReplacementChar ? buffer.toString('latin1') : utf8Text;
+  }
+
+  private static decodeBigEndianUtf16(buffer: Buffer): string {
+    const evenLength = buffer.length - (buffer.length % 2);
+    const swapped = Buffer.from(buffer.subarray(0, evenLength));
+    swapped.swap16();
+
+    return swapped.toString('utf16le');
   }
 }

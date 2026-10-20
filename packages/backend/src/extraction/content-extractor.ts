@@ -11,7 +11,12 @@ import {
 } from './content.types';
 import { EpubParser } from './epub-parser';
 import { PdfParser } from './pdf-parser';
+import { StreamUtils } from './stream-utils';
 import { TxtParser } from './txt-parser';
+
+const MAX_COVER_BYTES = 5 * 1024 * 1024;
+const COVER_SIZE_MESSAGE =
+  'A capa do livro excede o limite de tamanho suportado.';
 
 export interface ExtractedContent {
   chapters: ExtractedChapter[];
@@ -97,7 +102,11 @@ export class ContentExtractor {
   ): Promise<string | undefined> {
     if (!cover) return undefined;
 
-    const coverBuffer = await ContentExtractor.readStreamToBuffer(cover.stream);
+    const coverBuffer = await StreamUtils.readToBuffer(
+      cover.stream,
+      MAX_COVER_BYTES,
+      COVER_SIZE_MESSAGE,
+    );
     const storageKey = `covers/${cover.hash}.${cover.extension}`;
     const coverStream = Readable.from(coverBuffer);
 
@@ -111,19 +120,5 @@ export class ContentExtractor {
       stream: coverStream,
       size: coverBuffer.length,
     });
-  }
-
-  private static async readStreamToBuffer(stream: Readable): Promise<Buffer> {
-    const chunks: Buffer[] = [];
-
-    for await (const chunk of stream) {
-      const chunkValue: unknown = chunk;
-      const chunkBuffer = Buffer.isBuffer(chunkValue)
-        ? chunkValue
-        : Buffer.from(chunkValue as Uint8Array);
-      chunks.push(chunkBuffer);
-    }
-
-    return Buffer.concat(chunks);
   }
 }

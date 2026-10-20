@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Readable } from 'node:stream';
 import {
   ContentExtractionError,
@@ -28,6 +28,8 @@ const XHTML_MEDIA_TYPES = new Set(['application/xhtml+xml', 'text/html']);
  */
 @Injectable()
 export class EpubParser {
+  private readonly logger = new Logger(EpubParser.name);
+
   async parse(stream: Readable): Promise<ExtractionResult> {
     try {
       return await this.extract(stream);
@@ -129,15 +131,30 @@ export class EpubParser {
       chapterPaths,
       tableOfContents.orderedPaths,
     );
+    const texts: string[] = [];
 
-    return orderedPaths
-      .map((path) => archive.readText(path))
-      .filter(
-        (html) =>
-          !EpubTableOfContentsReader.isTableOfContentsDocument(html),
-      )
-      .map((html) => HtmlToText.convert(html))
-      .filter((text) => text.length > 0);
+    for (const path of orderedPaths) {
+      const html = archive.tryReadText(path);
+
+      if (html === undefined) {
+        this.logger.warn(`Documento do EPUB não encontrado, ignorando: ${path}`);
+        continue;
+      }
+
+      const isNavigationDocument =
+        EpubTableOfContentsReader.isTableOfContentsDocument(html);
+      const isVisibleContents =
+        EpubTableOfContentsReader.isLinkHeavyContentsDocument(html, paths, path);
+
+      if (isNavigationDocument || isVisibleContents) continue;
+
+      const text = HtmlToText.convert(html);
+      if (text.length === 0) continue;
+
+      texts.push(text);
+    }
+
+    return texts;
   }
 
   private joinChapters(chapters: ExtractedChapter[]): string {

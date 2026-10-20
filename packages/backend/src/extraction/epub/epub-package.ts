@@ -17,6 +17,7 @@ export interface EpubPackageDocument {
   title?: string;
   author?: string;
   coverId?: string;
+  guideCoverHref?: string;
   tocId?: string;
   manifestById: Map<string, EpubManifestItem>;
   manifestItems: EpubManifestItem[];
@@ -46,6 +47,7 @@ export class EpubPackageReader {
       title: EpubXml.readText(EpubXml.toArray(metadata.title)[0]),
       author: EpubXml.readText(EpubXml.toArray(metadata.creator)[0]),
       coverId: EpubPackageReader.readCoverId(metadata),
+      guideCoverHref: EpubPackageReader.readGuideCoverHref(packageData),
       tocId: EpubXml.readAttribute(spine, '@_toc'),
       manifestById: new Map(manifestItems.map((item) => [item.id, item])),
       manifestItems,
@@ -109,6 +111,23 @@ export class EpubPackageReader {
       if (!isCover) continue;
 
       return EpubXml.readAttribute(record, '@_content');
+    }
+
+    return undefined;
+  }
+
+  private static readGuideCoverHref(
+    packageData: Record<string, unknown>,
+  ): string | undefined {
+    const guide = EpubXml.toRecord(packageData.guide);
+
+    for (const reference of EpubXml.toArray(guide.reference)) {
+      const record = EpubXml.toRecord(reference);
+      const isCover = EpubXml.readAttribute(record, '@_type') === 'cover';
+
+      if (!isCover) continue;
+
+      return EpubXml.readAttribute(record, '@_href');
     }
 
     return undefined;
