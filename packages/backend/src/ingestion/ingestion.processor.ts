@@ -18,12 +18,16 @@ import { IngestionService } from './ingestion.service';
 
 type IngestionJobData = { bookId: string };
 
+const FAILURE_FALLBACK_MESSAGE = 'Falha na ingestão do ebook.';
+
 /**
  * Consome a fila `ebook-ingestion`. Cada job carrega só o id do livro; toda a
  * decisão de estágio fica no `IngestionService`.
  *
- * Contagem de tentativas é do BullMQ: a falha sempre é relançada para ele
- * contar, exceto livro inexistente, que é erro definitivo (sem retry).
+ * Contagem de tentativas é do BullMQ: o processor só relança e o evento
+ * `failed` decide o `failed` do livro quando as tentativas se esgotam. Isso
+ * cobre também falhas decididas fora do processor (stall, deferred), que nunca
+ * passam por `processJob`.
  */
 @Injectable()
 export class IngestionProcessor implements OnModuleInit, OnModuleDestroy {
@@ -65,16 +69,15 @@ export class IngestionProcessor implements OnModuleInit, OnModuleDestroy {
       await this.ingestionService.process(bookId);
     } catch (error) {
       const isBookMissing = error instanceof EbookNotFoundError;
-      if (isBookMissing) {
-        this.logger.error(
-          `Job descartado sem retry: bookId=${bookId}, motivo=${this.toMessage(error)}`,
-        );
-        throw new UnrecoverableError(this.toMessage(error));
-      }
+      if (!isBookMissing) throw error;
 
-      await this.markFailedIfExhausted(job, bookId, error);
-      // Relança sempre: o BullMQ precisa contar a tentativa e agendar o backoff.
-      throw error;
+      const message = this.toMessage(error);
+      await this.markFailed(bookId, message);
+      this.logger.error(
+        `Job descartado sem retry: bookId=${bookId}, motivo=${message}`,
+      );
+
+      throw new UnrecoverableError(message);
     }
   }
 
@@ -90,22 +93,21 @@ export class IngestionProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async markFailedIfExhausted(
-    job: Job<IngestionJobData>,
-    bookId: string,
-    error: unknown,
-  ): Promise<void> {
-    const attemptNumber = job.attemptsMade + 1;
-    const maxAttempts = job.opts.attempts ?? 1;
-    const isLastAttempt = attemptNumber >= maxAttempts;
-    if (!isLastAttempt) return;
-
-    const message = this.toMessage(error);
-    await this.ebookRepository.updateStatus(bookId, BookStatus.FAILED, message);
-
-    this.logger.error(
-      `Ingestão falhou após ${maxAttempts} tentativas: bookId=${bookId}, motivo=${message}`,
-    );
+  private async markFailed(bookId: string, reason: string): Promise<void> {
+    try {
+      await this.ebookRepository.updateStatus(
+        bookId,
+        BookStatus.FAILED,
+        reason,
+      );
+      this.logger.error(
+        `Ingestão marcada como failed: bookId=${bookId}, motivo=${reason}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Falha ao marcar livro como failed: bookId=${bookId}, motivo=${this.toMessage(error)}`,
+      );
+    }
   }
 
   private registerWorkerLogs(worker: Worker<IngestionJobData>): void {
@@ -116,12 +118,39 @@ export class IngestionProcessor implements OnModuleInit, OnModuleDestroy {
     });
 
     worker.on('failed', (job, error) => {
-      const bookId = job?.data.bookId ?? 'desconhecido';
-      const jobId = job?.id ?? 'desconhecido';
-      this.logger.warn(
-        `Ingestão falhou: bookId=${bookId} jobId=${jobId} motivo=${this.toMessage(error)}`,
-      );
+      void this.handleFailedJob(job, error);
     });
+  }
+
+  /**
+   * Decide o `failed` do livro no fim das tentativas. O evento recebe também
+   * falhas terminais do próprio BullMQ (stall, deferred), que não passam pelo
+   * `processJob`.
+   */
+  private async handleFailedJob(
+    job: Job<IngestionJobData> | undefined,
+    error: Error,
+  ): Promise<void> {
+    if (!job) {
+      this.logger.warn(
+        `Ingestão falhou sem job associado: motivo=${this.toMessage(error)}`,
+      );
+      return;
+    }
+
+    const bookId = job.data.bookId;
+    const attemptsMade = job.attemptsMade;
+    const maxAttempts = job.opts.attempts ?? 1;
+    const reason = job.failedReason ?? FAILURE_FALLBACK_MESSAGE;
+
+    this.logger.warn(
+      `Ingestão falhou: bookId=${bookId} jobId=${job.id ?? 'desconhecido'} tentativa=${attemptsMade}/${maxAttempts} motivo=${reason}`,
+    );
+
+    const hasExhaustedAttempts = attemptsMade >= maxAttempts;
+    if (!hasExhaustedAttempts) return;
+
+    await this.markFailed(bookId, reason);
   }
 
   private toMessage(error: unknown): string {

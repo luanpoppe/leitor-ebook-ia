@@ -100,6 +100,10 @@ export class IngestionService {
     // o parcial permanece para a próxima tentativa retomar.
     await this.contentRepository.replaceContent(bookId, replaceInput);
 
+    // O erro de origem (ex.: IA desativada por falta de chave) é mais útil para
+    // o usuário do que a contagem de trechos sem embedding.
+    if (prepared.error) throw prepared.error;
+
     const hasRemainingChunks = prepared.remaining > 0;
     if (hasRemainingChunks) throw new IncompleteIndexingError(prepared.remaining);
 
@@ -118,6 +122,8 @@ export class IngestionService {
     chapterCount: number,
   ): Promise<IngestionOutcome> {
     const outcome = await this.indexing.resumeMissing(bookId);
+
+    if (outcome.error) throw outcome.error;
 
     const hasNoChunks = outcome.total === 0;
     const hasRemainingChunks = outcome.remaining > 0;
