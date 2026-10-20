@@ -7,6 +7,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { FileStorageModule } from './storage/file-storage.module';
 import { ContentExtractionModule } from './extraction/content-extraction.module';
 import { IndexingModule } from './indexing/indexing.module';
+import { IngestionModule } from './ingestion/ingestion.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { IndexingModule } from './indexing/indexing.module';
     FileStorageModule,
     ContentExtractionModule,
     IndexingModule,
+    IngestionModule,
   ],
   controllers: [AppController],
 })
