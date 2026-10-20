@@ -10,3 +10,4 @@
 - [frontend-core](./frontend-core.md) — shell Next.js: layout + TanStack Query, cliente axios com env validada (zod), home placeholder
 - [minio-local](./minio-local.md) — object storage de dev: imagem bitnamilegacy/minio, entrypoint que cria o bucket `ebooks`
 - [catalogo-ebooks](./catalogo-ebooks.md) — tabelas books/chapters/chunks (embedding pgvector), EbookRepository com dedupe por hash e reprocessamento transacional
+- [armazenamento-arquivos](./armazenamento-arquivos.md) — FileStorageService sobre o MinIO: chave `<hash>.<ext>`, streams, URL pré-assinada e remoção idempotente
