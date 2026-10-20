@@ -64,7 +64,9 @@ model Chunk {
   chapterId String                    @map("chapter_id") @db.Uuid
   position  Int
   text      String
-  embedding Unsupported("vector(1536)")
+  // NULL = trecho persistido ainda não vetorizado. A escrita de chunks é SQL puro
+  // (pgvector via executeRaw), não migrar para o Prisma Client.
+  embedding Unsupported("vector(1536)")?
 
   chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
