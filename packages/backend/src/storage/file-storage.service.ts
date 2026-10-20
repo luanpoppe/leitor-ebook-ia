@@ -14,16 +14,30 @@ import {
   StorageUnavailableError,
 } from './storage.errors';
 
-export interface PutObjectInput {
+export interface PutBookInput {
   stream: Readable;
   size: number;
   hash: string;
   format: BookFormat;
 }
 
+export interface PutObjectInput {
+  storageKey: string;
+  contentType: string;
+  stream: Readable;
+  size: number;
+}
+
 const PRESIGNED_URL_EXPIRES_IN_SECONDS = 3600;
 
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
+
+/**
+ * Chave de objeto genérico no formato `<prefixo>/<arquivo>`, com caracteres
+ * seguros para o storage. `..` é barrado separadamente para impedir que a
+ * chave escape do prefixo lógico.
+ */
+const OBJECT_STORAGE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 const FORMAT_EXTENSION: Record<BookFormat, string> = {
   [BookFormat.EPUB]: 'epub',
@@ -65,17 +79,37 @@ export class FileStorageService {
     private readonly env: EnvService,
   ) {}
 
-  async put(input: PutObjectInput): Promise<string> {
+  async put(input: PutBookInput): Promise<string> {
     const hash = input.hash.trim().toLowerCase();
     this.assertValidHash(hash);
-    this.assertValidSize(input.size);
-    const client = this.requireClient();
 
     const storageKey = this.buildStorageKey(hash, input.format);
+    const contentType = this.contentTypeFor(input.format);
 
-    return this.withPutLock(storageKey, () =>
-      this.writeObject(client, storageKey, input),
-    );
+    return this.uploadWithGuards({
+      storageKey,
+      contentType,
+      stream: input.stream,
+      size: input.size,
+    });
+  }
+
+  /**
+   * Grava um objeto genérico (ex.: capa de ebook) numa storageKey explícita.
+   * Diferente de `put`, não valida hash nem formato de ebook.
+   */
+  async putObject(input: PutObjectInput): Promise<string> {
+    const storageKey = input.storageKey.trim();
+    const contentType = input.contentType.trim();
+    this.assertValidObjectStorageKey(storageKey);
+    this.assertValidContentType(contentType);
+
+    return this.uploadWithGuards({
+      storageKey,
+      contentType,
+      stream: input.stream,
+      size: input.size,
+    });
   }
 
   async get(storageKey: string): Promise<Readable> {
@@ -125,29 +159,40 @@ export class FileStorageService {
     this.logger.log(`Objeto removido do storage: ${storageKey}`);
   }
 
+  /**
+   * Caminho único de upload: valida tamanho, exige client configurado e
+   * serializa gravações da mesma chave antes de escrever no bucket.
+   */
+  private async uploadWithGuards(input: PutObjectInput): Promise<string> {
+    this.assertValidSize(input.size);
+    const client = this.requireClient();
+
+    return this.withPutLock(input.storageKey, () =>
+      this.writeObject(client, input),
+    );
+  }
+
   private async writeObject(
     client: Client,
-    storageKey: string,
     input: PutObjectInput,
   ): Promise<string> {
-    const contentType = this.contentTypeFor(input.format);
-    const metadata = { 'Content-Type': contentType };
+    const metadata = { 'Content-Type': input.contentType };
 
     try {
       await this.runUpload(
         client,
-        storageKey,
+        input.storageKey,
         input.stream,
         input.size,
         metadata,
       );
     } catch (error) {
-      this.logWriteFailure(error, storageKey);
+      this.logWriteFailure(error, input.storageKey);
       throw error;
     }
 
-    this.logger.log(`Objeto gravado no storage: ${storageKey}`);
-    return storageKey;
+    this.logger.log(`Objeto gravado no storage: ${input.storageKey}`);
+    return input.storageKey;
   }
 
   /**
@@ -309,6 +354,30 @@ export class FileStorageService {
 
     throw new InvalidStorageInputError(
       'A storageKey do objeto no armazenamento não pode ser vazia.',
+    );
+  }
+
+  private assertValidContentType(contentType: string): void {
+    if (contentType.length > 0) return;
+
+    throw new InvalidStorageInputError(
+      'O contentType do objeto no armazenamento não pode ser vazio.',
+    );
+  }
+
+  private assertValidObjectStorageKey(storageKey: string): void {
+    if (storageKey.length === 0) {
+      throw new InvalidStorageInputError(
+        'A storageKey do objeto no armazenamento não pode ser vazia.',
+      );
+    }
+
+    const hasTraversal = storageKey.includes('..');
+    const isSafeFormat = OBJECT_STORAGE_KEY_PATTERN.test(storageKey);
+    if (!hasTraversal && isSafeFormat) return;
+
+    throw new InvalidStorageInputError(
+      `storageKey inválida para o storage: "${storageKey}". Esperado o formato "<prefixo>/<arquivo>" com caracteres seguros e sem "..".`,
     );
   }
 
