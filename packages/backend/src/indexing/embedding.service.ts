@@ -1,0 +1,120 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { AIEmbeddings, type AIEmbeddingModelNames } from '@luanpoppe/ai';
+import { AI_CLIENT, type AiClient } from '../core/ai/ai.provider';
+import { EnvService } from '../core/env.service';
+import { EmbeddingUnavailableError } from './indexing.errors';
+
+/**
+ * Configuração de comportamento do modelo de embedding — hardcoded de
+ * propósito, não é variável de ambiente.
+ * O prefixo `openrouter/` é exigido pelo SDK para rotear a chamada via
+ * OpenRouter com `openRouterApiKey`.
+ */
+export const EMBEDDING_MODEL: AIEmbeddingModelNames =
+  'openrouter/openai/text-embedding-3-small';
+export const EMBEDDING_DIMENSIONS = 1536;
+export const EMBEDDING_BATCH_SIZE = 64;
+
+const EMBEDDINGS_DISABLED_MESSAGE =
+  'Embeddings desativados: OPENROUTER_API_KEY não configurada.';
+
+@Injectable()
+export class EmbeddingService {
+  private readonly logger = new Logger(EmbeddingService.name);
+
+  constructor(
+    @Inject(AI_CLIENT) private readonly client: AiClient,
+    private readonly env: EnvService,
+  ) {}
+
+  /**
+   * Divide os textos em lotes do tamanho informado, preservando a ordem.
+   * Lista vazia devolve lista vazia (nenhum lote).
+   */
+  static batchTexts(
+    texts: string[],
+    size = EMBEDDING_BATCH_SIZE,
+  ): string[][] {
+    if (texts.length === 0) return [];
+
+    const batches: string[][] = [];
+    for (let start = 0; start < texts.length; start += size) {
+      batches.push(texts.slice(start, start + size));
+    }
+
+    return batches;
+  }
+
+  /**
+   * Gera um vetor por texto, enviando os lotes em sequência para não estourar
+   * o rate limit do provedor. A ordem dos vetores segue a ordem dos textos.
+   */
+  async embedTexts(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) return [];
+    if (!this.client) {
+      throw new EmbeddingUnavailableError(EMBEDDINGS_DISABLED_MESSAGE);
+    }
+
+    const { OPENROUTER_API_KEY } = this.env.getEnvs();
+    if (!OPENROUTER_API_KEY) {
+      throw new EmbeddingUnavailableError(EMBEDDINGS_DISABLED_MESSAGE);
+    }
+
+    const batches = EmbeddingService.batchTexts(texts);
+    this.logger.log(
+      `Gerando embeddings de ${texts.length} texto(s) em ${batches.length} lote(s).`,
+    );
+
+    const vectors: number[][] = [];
+    for (const batch of batches) {
+      const batchVectors = await this.embedBatch(batch, OPENROUTER_API_KEY);
+      vectors.push(...batchVectors);
+    }
+
+    this.logger.log(`Embeddings gerados: ${vectors.length} vetor(es).`);
+    return vectors;
+  }
+
+  private async embedBatch(
+    batch: string[],
+    openRouterApiKey: string,
+  ): Promise<number[][]> {
+    let batchVectors: number[][];
+
+    try {
+      batchVectors = await AIEmbeddings.embedDocuments(
+        batch,
+        {
+          model: EMBEDDING_MODEL,
+          dimensions: EMBEDDING_DIMENSIONS,
+        },
+        { openRouterApiKey },
+      );
+    } catch (error) {
+      const normalizedError = this.toError(error);
+      this.logger.error(
+        `Falha ao gerar embeddings de um lote: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+
+      throw new EmbeddingUnavailableError(
+        normalizedError.message,
+        normalizedError,
+      );
+    }
+
+    const hasConsistentCount = batchVectors.length === batch.length;
+    if (!hasConsistentCount) {
+      const message = `Resposta inconsistente da API de embeddings: ${batchVectors.length} vetor(es) para ${batch.length} texto(s).`;
+      this.logger.error(message);
+
+      throw new EmbeddingUnavailableError(message);
+    }
+
+    return batchVectors;
+  }
+
+  private toError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+}
