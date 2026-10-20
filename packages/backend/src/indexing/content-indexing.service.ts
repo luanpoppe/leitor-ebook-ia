@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EbookContentRepository } from '../catalog/ebook-content.repository';
+import { ChunkEmbeddingRepository } from '../catalog/chunk-embedding.repository';
 import type {
   ChunkEmbeddingUpdate,
   MissingEmbeddingChunk,
@@ -23,7 +23,7 @@ export interface IndexedChapter {
 
 export interface IndexingOutcome {
   embedded: number;
-  missing: number;
+  remaining: number;
   error?: EmbeddingUnavailableError;
 }
 
@@ -31,8 +31,14 @@ export interface PreparedContent extends IndexingOutcome {
   chapters: IndexedChapter[];
 }
 
-/** Mesma forma do `IndexingOutcome`; alias evita a interface vazia, proibida pelo lint. */
-export type ResumeOutcome = IndexingOutcome;
+/**
+ * Resultado da retomada. `total` é o número de trechos do livro e `remaining`
+ * os que ainda estão sem vetor; a pipeline decide `ready` com
+ * `total > 0 && remaining === 0` — livro sem trecho nenhum não está pronto.
+ */
+export interface ResumeOutcome extends IndexingOutcome {
+  total: number;
+}
 
 interface EmbeddingAttempt {
   vectors: number[][];
@@ -55,7 +61,7 @@ export class ContentIndexingService {
 
   constructor(
     private readonly embeddingService: EmbeddingService,
-    private readonly ebookContentRepository: EbookContentRepository,
+    private readonly chunkEmbeddingRepository: ChunkEmbeddingRepository,
   ) {}
 
   /**
@@ -68,7 +74,7 @@ export class ContentIndexingService {
     );
 
     const hasChunkTexts = chunkTexts.length > 0;
-    if (!hasChunkTexts) return { chapters: [], embedded: 0, missing: 0 };
+    if (!hasChunkTexts) return { chapters: [], embedded: 0, remaining: 0 };
 
     const attempt = await this.embedSafely(chunkTexts);
     const indexedChapters = ContentIndexingService.buildIndexedChapters(
@@ -78,12 +84,16 @@ export class ContentIndexingService {
     );
 
     const embedded = attempt.vectors.length;
-    const missing = chunkTexts.length - embedded;
+    const remaining = chunkTexts.length - embedded;
     this.logger.log(
-      `Indexação preparada: ${chapterChunks.length} capítulo(s), ${chunkTexts.length} trecho(s), ${embedded} embedding(s), ${missing} sem vetor.`,
+      `Indexação preparada: ${chapterChunks.length} capítulo(s), ${chunkTexts.length} trecho(s), ${embedded} embedding(s), ${remaining} sem vetor.`,
     );
 
-    const prepared: PreparedContent = { chapters: indexedChapters, embedded, missing };
+    const prepared: PreparedContent = {
+      chapters: indexedChapters,
+      embedded,
+      remaining,
+    };
     if (attempt.error) prepared.error = attempt.error;
 
     return prepared;
@@ -91,23 +101,26 @@ export class ContentIndexingService {
 
   /**
    * Envia à API apenas os trechos sem vetor, grava o que conseguiu e devolve
-   * quantos ainda restam. Não lança `EmbeddingUnavailableError`.
+   * quantos ainda restam. Não lança `EmbeddingUnavailableError`. Livro sem
+   * chunk nenhum devolve `total: 0` — diferente de livro todo vetorizado, que
+   * devolve `total` cheio e `remaining: 0`.
    */
   async resumeMissing(bookId: string): Promise<ResumeOutcome> {
     const missingChunks =
-      await this.ebookContentRepository.findChunksWithoutEmbedding(bookId);
+      await this.chunkEmbeddingRepository.findChunksWithoutEmbedding(bookId);
+    const total = await this.chunkEmbeddingRepository.countChunks(bookId);
 
     const hasMissingChunks = missingChunks.length > 0;
     if (!hasMissingChunks) {
       this.logger.log(
-        `Retomada do ebook ${bookId}: nenhum trecho sem embedding.`,
+        `Retomada do ebook ${bookId}: nenhum dos ${total} trecho(s) está sem embedding.`,
       );
-      return { embedded: 0, missing: 0 };
+      return { embedded: 0, remaining: 0, total };
     }
 
     const attempt = await this.embedAndPersistInBatches(missingChunks);
     const remaining =
-      await this.ebookContentRepository.countChunksWithoutEmbedding(bookId);
+      await this.chunkEmbeddingRepository.countChunksWithoutEmbedding(bookId);
 
     this.logger.log(
       `Retomada do ebook ${bookId}: ${missingChunks.length} trecho(s) sem vetor, ${attempt.embedded} embedding(s) gravado(s), ${remaining} restante(s).`,
@@ -115,15 +128,16 @@ export class ContentIndexingService {
 
     const outcome: ResumeOutcome = {
       embedded: attempt.embedded,
-      missing: remaining,
+      remaining,
+      total,
     };
     if (attempt.error) outcome.error = attempt.error;
 
     return outcome;
   }
 
-  static incompleteMessage(missing: number): string {
-    return `Indexação incompleta: ${missing} trechos sem embedding.`;
+  static incompleteMessage(remaining: number): string {
+    return `Indexação incompleta: ${remaining} trechos sem embedding.`;
   }
 
   /**
@@ -142,9 +156,9 @@ export class ContentIndexingService {
         const isUnavailable = error instanceof EmbeddingUnavailableError;
         if (!isUnavailable) throw error;
 
-        const missing = texts.length - vectors.length;
+        const remaining = texts.length - vectors.length;
         this.logger.warn(
-          `Falha ao gerar embeddings de um lote: ${error.message}. ${vectors.length} embedding(s) preservado(s), ${missing} trecho(s) sem vetor.`,
+          `Falha ao gerar embeddings de um lote: ${error.message}. ${vectors.length} embedding(s) preservado(s), ${remaining} trecho(s) sem vetor.`,
         );
         return { vectors, error };
       }
@@ -203,7 +217,7 @@ export class ContentIndexingService {
       updates.push({ chunkId: chunk.id, embedding });
     }
 
-    return this.ebookContentRepository.updateChunkEmbeddings(updates);
+    return this.chunkEmbeddingRepository.updateChunkEmbeddings(updates);
   }
 
   private static buildIndexedChapters(

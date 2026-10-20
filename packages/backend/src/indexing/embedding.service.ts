@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AIEmbeddings, type AIEmbeddingModelNames } from '@luanpoppe/ai';
 import { AI_CLIENT, type AiClient } from '../core/ai/ai.provider';
+import { EMBEDDING_DIMENSIONS } from '../core/ai/embedding.constants';
 import { EnvService } from '../core/env.service';
 import { EmbeddingUnavailableError } from './indexing.errors';
 
@@ -12,7 +13,6 @@ import { EmbeddingUnavailableError } from './indexing.errors';
  */
 export const EMBEDDING_MODEL: AIEmbeddingModelNames =
   'openrouter/openai/text-embedding-3-small';
-export const EMBEDDING_DIMENSIONS = 1536;
 export const EMBEDDING_BATCH_SIZE = 64;
 
 const EMBEDDINGS_DISABLED_MESSAGE =
@@ -43,28 +43,6 @@ export class EmbeddingService {
     }
 
     return batches;
-  }
-
-  /**
-   * Gera um vetor por texto, enviando os lotes em sequência para não estourar
-   * o rate limit do provedor. A ordem dos vetores segue a ordem dos textos.
-   */
-  async embedTexts(texts: string[]): Promise<number[][]> {
-    if (texts.length === 0) return [];
-
-    const batches = EmbeddingService.batchTexts(texts);
-    this.logger.log(
-      `Gerando embeddings de ${texts.length} texto(s) em ${batches.length} lote(s).`,
-    );
-
-    const vectors: number[][] = [];
-    for (const batch of batches) {
-      const batchVectors = await this.embedBatch(batch);
-      vectors.push(...batchVectors);
-    }
-
-    this.logger.log(`Embeddings gerados: ${vectors.length} vetor(es).`);
-    return vectors;
   }
 
   /**

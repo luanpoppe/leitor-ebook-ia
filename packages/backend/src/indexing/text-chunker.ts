@@ -9,6 +9,13 @@ const SENTENCE_SEPARATOR = ' ';
 const PARAGRAPH_BREAK_PATTERN = /\n{2,}/;
 const SENTENCE_BREAK_PATTERN = /(?<=[.!?])\s+/u;
 
+/**
+ * Teto de cada fragmento. Já reserva o overlap e o separador que o trecho novo
+ * vai receber, então o contexto repetido não empurra o trecho acima do alvo.
+ */
+const MAX_FRAGMENT_LENGTH =
+  TARGET_CHUNK_LENGTH - OVERLAP_LENGTH - PARAGRAPH_SEPARATOR.length;
+
 export interface ChunkDraft {
   position: number;
   text: string;
@@ -54,8 +61,8 @@ export class TextChunker {
     const fragments: string[] = [];
 
     for (const paragraph of paragraphs) {
-      const isWithinTarget = paragraph.length <= TARGET_CHUNK_LENGTH;
-      if (isWithinTarget) {
+      const fitsInFragment = paragraph.length <= MAX_FRAGMENT_LENGTH;
+      if (fitsInFragment) {
         fragments.push(paragraph);
         continue;
       }
@@ -68,8 +75,9 @@ export class TextChunker {
   }
 
   /**
-   * Quebra um parágrafo grande preferindo fim de frase. Uma frase que sozinha
-   * passa do limite rígido é cortada no último espaço antes dele.
+   * Quebra um parágrafo grande preferindo fim de frase. Cada frase é fatiada
+   * na janela do fragmento, então o limite rígido só entra quando não existe
+   * espaço nenhum para cortar sem partir uma palavra.
    */
   private static splitLongParagraph(paragraph: string): string[] {
     const sentences = paragraph.split(SENTENCE_BREAK_PATTERN);
@@ -77,17 +85,17 @@ export class TextChunker {
     let currentFragment = '';
 
     for (const sentence of sentences) {
-      const sentencePieces = TextChunker.limitSentenceLength(sentence);
+      const sentencePieces = TextChunker.splitOversizedText(sentence);
 
       for (const piece of sentencePieces) {
         const isCurrentEmpty = currentFragment.length === 0;
         const candidateLength = isCurrentEmpty
           ? piece.length
           : currentFragment.length + SENTENCE_SEPARATOR.length + piece.length;
-        const overflowsTarget =
-          !isCurrentEmpty && candidateLength > TARGET_CHUNK_LENGTH;
+        const overflowsFragment =
+          !isCurrentEmpty && candidateLength > MAX_FRAGMENT_LENGTH;
 
-        if (overflowsTarget) {
+        if (overflowsFragment) {
           fragments.push(currentFragment);
           currentFragment = piece;
           continue;
@@ -104,20 +112,17 @@ export class TextChunker {
     return fragments;
   }
 
-  private static limitSentenceLength(sentence: string): string[] {
-    const isWithinHardMax = sentence.length <= HARD_MAX_CHUNK_LENGTH;
-    if (isWithinHardMax) return [sentence];
+  private static splitOversizedText(text: string): string[] {
+    const fitsInFragment = text.length <= MAX_FRAGMENT_LENGTH;
+    if (fitsInFragment) return [text];
 
     const pieces: string[] = [];
-    let remainingText = sentence;
+    let remainingText = text;
 
-    while (remainingText.length > HARD_MAX_CHUNK_LENGTH) {
-      const window = remainingText.slice(0, HARD_MAX_CHUNK_LENGTH);
-      const lastSpaceIndex = window.lastIndexOf(' ');
-      const cutIndex =
-        lastSpaceIndex > 0 ? lastSpaceIndex : HARD_MAX_CHUNK_LENGTH;
+    while (remainingText.length > MAX_FRAGMENT_LENGTH) {
+      const cutIndex = TextChunker.findCutIndex(remainingText);
 
-      pieces.push(remainingText.slice(0, cutIndex));
+      pieces.push(remainingText.slice(0, cutIndex).trimEnd());
       remainingText = remainingText.slice(cutIndex).trimStart();
     }
 
@@ -126,60 +131,90 @@ export class TextChunker {
     return pieces;
   }
 
+  /**
+   * Corta preferindo a janela do alvo; sem espaço nela, tenta a janela do
+   * limite rígido; sem nenhum espaço, aí sim corta o texto no limite rígido.
+   */
+  private static findCutIndex(text: string): number {
+    const targetWindow = text.slice(0, MAX_FRAGMENT_LENGTH);
+    const targetSpaceIndex = targetWindow.lastIndexOf(' ');
+    if (targetSpaceIndex > 0) return targetSpaceIndex;
+
+    const hardMaxWindow = text.slice(0, HARD_MAX_CHUNK_LENGTH);
+    const hardMaxSpaceIndex = hardMaxWindow.lastIndexOf(' ');
+    if (hardMaxSpaceIndex > 0) return hardMaxSpaceIndex;
+
+    return HARD_MAX_CHUNK_LENGTH;
+  }
+
+  /**
+   * Junta fragmentos até o alvo e repete o fim do anterior no trecho seguinte.
+   * Como o fragmento já cabe junto com o overlap, o trecho nunca passa do alvo
+   * por causa do contexto repetido.
+   */
   private static mergeFragments(fragments: string[]): string[] {
     const chunkTexts: string[] = [];
     let currentChunk = '';
 
     for (const fragment of fragments) {
-      if (currentChunk.length === 0) {
-        currentChunk = fragment;
-        continue;
-      }
-
-      const candidateLength =
-        currentChunk.length + PARAGRAPH_SEPARATOR.length + fragment.length;
-      const fitsInCurrentChunk = candidateLength <= TARGET_CHUNK_LENGTH;
+      const appendedChunk = TextChunker.appendFragment(currentChunk, fragment);
+      const fitsInCurrentChunk = appendedChunk.length <= TARGET_CHUNK_LENGTH;
 
       if (fitsInCurrentChunk) {
-        currentChunk = `${currentChunk}${PARAGRAPH_SEPARATOR}${fragment}`;
+        currentChunk = appendedChunk;
         continue;
       }
 
-      chunkTexts.push(currentChunk);
-      currentChunk = TextChunker.startChunkFrom(currentChunk, fragment);
+      const hasCurrentContent = currentChunk.length > 0;
+      if (hasCurrentContent) chunkTexts.push(currentChunk);
+
+      currentChunk = TextChunker.openNextChunk(currentChunk, fragment);
     }
 
-    if (currentChunk.length > 0) chunkTexts.push(currentChunk);
+    const hasCurrentContent = currentChunk.length > 0;
+    if (hasCurrentContent) chunkTexts.push(currentChunk);
 
     return chunkTexts;
   }
 
-  private static startChunkFrom(
-    previousChunk: string,
-    fragment: string,
-  ): string {
-    const overlap = TextChunker.takeOverlap(previousChunk, fragment.length);
-    if (overlap.length === 0) return fragment;
+  private static appendFragment(currentChunk: string, fragment: string): string {
+    const isCurrentEmpty = currentChunk.length === 0;
+    if (isCurrentEmpty) return fragment;
 
-    return `${overlap}${PARAGRAPH_SEPARATOR}${fragment}`;
+    return `${currentChunk}${PARAGRAPH_SEPARATOR}${fragment}`;
+  }
+
+  /**
+   * Abre o trecho seguinte com o overlap do anterior. Fragmento maior que a
+   * folga (só acontece no fallback sem espaço) abre o trecho sem overlap.
+   */
+  private static openNextChunk(previousChunk: string, fragment: string): string {
+    const overlap = TextChunker.takeOverlap(previousChunk);
+    const hasOverlap = overlap.length > 0;
+    if (!hasOverlap) return fragment;
+
+    const chunkWithOverlap = `${overlap}${PARAGRAPH_SEPARATOR}${fragment}`;
+    const fitsInTarget = chunkWithOverlap.length <= TARGET_CHUNK_LENGTH;
+    if (!fitsInTarget) return fragment;
+
+    return chunkWithOverlap;
   }
 
   /**
    * Repete o fim do trecho anterior no começo do próximo. O corte começa no
-   * primeiro espaço da cauda para não abrir o trecho no meio de uma palavra.
+   * primeiro espaço da cauda para não abrir o trecho no meio de uma palavra;
+   * cauda sem espaço nenhum fica sem overlap pelo mesmo motivo.
    */
-  private static takeOverlap(previousChunk: string, nextLength: number): string {
-    // Um fragmento que já encosta no alvo não ganha overlap: passaria do alvo
-    // sem necessidade e, se vier de corte rígido, estouraria o limite máximo.
-    const canCarryOverlap = nextLength < TARGET_CHUNK_LENGTH;
-    if (!canCarryOverlap) return '';
+  private static takeOverlap(previousChunk: string): string {
+    const hasPreviousContent = previousChunk.length > 0;
+    if (!hasPreviousContent) return '';
 
     const tailStart = Math.max(0, previousChunk.length - OVERLAP_LENGTH);
     const tail = previousChunk.slice(tailStart);
     const firstSpaceIndex = tail.search(/\s/);
-    const overlap =
-      firstSpaceIndex >= 0 ? tail.slice(firstSpaceIndex + 1) : tail;
+    if (firstSpaceIndex < 0) return '';
 
+    const overlap = tail.slice(firstSpaceIndex + 1);
     const repeatsWholeChunk = overlap.length >= previousChunk.length;
     if (repeatsWholeChunk) return '';
 

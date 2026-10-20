@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BookStatus, Prisma } from '../generated/prisma/client';
+import { EMBEDDING_DIMENSIONS } from '../core/ai/embedding.constants';
 import { PrismaService } from '../core/prisma.service';
 import {
   EbookNotFoundError,
   InvalidEbookContentError,
 } from './catalog.errors';
+import { ChunkSql } from './chunks.sql';
 import {
-  ChunkEmbeddingUpdate,
-  MissingEmbeddingChunk,
   ReplaceContentChapterInput,
   ReplaceContentChunkInput,
   ReplaceContentInput,
@@ -20,9 +20,13 @@ interface CreatedChapter {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const EMBEDDING_DIMENSIONS = 1536;
 const DEFAULT_FAILURE_MESSAGE = 'Falha na ingestão sem detalhe informado.';
 
+/**
+ * Substitui capítulos e chunks de um ebook de forma atômica. A vetorização
+ * (leitura dos chunks sem embedding e gravação dos vetores) fica no
+ * `ChunkEmbeddingRepository`.
+ */
 @Injectable()
 export class EbookContentRepository {
   private readonly logger = new Logger(EbookContentRepository.name);
@@ -30,7 +34,6 @@ export class EbookContentRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Substitui capítulos e chunks de um ebook de forma atômica.
    * `chunks.embedding` não existe no Prisma Client (coluna `Unsupported`),
    * por isso a escrita dos chunks é feita por SQL bruto parametrizado.
    */
@@ -68,89 +71,6 @@ export class EbookContentRepository {
     this.logger.log(
       `Conteúdo do ebook ${bookId} substituído: ${chapterCount} capítulo(s), ${chunkCount} chunk(s).`,
     );
-  }
-
-  /**
-   * Trechos do livro que ainda não têm embedding, na ordem de leitura.
-   * É a base da retomada: só eles vão para a API de embeddings.
-   */
-  async findChunksWithoutEmbedding(
-    bookId: string,
-  ): Promise<MissingEmbeddingChunk[]> {
-    this.assertUuidOrNotFound(bookId);
-
-    const chunks = await this.prisma.$queryRaw<MissingEmbeddingChunk[]>`
-      SELECT
-        c."id",
-        ch."position" AS "chapterPosition",
-        c."position",
-        c."text"
-      FROM "chunks" c
-      INNER JOIN "chapters" ch ON ch."id" = c."chapter_id"
-      WHERE ch."book_id" = ${bookId}::uuid
-        AND c."embedding" IS NULL
-      ORDER BY ch."position", c."position"
-    `;
-
-    return chunks;
-  }
-
-  async countChunksWithoutEmbedding(bookId: string): Promise<number> {
-    this.assertUuidOrNotFound(bookId);
-
-    const rows = await this.prisma.$queryRaw<Array<{ count: bigint | string }>>`
-      SELECT count(*) AS "count"
-      FROM "chunks" c
-      INNER JOIN "chapters" ch ON ch."id" = c."chapter_id"
-      WHERE ch."book_id" = ${bookId}::uuid
-        AND c."embedding" IS NULL
-    `;
-
-    const count = rows[0]?.count ?? 0;
-    return Number(count);
-  }
-
-  /**
-   * Grava embeddings em lote apenas nos chunks ainda sem vetor, o que torna
-   * a retomada idempotente: linhas já vetorizadas não são sobrescritas.
-   */
-  async updateChunkEmbeddings(
-    updates: ChunkEmbeddingUpdate[],
-  ): Promise<number> {
-    const hasUpdates = updates.length > 0;
-    if (!hasUpdates) return 0;
-
-    this.assertValidUpdates(updates);
-
-    const rows = updates.map((update) => {
-      const vectorLiteral = this.toVectorLiteral(update.embedding);
-      return Prisma.sql`(${update.chunkId}::uuid, ${vectorLiteral}::vector)`;
-    });
-    const values = Prisma.join(rows);
-
-    const affected = await this.prisma.$executeRaw`
-      UPDATE "chunks" AS c
-      SET "embedding" = v."embedding"
-      FROM (VALUES ${values}) AS v("id", "embedding")
-      WHERE c."id" = v."id"
-        AND c."embedding" IS NULL
-    `;
-
-    const hasAffectedAllUpdates = affected === updates.length;
-    if (!hasAffectedAllUpdates) {
-      this.logger.warn(
-        `Atualização de embeddings parcial: ${affected} de ${updates.length} chunk(s) gravado(s).`,
-      );
-    }
-
-    return affected;
-  }
-
-  private assertValidUpdates(updates: ChunkEmbeddingUpdate[]): void {
-    for (const [index, update] of updates.entries()) {
-      const location = `chunk ${update.chunkId} (item ${index + 1})`;
-      this.assertValidEmbedding(update.embedding, location);
-    }
   }
 
   private async updateBookMetadata(
@@ -198,21 +118,15 @@ export class EbookContentRepository {
 
   private assertValidContent(chapters: ReplaceContentChapterInput[]): void {
     for (const [chapterIndex, chapter] of chapters.entries()) {
-      this.assertValidChapterText(chapter, chapterIndex);
+      const isTextEmpty = chapter.text.trim().length === 0;
+      if (isTextEmpty) {
+        throw new InvalidEbookContentError(
+          `Capítulo ${chapterIndex + 1} (posição ${chapter.position}) está com texto vazio.`,
+        );
+      }
+
       this.assertValidChunks(chapter.chunks, chapterIndex);
     }
-  }
-
-  private assertValidChapterText(
-    chapter: ReplaceContentChapterInput,
-    chapterIndex: number,
-  ): void {
-    const isTextEmpty = chapter.text.trim().length === 0;
-    if (!isTextEmpty) return;
-
-    throw new InvalidEbookContentError(
-      `Capítulo ${chapterIndex + 1} (posição ${chapter.position}) está com texto vazio.`,
-    );
   }
 
   private assertValidChunks(
@@ -220,23 +134,15 @@ export class EbookContentRepository {
     chapterIndex: number,
   ): void {
     for (const [chunkIndex, chunk] of chunks.entries()) {
-      this.assertValidChunk(chunk, chapterIndex, chunkIndex);
+      const location = `capítulo ${chapterIndex + 1}, chunk ${chunkIndex + 1}`;
+
+      const isTextEmpty = chunk.text.trim().length === 0;
+      if (isTextEmpty) {
+        throw new InvalidEbookContentError(`Texto vazio no ${location}.`);
+      }
+
+      this.assertValidEmbedding(chunk.embedding, location);
     }
-  }
-
-  private assertValidChunk(
-    chunk: ReplaceContentChunkInput,
-    chapterIndex: number,
-    chunkIndex: number,
-  ): void {
-    const location = `capítulo ${chapterIndex + 1}, chunk ${chunkIndex + 1}`;
-
-    const isTextEmpty = chunk.text.trim().length === 0;
-    if (isTextEmpty) {
-      throw new InvalidEbookContentError(`Texto vazio no ${location}.`);
-    }
-
-    this.assertValidEmbedding(chunk.embedding, location);
   }
 
   /**
@@ -332,8 +238,7 @@ export class EbookContentRepository {
     const hasChunks = chunks.length > 0;
     if (!hasChunks) return 0;
 
-    const rows = chunks.map((chunk) => this.buildChunkRow(chapterId, chunk));
-    const values = Prisma.join(rows);
+    const values = ChunkSql.buildChunkValues(chapterId, chunks);
 
     await tx.$executeRaw`
       INSERT INTO "chunks" ("id", "chapter_id", "position", "text", "embedding")
@@ -343,29 +248,8 @@ export class EbookContentRepository {
     return chunks.length;
   }
 
-  private buildChunkRow(
-    chapterId: string,
-    chunk: ReplaceContentChunkInput,
-  ): Prisma.Sql {
-    const embedding = chunk.embedding ?? null;
-    if (embedding === null) {
-      return Prisma.sql`(gen_random_uuid(), ${chapterId}::uuid, ${chunk.position}, ${chunk.text}, NULL::vector)`;
-    }
-
-    const vectorLiteral = this.toVectorLiteral(embedding);
-    return Prisma.sql`(gen_random_uuid(), ${chapterId}::uuid, ${chunk.position}, ${chunk.text}, ${vectorLiteral}::vector)`;
-  }
-
-  private toVectorLiteral(embedding: number[]): string {
-    return `[${embedding.join(',')}]`;
-  }
-
-  private isUuid(value: string): boolean {
-    return UUID_PATTERN.test(value);
-  }
-
   private assertUuidOrNotFound(id: string): void {
-    const isIdValid = this.isUuid(id);
+    const isIdValid = UUID_PATTERN.test(id);
     if (isIdValid) return;
 
     throw new EbookNotFoundError(id);
