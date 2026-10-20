@@ -38,7 +38,7 @@ services:
       - "${MINIO_API_PORT}:9000"
       - "${MINIO_CONSOLE_PORT}:9001"
     volumes:
-      - minio:/bitnami/minio/data
+      - minio-bitnami:/bitnami/minio/data
       - ./docker/minio/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     environment:
@@ -62,4 +62,4 @@ services:
 volumes:
   postgres:
   redis:
-  minio:
+  minio-bitnami:
