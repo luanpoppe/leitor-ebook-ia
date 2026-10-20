@@ -31,3 +31,10 @@ export class InvalidEbookContentError extends Error {
     this.name = 'InvalidEbookContentError';
   }
 }
+
+export class InvalidEbookInputError extends Error {
+  constructor(message = 'Os dados do ebook são inválidos.') {
+    super(message);
+    this.name = 'InvalidEbookInputError';
+  }
+}
