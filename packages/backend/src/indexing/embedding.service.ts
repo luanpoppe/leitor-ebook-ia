@@ -51,14 +51,6 @@ export class EmbeddingService {
    */
   async embedTexts(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
-    if (!this.client) {
-      throw new EmbeddingUnavailableError(EMBEDDINGS_DISABLED_MESSAGE);
-    }
-
-    const { OPENROUTER_API_KEY } = this.env.getEnvs();
-    if (!OPENROUTER_API_KEY) {
-      throw new EmbeddingUnavailableError(EMBEDDINGS_DISABLED_MESSAGE);
-    }
 
     const batches = EmbeddingService.batchTexts(texts);
     this.logger.log(
@@ -67,7 +59,7 @@ export class EmbeddingService {
 
     const vectors: number[][] = [];
     for (const batch of batches) {
-      const batchVectors = await this.embedBatch(batch, OPENROUTER_API_KEY);
+      const batchVectors = await this.embedBatch(batch);
       vectors.push(...batchVectors);
     }
 
@@ -75,10 +67,15 @@ export class EmbeddingService {
     return vectors;
   }
 
-  private async embedBatch(
-    batch: string[],
-    openRouterApiKey: string,
-  ): Promise<number[][]> {
+  /**
+   * Gera os vetores de um único lote (até `EMBEDDING_BATCH_SIZE` textos).
+   * Público para o chamador gravar lote a lote, sem perder o que já foi pago
+   * quando um lote posterior falha.
+   */
+  async embedBatch(batch: string[]): Promise<number[][]> {
+    if (batch.length === 0) return [];
+
+    const openRouterApiKey = this.requireOpenRouterApiKey();
     let batchVectors: number[][];
 
     try {
@@ -112,6 +109,19 @@ export class EmbeddingService {
     }
 
     return batchVectors;
+  }
+
+  private requireOpenRouterApiKey(): string {
+    if (!this.client) {
+      throw new EmbeddingUnavailableError(EMBEDDINGS_DISABLED_MESSAGE);
+    }
+
+    const { OPENROUTER_API_KEY } = this.env.getEnvs();
+    if (!OPENROUTER_API_KEY) {
+      throw new EmbeddingUnavailableError(EMBEDDINGS_DISABLED_MESSAGE);
+    }
+
+    return OPENROUTER_API_KEY;
   }
 
   private toError(error: unknown): Error {
