@@ -25,4 +25,4 @@ Stack de desenvolvimento na raiz do monorepo: PostgreSQL com imagem pgvector, Re
 
 - Backend (`3026`) e frontend (`3027`) **não** estão no Compose — continuam via `pnpm dev`.
 - Ao mudar `*_PORT` no `.env`, atualizar manualmente as URLs em `DATABASE_URL` / `REDIS_URL` / `MINIO_ENDPOINT` (não há interpolação cruzada no dotenv).
-- Imagem MinIO pinada em `RELEASE.2025-09-07T16-13-09Z` (reprodutibilidade entre devs).
+- Imagem MinIO pinada em `bitnamilegacy/minio:2025.7.23-debian-12-r5` (reprodutibilidade entre devs) — trocada na mudança `ingestao-ebooks`, porque `minio/minio` saiu do Docker Hub. Ver `.sdd/context/minio-local.md`.
