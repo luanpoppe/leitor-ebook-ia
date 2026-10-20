@@ -11,3 +11,4 @@
 - [minio-local](./minio-local.md) — object storage de dev: imagem bitnamilegacy/minio, entrypoint que cria o bucket `ebooks`
 - [catalogo-ebooks](./catalogo-ebooks.md) — tabelas books/chapters/chunks (embedding pgvector), EbookRepository com dedupe por hash e reprocessamento transacional
 - [armazenamento-arquivos](./armazenamento-arquivos.md) — FileStorageService sobre o MinIO: chave `<hash>.<ext>`, streams, URL pré-assinada e remoção idempotente
+- [extracao-conteudo](./extracao-conteudo.md) — ContentExtractor por formato (EPUB/PDF/TXT/MD), parsers de capítulo, normalização de texto e capa em `covers/<hash>.<ext>`
