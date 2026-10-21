@@ -25,6 +25,7 @@ O caminho assíncrono que transforma o arquivo enviado em livro pesquisável: a 
 - **Retomada por estágio** — evita repagar extração e embeddings: sem capítulos reextrai, com capítulos só completa vetores.
 - **`failed` só na última tentativa** — entre tentativas o livro continua `processing`, sem piscar erro para o leitor.
 - **Livro inexistente é definitivo** — repetir não cria o registro; não gasta as tentativas.
+- **Reprocess pedido durante o job é honrado** — se o livro está `pending` no fim das tentativas, o worker reenfileira em vez de marcar `failed`, porque o `enqueue` do reprocess deduplicou contra o job que acabou de morrer.
 
 ## Notas
 

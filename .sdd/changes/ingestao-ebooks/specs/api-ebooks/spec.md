@@ -109,8 +109,8 @@ Todos os erros de domínio têm corpo `{ "statusCode": number, "message": string
 
 ## Contratos expostos
 
-- `POST /ebooks` — upload multipart; `202` com `{ id, status, title }` e `Location` (novo; provisório até o chunk).
-- `GET /ebooks` — listagem paginada (novo; provisório até o chunk).
-- `GET /ebooks/:id` — detalhe com `coverUrl` (novo; provisório até o chunk).
-- `POST /ebooks/:id/reprocess` — reprocessa `failed` (novo; provisório até o chunk).
+- `POST /ebooks` — `packages/backend/src/api/ebooks/ebooks.controller.ts:EbooksController.upload`
+- `GET /ebooks` — `packages/backend/src/api/ebooks/ebooks.controller.ts:EbooksController.list`
+- `GET /ebooks/:id` — `packages/backend/src/api/ebooks/ebooks.controller.ts:EbooksController.findById`
+- `POST /ebooks/:id/reprocess` — `packages/backend/src/api/ebooks/ebooks.controller.ts:EbooksController.reprocess`
 - `FileStorageService.put` / `IngestionQueue.enqueue` — `packages/backend/src/storage/file-storage.service.ts` e `packages/backend/src/ingestion/ingestion.queue.ts`.

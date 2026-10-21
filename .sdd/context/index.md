@@ -14,3 +14,4 @@
 - [extracao-conteudo](./extracao-conteudo.md) — ContentExtractor por formato (EPUB/PDF/TXT/MD), parsers de capítulo, normalização de texto e capa em `covers/<hash>.<ext>`
 - [chunking-embeddings](./chunking-embeddings.md) — TextChunker, EmbeddingService e ContentIndexingService: trechos de ~1.000 chars, vetores de 1536 no pgvector e retomada só dos faltantes
 - [pipeline-ingestao](./pipeline-ingestao.md) — fila BullMQ + worker in-process: enfileira por bookId, extrai ou retoma, grava parciais e fecha ready/failed
+- [api-ebooks](./api-ebooks.md) — borda HTTP da estante: upload multipart com compensação, listagem/detalhe com capa pré-assinada, reprocess e filtro de erro `{ statusCode, message }`
