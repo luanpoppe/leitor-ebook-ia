@@ -15,3 +15,4 @@
 - [chunking-embeddings](./chunking-embeddings.md) — TextChunker, EmbeddingService e ContentIndexingService: trechos de ~1.000 chars, vetores de 1536 no pgvector e retomada só dos faltantes
 - [pipeline-ingestao](./pipeline-ingestao.md) — fila BullMQ + worker in-process: enfileira por bookId, extrai ou retoma, grava parciais e fecha ready/failed
 - [api-ebooks](./api-ebooks.md) — borda HTTP da estante: upload multipart com compensação, listagem/detalhe com capa pré-assinada, reprocess e filtro de erro `{ statusCode, message }`
+- [frontend-ebooks](./frontend-ebooks.md) — estante na home: upload com progresso, lista com polling condicionado, cartão, painel de detalhe e página `/ebooks/[id]`
