@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { getEbook, isNotFoundError } from "./api";
+import { getApiErrorInfo, getEbook, isNotFoundError } from "./api";
 import type { EbookDetail, EbookStatus } from "./types";
 import { ebookKeys } from "./use-ebooks";
 
@@ -23,6 +23,7 @@ export interface UseEbookDetailResult {
   isError: boolean;
   notFound: boolean;
   error: Error | null;
+  errorMessage: string | null;
   refetch: EbookDetailQueryResult["refetch"];
 }
 
@@ -46,6 +47,7 @@ export function useEbookDetail(id: string): UseEbookDetailResult {
   // diferentes: "não encontrado" não tem o que tentar de novo.
   const hasError = Boolean(error);
   const notFound = hasError && isNotFoundError(error);
+  const errorMessage = resolveErrorMessage(ebookQuery);
 
   return {
     ebook,
@@ -53,6 +55,7 @@ export function useEbookDetail(id: string): UseEbookDetailResult {
     isError: ebookQuery.isError,
     notFound,
     error,
+    errorMessage,
     refetch: ebookQuery.refetch,
   };
 }
@@ -60,6 +63,17 @@ export function useEbookDetail(id: string): UseEbookDetailResult {
 async function fetchEbookDetail(id: string): Promise<EbookDetail> {
   const ebook = await getEbook(id);
   return ebook;
+}
+
+// A mensagem exibida vem do mesmo tradutor de erro da API, para a tela não
+// depender do `message` cru do Axios.
+function resolveErrorMessage(
+  query: EbookDetailQueryResult
+): string | null {
+  if (!query.isError) return null;
+
+  const errorInfo = getApiErrorInfo(query.error);
+  return errorInfo.message;
 }
 
 // Enquanto a ingestão roda o detalhe muda sozinho; nos estados finais

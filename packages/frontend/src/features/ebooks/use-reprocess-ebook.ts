@@ -12,13 +12,36 @@ const REPROCESS_SUCCESS_MESSAGE = "Livro reenviado para processamento.";
 
 export interface UseReprocessEbookResult {
   reprocess: (id: string) => void;
-  isReprocessing: boolean;
-  reprocessingId: string | null;
+  isReprocessingFor: (id: string) => boolean;
 }
 
 export function useReprocessEbook(): UseReprocessEbookResult {
   const queryClient = useQueryClient();
-  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
+  // Cada livro tem o próprio estado de envio: vários reprocessamentos podem
+  // estar em voo ao mesmo tempo, cada um com o seu botão em "Tentando...".
+  const [inFlightIds, setInFlightIds] = useState<ReadonlySet<string>>(
+    new Set()
+  );
+
+  const markInFlight = (id: string): void => {
+    setInFlightIds((currentIds) => {
+      if (currentIds.has(id)) return currentIds;
+
+      const nextIds = new Set(currentIds);
+      nextIds.add(id);
+      return nextIds;
+    });
+  };
+
+  const clearInFlight = (id: string): void => {
+    setInFlightIds((currentIds) => {
+      if (!currentIds.has(id)) return currentIds;
+
+      const nextIds = new Set(currentIds);
+      nextIds.delete(id);
+      return nextIds;
+    });
+  };
 
   const reprocessMutation = useMutation<
     ReprocessEbookResponse,
@@ -27,7 +50,7 @@ export function useReprocessEbook(): UseReprocessEbookResult {
   >({
     mutationFn: (id) => reprocessEbook(id),
     onMutate: (id) => {
-      setReprocessingId(id);
+      markInFlight(id);
     },
     onSuccess: async (ebook) => {
       const detailKey = ebookDetailKey(ebook.id);
@@ -35,22 +58,29 @@ export function useReprocessEbook(): UseReprocessEbookResult {
       await queryClient.invalidateQueries({ queryKey: detailKey });
       toast.success(REPROCESS_SUCCESS_MESSAGE);
     },
-    onError: (error) => {
+    onError: async (error) => {
       const failureInfo = getApiErrorInfo(error);
       toast.error(failureInfo.message);
+      // A estante também é invalidada no erro: o livro pode ter mudado de
+      // estado no servidor mesmo que a resposta da mutação tenha falhado.
+      await queryClient.invalidateQueries({ queryKey: ebookKeys.all });
     },
-    onSettled: () => {
-      setReprocessingId(null);
+    onSettled: (_data, _error, id) => {
+      clearInFlight(id);
     },
   });
 
   const reprocess = (id: string): void => {
+    const isAlreadyInFlight = inFlightIds.has(id);
+    if (isAlreadyInFlight) return;
+
     reprocessMutation.mutate(id);
   };
 
+  const isReprocessingFor = (id: string): boolean => inFlightIds.has(id);
+
   return {
     reprocess,
-    isReprocessing: reprocessMutation.isPending,
-    reprocessingId,
+    isReprocessingFor,
   };
 }

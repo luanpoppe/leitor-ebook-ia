@@ -31,7 +31,7 @@ export default function EbookPage() {
   const params = useParams<RouteParams>();
   const bookId = resolveBookId(params?.id);
 
-  const { ebook, isLoading, isError, notFound, error, refetch } =
+  const { ebook, isLoading, isError, notFound, errorMessage, refetch } =
     useEbookDetail(bookId);
 
   const renderBody = () => {
@@ -46,11 +46,11 @@ export default function EbookPage() {
     if (notFound) return <NotFoundState />;
 
     if (isError) {
-      const errorMessage = error?.message ?? GENERIC_ERROR_LABEL;
+      const failureMessage = errorMessage ?? GENERIC_ERROR_LABEL;
 
       return (
         <div className="mt-6">
-          <p className="text-sm text-red-700">{errorMessage}</p>
+          <p className="text-sm text-red-700">{failureMessage}</p>
 
           <button
             type="button"

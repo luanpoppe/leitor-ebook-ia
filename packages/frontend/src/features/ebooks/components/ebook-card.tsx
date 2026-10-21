@@ -54,10 +54,10 @@ export function EbookCard({
         onClick={handleOpen}
         className={OPEN_BUTTON_CLASS_NAME}
       >
-        {/* O resumo da listagem não traz capa; o placeholder com o título
-            no lugar da imagem é o comportamento aprovado para esse caso. */}
+        {/* A listagem já traz a capa pré-assinada; quando `coverUrl` é null
+            (sem capa ou storage fora), o placeholder com o título assume. */}
         <div className="w-20 shrink-0">
-          <EbookCover title={ebook.title} coverUrl={null} />
+          <EbookCover title={ebook.title} coverUrl={ebook.coverUrl} />
         </div>
 
         <div className="min-w-0 flex-1">

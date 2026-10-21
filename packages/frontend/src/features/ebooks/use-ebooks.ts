@@ -5,7 +5,7 @@ import type {
   InfiniteData,
   UseInfiniteQueryResult,
 } from "@tanstack/react-query";
-import { listEbooks } from "./api";
+import { getApiErrorInfo, listEbooks } from "./api";
 import { DEFAULT_PAGE_SIZE } from "./constants";
 import type { EbookStatus, EbookSummary, PagedEbooks } from "./types";
 
@@ -42,6 +42,7 @@ export type UseEbooksResult = Pick<
 > & {
   ebooks: EbookSummary[];
   total: number;
+  errorMessage: string | null;
 };
 
 export function useEbooks(): UseEbooksResult {
@@ -63,10 +64,12 @@ export function useEbooks(): UseEbooksResult {
   const pages = ebooksQuery.data?.pages;
   const ebooks = collectEbooks(pages);
   const total = getLastPageTotal(pages);
+  const errorMessage = resolveErrorMessage(ebooksQuery);
 
   return {
     ebooks,
     total,
+    errorMessage,
     isLoading: ebooksQuery.isLoading,
     isError: ebooksQuery.isError,
     error: ebooksQuery.error,
@@ -127,6 +130,15 @@ function countLoadedEbooks(pages: readonly PagedEbooks[]): number {
   }
 
   return loadedCount;
+}
+
+// A mensagem exibida vem do mesmo tradutor de erro da API, para a tela não
+// depender do `message` cru do Axios.
+function resolveErrorMessage(query: EbooksQueryResult): string | null {
+  if (!query.isError) return null;
+
+  const errorInfo = getApiErrorInfo(query.error);
+  return errorInfo.message;
 }
 
 function collectEbooks(

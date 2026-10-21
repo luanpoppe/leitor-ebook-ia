@@ -39,14 +39,14 @@ export function Estante() {
     ebooks,
     isLoading,
     isError,
-    error,
+    errorMessage,
     refetch,
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
   } = useEbooks();
 
-  const { reprocess, reprocessingId } = useReprocessEbook();
+  const { reprocess, isReprocessingFor } = useReprocessEbook();
 
   // O destaque é passageiro: rola até o cartão da duplicata e o apaga depois,
   // para o aviso não ficar preso na tela.
@@ -55,7 +55,17 @@ export function Estante() {
 
     const cardElementId = `ebook-card-${highlightedBookId}`;
     const cardElement = document.getElementById(cardElementId);
-    cardElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    // A duplicata pode estar fora das páginas já carregadas: sem cartão na
+    // tela, o detalhe é o único jeito de o usuário ver o livro existente.
+    const isCardRendered = cardElement !== null;
+    if (!isCardRendered) {
+      setSelectedBookId(highlightedBookId);
+      setHighlightedBookId(null);
+      return;
+    }
+
+    cardElement.scrollIntoView({ behavior: "smooth", block: "center" });
 
     const timeoutId = window.setTimeout(() => {
       setHighlightedBookId(null);
@@ -95,7 +105,7 @@ export function Estante() {
             <EbookCard
               ebook={ebook}
               isHighlighted={ebook.id === highlightedBookId}
-              isReprocessing={ebook.id === reprocessingId}
+              isReprocessing={isReprocessingFor(ebook.id)}
               onOpen={handleOpen}
               onReprocess={reprocess}
             />
@@ -126,8 +136,6 @@ export function Estante() {
     }
 
     if (isError && isShelfEmpty) {
-      const errorMessage = error?.message;
-
       return (
         <div role="alert" className={ERROR_BANNER_CLASS_NAME}>
           <p className="text-sm font-medium text-red-800">{LOAD_ERROR_LABEL}</p>

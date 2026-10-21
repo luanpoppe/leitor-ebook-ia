@@ -11,6 +11,8 @@ const INITIAL_PROGRESS = 0;
 
 const UPLOAD_SUCCESS_MESSAGE = "Ebook enviado. O processamento já começou.";
 
+const DUPLICATE_MESSAGE = "Este ebook já está na estante.";
+
 type UploadEbookErrorInfo = ReturnType<typeof getApiErrorInfo>;
 
 interface UploadEbookVariables {
@@ -60,8 +62,11 @@ export function useUploadEbook(
     },
     onError: (error) => {
       const failureInfo = getApiErrorInfo(error);
-      setErrorInfo(failureInfo);
-      toast.error(failureInfo.message);
+      const isDuplicate = Boolean(failureInfo.existingBookId);
+      const message = isDuplicate ? DUPLICATE_MESSAGE : failureInfo.message;
+
+      setErrorInfo({ ...failureInfo, message });
+      toast.error(message);
 
       if (failureInfo.existingBookId) {
         options.onDuplicate?.(failureInfo.existingBookId);

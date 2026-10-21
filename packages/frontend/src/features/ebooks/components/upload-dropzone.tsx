@@ -43,7 +43,12 @@ export function UploadDropzone({
   });
 
   const handleFile = (file: File): void => {
-    const extension = file.name.split(".").pop()?.toLowerCase();
+    // Sem ponto no nome (ou com ponto só no início, tipo `.epub`) não existe
+    // extensão para validar, então o arquivo é rejeitado.
+    const lastDotIndex = file.name.lastIndexOf(".");
+    const extension =
+      lastDotIndex > 0 ? file.name.slice(lastDotIndex + 1).toLowerCase() : "";
+
     const isExtensionAccepted = ACCEPTED_EXTENSIONS.some(
       (accepted) => accepted === extension
     );
@@ -177,6 +182,7 @@ export function UploadDropzone({
             aria-valuenow={progress}
             aria-valuemin={0}
             aria-valuemax={100}
+            aria-valuetext={`${progress}%`}
             aria-label="Progresso do envio"
             className="h-2 w-full overflow-hidden rounded-full bg-neutral-200"
           >
@@ -190,11 +196,15 @@ export function UploadDropzone({
       )}
 
       {localError && (
-        <p className="mt-2 text-sm text-red-700">{localError}</p>
+        <p role="alert" className="mt-2 text-sm text-red-700">
+          {localError}
+        </p>
       )}
 
       {errorInfo && (
-        <p className="mt-2 text-sm text-red-700">{errorInfo.message}</p>
+        <p role="alert" className="mt-2 text-sm text-red-700">
+          {errorInfo.message}
+        </p>
       )}
     </div>
   );
