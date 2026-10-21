@@ -24,12 +24,12 @@ export interface EbookSummary {
   format: string;
   status: string;
   createdAt: string;
+  coverUrl: string | null;
 }
 
 export interface EbookDetail extends EbookSummary {
   size: number;
   errorMessage: string | null;
-  coverUrl: string | null;
 }
 
 export interface PagedEbooks {

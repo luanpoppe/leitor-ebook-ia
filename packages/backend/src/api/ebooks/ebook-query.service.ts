@@ -25,7 +25,11 @@ export class EbookQueryService {
     const countPromise = this.ebookRepository.count();
 
     const [books, total] = await Promise.all([listPromise, countPromise]);
-    const items = books.map((book) => this.toSummary(book));
+    // As capas são resolvidas em paralelo e cada falha vira `null` no item:
+    // a listagem nunca cai por causa do storage, e a ordem é preservada.
+    const items = await Promise.all(
+      books.map(async (book) => this.toSummaryWithCover(book)),
+    );
 
     return { items, page: query.page, pageSize: query.pageSize, total };
   }
@@ -45,7 +49,7 @@ export class EbookQueryService {
     };
   }
 
-  private toSummary(book: Book): EbookSummary {
+  private toSummary(book: Book): Omit<EbookSummary, 'coverUrl'> {
     return {
       id: book.id,
       title: book.title,
@@ -54,6 +58,13 @@ export class EbookQueryService {
       status: book.status.toLowerCase(),
       createdAt: book.createdAt.toISOString(),
     };
+  }
+
+  private async toSummaryWithCover(book: Book): Promise<EbookSummary> {
+    const summary = this.toSummary(book);
+    const coverUrl = await this.resolveCoverUrl(book.coverStorageKey);
+
+    return { ...summary, coverUrl };
   }
 
   /**
