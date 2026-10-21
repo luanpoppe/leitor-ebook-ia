@@ -8,6 +8,7 @@ import { FileStorageModule } from './storage/file-storage.module';
 import { ContentExtractionModule } from './extraction/content-extraction.module';
 import { IndexingModule } from './indexing/indexing.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { EbooksModule } from './api/ebooks/ebooks.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { IngestionModule } from './ingestion/ingestion.module';
     ContentExtractionModule,
     IndexingModule,
     IngestionModule,
+    EbooksModule,
   ],
   controllers: [AppController],
 })
