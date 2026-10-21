@@ -78,6 +78,10 @@ export class EbookRepository {
     });
   }
 
+  async count(): Promise<number> {
+    return this.prisma.book.count();
+  }
+
   async updateStatus(
     id: string,
     status: BookStatus,
