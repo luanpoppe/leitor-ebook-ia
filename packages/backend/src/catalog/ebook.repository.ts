@@ -103,6 +103,24 @@ export class EbookRepository {
     await this.handleStatusUpdateBlocked(id, status);
   }
 
+  /**
+   * Remove o ebook pelo id. Usado na compensação do upload (fila indisponível),
+   * quando o livro recém-criado precisa sair do catálogo. `deleteMany` é
+   * idempotente: não lança com id inexistente nem exige validar o UUID antes,
+   * que é exatamente o comportamento best-effort esperado na compensação.
+   */
+  async deleteById(id: string): Promise<void> {
+    const result = await this.prisma.book.deleteMany({ where: { id } });
+
+    const wasDeleted = result.count > 0;
+    if (wasDeleted) {
+      this.logger.log(`Ebook removido do catálogo: ${id}.`);
+      return;
+    }
+
+    this.logger.warn(`Remoção ignorada: ebook ${id} não existe no catálogo.`);
+  }
+
   private assertValidCreateInput(input: CreateEbookInput): string {
     const isTitleEmpty = input.title.trim().length === 0;
     if (isTitleEmpty) {
