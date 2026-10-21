@@ -14,6 +14,7 @@ import {
 } from '../core/queue/redis-connection.provider';
 import { BookStatus } from '../generated/prisma/client';
 import { INGESTION_QUEUE_NAME } from './ingestion.constants';
+import { IngestionQueue } from './ingestion.queue';
 import { IngestionService } from './ingestion.service';
 
 type IngestionJobData = { bookId: string };
@@ -39,6 +40,7 @@ export class IngestionProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly connection: RedisConnection,
     private readonly ingestionService: IngestionService,
     private readonly ebookRepository: EbookRepository,
+    private readonly ingestionQueue: IngestionQueue,
   ) {}
 
   onModuleInit(): void {
@@ -150,7 +152,49 @@ export class IngestionProcessor implements OnModuleInit, OnModuleDestroy {
     const hasExhaustedAttempts = attemptsMade >= maxAttempts;
     if (!hasExhaustedAttempts) return;
 
+    const isReprocessPending = await this.hasPendingReprocess(bookId);
+    if (isReprocessPending) {
+      await this.reenqueueAfterReprocess(bookId, reason);
+      return;
+    }
+
     await this.markFailed(bookId, reason);
+  }
+
+  /**
+   * O reprocessamento da API marca `pending` antes de enfileirar; se o livro
+   * ainda estiver `pending` no fim das tentativas, o pedido caiu na janela em
+   * que este job estava ativo e o `enqueue` deduplicou contra ele. Sem isto, o
+   * livro ficaria `pending` sem job nenhum e o próximo reprocess daria 409.
+   */
+  private async hasPendingReprocess(bookId: string): Promise<boolean> {
+    try {
+      const book = await this.ebookRepository.findById(bookId);
+      return book?.status === BookStatus.PENDING;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao consultar status para reprocessamento: bookId=${bookId} motivo=${this.toMessage(error)}`,
+      );
+      return false;
+    }
+  }
+
+  private async reenqueueAfterReprocess(
+    bookId: string,
+    reason: string,
+  ): Promise<void> {
+    try {
+      await this.ingestionQueue.enqueue(bookId);
+      this.logger.log(
+        `Reprocessamento pendente reenfileirado: bookId=${bookId} motivoAnterior=${reason}`,
+      );
+    } catch (error) {
+      const message = this.toMessage(error);
+      this.logger.error(
+        `Falha ao reenfileirar reprocessamento: bookId=${bookId} motivo=${message}`,
+      );
+      await this.markFailed(bookId, reason);
+    }
   }
 
   private toMessage(error: unknown): string {

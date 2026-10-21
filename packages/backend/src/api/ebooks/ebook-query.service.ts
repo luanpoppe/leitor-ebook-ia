@@ -3,10 +3,6 @@ import { EbookNotFoundError } from '../../catalog/catalog.errors';
 import { EbookRepository } from '../../catalog/ebook.repository';
 import { Book } from '../../generated/prisma/client';
 import { FileStorageService } from '../../storage/file-storage.service';
-import {
-  StorageObjectNotFoundError,
-  StorageUnavailableError,
-} from '../../storage/storage.errors';
 import type { EbookDetail, EbookSummary, PagedEbooks } from './ebooks.schemas';
 
 /**
@@ -74,11 +70,8 @@ export class EbookQueryService {
     try {
       return await this.storage.getPresignedUrl(coverStorageKey);
     } catch (error) {
-      const isExpectedCoverFailure =
-        error instanceof StorageObjectNotFoundError ||
-        error instanceof StorageUnavailableError;
-      if (!isExpectedCoverFailure) throw error;
-
+      // Capa é opcional por contrato: qualquer falha (objeto ausente, storage
+      // fora, timeout do SDK) vira `coverUrl: null` em vez de derrubar o detalhe.
       const message = this.errorMessage(error);
       this.logger.warn(
         `Capa indisponível para a chave ${coverStorageKey}: ${message}`,

@@ -3,9 +3,15 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
-import { EbookRepository } from '../../catalog/ebook.repository';
-import { EbookNotFoundError } from '../../catalog/catalog.errors';
-import { BookFormat, BookStatus } from '../../generated/prisma/client';
+import {
+  type CreateEbookInput,
+  EbookRepository,
+} from '../../catalog/ebook.repository';
+import {
+  DuplicateEbookError,
+  EbookNotFoundError,
+} from '../../catalog/catalog.errors';
+import { Book, BookFormat, BookStatus } from '../../generated/prisma/client';
 import { IngestionQueue } from '../../ingestion/ingestion.queue';
 import { FileStorageService } from '../../storage/file-storage.service';
 import {
@@ -87,6 +93,12 @@ export class EbookUploadService {
 
     const format = this.resolveFormat(file.originalname);
     const hash = await this.hashFile(file.path);
+
+    // Duplicata é checada antes de escrever no storage: chave é `<hash>.<ext>`,
+    // então o mesmo conteúdo em outro formato criaria um objeto sem dono.
+    const existingBook = await this.ebookRepository.findByHash(hash);
+    if (existingBook) throw new DuplicateEbookError(existingBook.id);
+
     const stream = createReadStream(file.path);
     const storageKey = await this.storage.put({
       stream,
@@ -96,13 +108,16 @@ export class EbookUploadService {
     });
 
     const title = this.resolveTitle(file.originalname);
-    const book = await this.ebookRepository.create({
-      title,
-      format,
-      sizeBytes: file.size,
-      hash,
+    const book = await this.createBookOrRemoveObject(
+      {
+        title,
+        format,
+        sizeBytes: file.size,
+        hash,
+        storageKey,
+      },
       storageKey,
-    });
+    );
 
     await this.enqueueOrCompensate(book.id, storageKey);
 
@@ -115,6 +130,39 @@ export class EbookUploadService {
       status: this.toApiStatus(book.status),
       title: book.title,
     };
+  }
+
+  /**
+   * O objeto já está no storage quando o catálogo é criado; se a criação falhar
+   * (banco fora, unique de hash perdido numa corrida), o objeto é removido para
+   * não sobrar arquivo sem dono no bucket.
+   */
+  private async createBookOrRemoveObject(
+    input: CreateEbookInput,
+    storageKey: string,
+  ): Promise<Book> {
+    try {
+      return await this.ebookRepository.create(input);
+    } catch (error) {
+      const message = this.errorMessage(error);
+      this.logger.error(
+        `Falha ao criar livro; removendo objeto storageKey=${storageKey} erro=${message}`,
+      );
+      await this.tryRemoveObject(storageKey);
+      throw error;
+    }
+  }
+
+  /** A remoção nunca mascara o erro original: só registra a falha da limpeza. */
+  private async tryRemoveObject(storageKey: string): Promise<void> {
+    try {
+      await this.storage.remove(storageKey);
+    } catch (error) {
+      const message = this.errorMessage(error);
+      this.logger.error(
+        `Falha ao remover objeto storageKey=${storageKey} erro=${message}`,
+      );
+    }
   }
 
   private async enqueueOrCompensate(
