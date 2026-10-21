@@ -1,6 +1,7 @@
 id: ingestao-ebooks
 title: Ingestão de ebooks
 created: 2026-10-18
+archived: 2026-10-21
 format: md
 lang: pt-BR
 chunk_size: micro
