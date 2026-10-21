@@ -17,6 +17,11 @@ interface UploadEbookVariables {
   file: File;
 }
 
+export interface UseUploadEbookOptions {
+  onSuccess?: (result: UploadEbookResponse) => void;
+  onDuplicate?: (existingBookId: string) => void;
+}
+
 export interface UseUploadEbookResult {
   upload: (file: File) => void;
   progress: number;
@@ -25,7 +30,9 @@ export interface UseUploadEbookResult {
   reset: () => void;
 }
 
-export function useUploadEbook(): UseUploadEbookResult {
+export function useUploadEbook(
+  options: UseUploadEbookOptions = {}
+): UseUploadEbookResult {
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState<number>(INITIAL_PROGRESS);
   const [errorInfo, setErrorInfo] = useState<UploadEbookErrorInfo | null>(null);
@@ -44,14 +51,21 @@ export function useUploadEbook(): UseUploadEbookResult {
       setProgress(INITIAL_PROGRESS);
       setErrorInfo(null);
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ebookKeys.all });
       toast.success(UPLOAD_SUCCESS_MESSAGE);
+      // Progresso volta a zero no fim: a barra só existe durante o envio.
+      setProgress(INITIAL_PROGRESS);
+      options.onSuccess?.(result);
     },
     onError: (error) => {
       const failureInfo = getApiErrorInfo(error);
       setErrorInfo(failureInfo);
       toast.error(failureInfo.message);
+
+      if (failureInfo.existingBookId) {
+        options.onDuplicate?.(failureInfo.existingBookId);
+      }
     },
   });
 
