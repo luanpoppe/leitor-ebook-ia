@@ -111,9 +111,17 @@ export class PdfParser {
       return PdfChapterBuilder.fromHeadings(pageTexts);
     }
 
-    const startPages = contentOutline.map((entry) => entry.pageIndex);
-    const ranges = PdfOutlinePlanner.planRanges(startPages, pageTexts.length);
-    const titles = contentOutline.map((entry) => entry.title);
+    // Título e faixa precisam passar pela mesma seleção, senão o outline com
+    // páginas repetidas desalinha os títulos dos capítulos.
+    const entries = PdfOutlinePlanner.selectEntries(
+      contentOutline,
+      pageTexts.length,
+    );
+    const ranges = PdfOutlinePlanner.planRanges(
+      entries.map((entry) => entry.pageIndex),
+      pageTexts.length,
+    );
+    const titles = entries.map((entry) => entry.title);
 
     return PdfChapterBuilder.fromRanges(pageTexts, ranges, titles);
   }

@@ -91,10 +91,13 @@ export class BackfillTitlesService {
 
     const currentCount = await this.contentRepository.countChapters(book.id);
     const stream = await this.storage.get(book.storageKey);
-    const content = await this.contentExtractor.extract({
-      format: book.format,
-      stream,
-    });
+    const content = await this.contentExtractor.extract(
+      {
+        format: book.format,
+        stream,
+      },
+      { persistCover: false },
+    );
 
     const countsMatch = content.chapters.length === currentCount;
     if (!countsMatch) {

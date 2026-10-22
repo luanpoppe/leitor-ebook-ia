@@ -47,7 +47,10 @@ export class ContentExtractor {
     private readonly storage: FileStorageService,
   ) {}
 
-  async extract(input: ExtractionInput): Promise<ExtractedContent> {
+  async extract(
+    input: ExtractionInput,
+    options: { persistCover?: boolean } = {},
+  ): Promise<ExtractedContent> {
     this.logger.log(`Iniciando extração de conteúdo: formato=${input.format}`);
 
     const parser = this.selectParser(input.format);
@@ -58,7 +61,12 @@ export class ContentExtractor {
       `Conteúdo extraído: formato=${input.format}, capítulos=${result.chapters.length}, capa=${hasCover ? 'sim' : 'não'}`,
     );
 
-    const coverStorageKey = await this.storeCover(result.metadata.cover);
+    // O backfill de títulos só reaproveita o texto, então não precisa reenviar
+    // a capa para o storage.
+    const shouldPersistCover = options.persistCover !== false;
+    const coverStorageKey = shouldPersistCover
+      ? await this.storeCover(result.metadata.cover)
+      : undefined;
 
     return {
       chapters: result.chapters,

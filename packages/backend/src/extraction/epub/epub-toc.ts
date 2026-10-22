@@ -20,6 +20,12 @@ export interface EpubTableOfContents {
 interface NcxNavPointEntry {
   source: string;
   label: string | null;
+  depth: number;
+}
+
+interface LabelCandidate {
+  label: string;
+  depth: number;
 }
 
 /**
@@ -170,7 +176,7 @@ export class EpubTableOfContentsReader {
     navPath: string,
     navContent: string,
   ): Map<string, string> {
-    const labelsByPath = new Map<string, string>();
+    const candidatesByPath = new Map<string, LabelCandidate>();
 
     for (const match of navContent.matchAll(ANCHOR_PATTERN)) {
       const path = EpubArchive.resolveHref(navPath, match[1]);
@@ -179,9 +185,50 @@ export class EpubTableOfContentsReader {
       const label = HtmlToText.convert(match[2]);
       if (label.length === 0) continue;
 
-      // Sumário hierárquico: o item mais específico aparece depois da parte,
-      // então a última ocorrência do caminho vence.
-      labelsByPath.set(path, label);
+      const anchorIndex = match.index ?? 0;
+      const prefix = navContent.slice(0, anchorIndex);
+      const depth = EpubTableOfContentsReader.countListDepth(prefix);
+
+      EpubTableOfContentsReader.keepMoreSpecificLabel(candidatesByPath, path, {
+        label,
+        depth,
+      });
+    }
+
+    return EpubTableOfContentsReader.toLabelsByPath(candidatesByPath);
+  }
+
+  private static countListDepth(prefix: string): number {
+    const openings = prefix.match(/<(?:ol|ul)\b/gi)?.length ?? 0;
+    const closings = prefix.match(/<\/(?:ol|ul)\s*>/gi)?.length ?? 0;
+
+    return openings - closings;
+  }
+
+  /**
+   * Entrada mais profunda vence (parte → capítulo); em empate de profundidade
+   * a primeira vence, pois irmãos costumam apontar para o mesmo arquivo.
+   */
+  private static keepMoreSpecificLabel(
+    candidatesByPath: Map<string, LabelCandidate>,
+    path: string,
+    candidate: LabelCandidate,
+  ): void {
+    const current = candidatesByPath.get(path);
+    const isMoreSpecific =
+      current === undefined || candidate.depth > current.depth;
+    if (!isMoreSpecific) return;
+
+    candidatesByPath.set(path, candidate);
+  }
+
+  private static toLabelsByPath(
+    candidatesByPath: Map<string, LabelCandidate>,
+  ): Map<string, string> {
+    const labelsByPath = new Map<string, string>();
+
+    for (const [path, candidate] of candidatesByPath) {
+      labelsByPath.set(path, candidate.label);
     }
 
     return labelsByPath;
@@ -201,10 +248,14 @@ export class EpubTableOfContentsReader {
     const navMap = EpubXml.toRecord(ncx.navMap);
     const entries: NcxNavPointEntry[] = [];
 
-    EpubTableOfContentsReader.collectNavPointEntries(navMap.navPoint, entries);
+    EpubTableOfContentsReader.collectNavPointEntries(
+      navMap.navPoint,
+      entries,
+      0,
+    );
 
     const orderedPaths: string[] = [];
-    const labelsByPath = new Map<string, string>();
+    const candidatesByPath = new Map<string, LabelCandidate>();
 
     for (const entry of entries) {
       const path = EpubArchive.resolveHref(ncxPath, entry.source);
@@ -213,36 +264,47 @@ export class EpubTableOfContentsReader {
       if (entry.label === null) continue;
       if (path.length === 0) continue;
 
-      // Sumário hierárquico: o item mais específico aparece depois da parte,
-      // então a última ocorrência do caminho vence.
-      labelsByPath.set(path, entry.label);
+      EpubTableOfContentsReader.keepMoreSpecificLabel(candidatesByPath, path, {
+        label: entry.label,
+        depth: entry.depth,
+      });
     }
 
     return {
       orderedPaths,
       excludedPaths: new Set([ncxPath]),
-      labelsByPath,
+      labelsByPath: EpubTableOfContentsReader.toLabelsByPath(candidatesByPath),
     };
   }
 
   private static collectNavPointEntries(
     navPoints: unknown,
     entries: NcxNavPointEntry[],
+    depth: number,
   ): void {
     for (const navPoint of EpubXml.toArray(navPoints)) {
       const record = EpubXml.toRecord(navPoint);
       const source = EpubXml.readAttribute(record.content, '@_src');
       const navLabel = EpubXml.toRecord(record.navLabel);
-      const label = EpubXml.readText(navLabel.text);
+      const label = EpubTableOfContentsReader.convertNcxLabel(navLabel.text);
 
       if (typeof source === 'string') {
-        entries.push({ source, label: label ?? null });
+        entries.push({ source, label, depth });
       }
 
       EpubTableOfContentsReader.collectNavPointEntries(
         record.navPoint,
         entries,
+        depth + 1,
       );
     }
+  }
+
+  private static convertNcxLabel(rawLabel: unknown): string | null {
+    const labelText = EpubXml.readText(rawLabel);
+    if (labelText === undefined) return null;
+
+    const convertedLabel = HtmlToText.convert(labelText);
+    return convertedLabel.length > 0 ? convertedLabel : null;
   }
 }
