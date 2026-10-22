@@ -13,6 +13,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "dev": "prisma generate && pnpm run start:dev",
+    "backfill:titles": "ts-node -r tsconfig-paths/register src/cli/backfill-titles.ts",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "start:debug": "nest start --debug --watch",
