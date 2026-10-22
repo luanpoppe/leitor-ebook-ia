@@ -19,3 +19,4 @@
 - [titulos-de-capitulo](./titulos-de-capitulo.md) — nome de cada capítulo extraído do arquivo, persistido em `chapters.title` e backfill dos livros antigos
 - [api-de-capitulos](./api-de-capitulos.md) — rotas de sumário e de página de capítulo, com paginação por offset e vizinhos
 - [progresso-de-leitura](./progresso-de-leitura.md) — ponto de retomada por livro (capítulo + offset em caracteres), rotas GET/PUT e as decisões de 204 e PK por livro
+- [tela-de-leitura](./tela-de-leitura.md) — rota `/ebooks/[id]/ler`: sumário em drawer, tipografia, teclado, retomada, gravação com debounce/beacon e estados de erro/fim
