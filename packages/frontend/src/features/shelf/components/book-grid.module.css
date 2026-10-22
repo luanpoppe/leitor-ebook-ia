@@ -70,7 +70,9 @@
   margin-top: 6px;
 }
 
-.retryText {
+.retryText,
+.readLink {
+  display: inline-block;
   margin-top: 8px;
   padding: 0;
   border: 0;
@@ -84,6 +86,16 @@
 .retryText:disabled {
   color: var(--muted);
   cursor: progress;
+}
+
+.readLink:hover {
+  color: var(--accent-ink);
+}
+
+.readLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 .skeletonCard {
