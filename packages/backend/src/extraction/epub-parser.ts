@@ -45,15 +45,13 @@ export class EpubParser {
   private async extract(stream: Readable): Promise<ExtractionResult> {
     const archive = await EpubArchive.open(stream);
     const packageDocument = EpubPackageReader.read(archive);
-    const rawChapterTexts = this.collectChapterTexts(
-      archive,
-      packageDocument,
-    );
+    const chapterDrafts = this.collectChapterTexts(archive, packageDocument);
 
     const chapters = TextNormalizer.normalizeChapters(
-      rawChapterTexts.map((text, index) => ({
+      chapterDrafts.map((draft, index) => ({
         position: index + 1,
-        text,
+        title: draft.title,
+        text: draft.text,
       })),
     );
 
@@ -75,7 +73,7 @@ export class EpubParser {
   private collectChapterTexts(
     archive: EpubArchive,
     packageDocument: EpubPackageDocument,
-  ): string[] {
+  ): Array<{ title: string | null; text: string }> {
     const tableOfContents = EpubTableOfContentsReader.read(
       archive,
       packageDocument,
@@ -96,13 +94,15 @@ export class EpubParser {
       .map((item) =>
         EpubArchive.resolveHref(packageDocument.packagePath, item.href),
       );
-    const allTexts = this.readDocumentTexts(
-      archive,
-      allPaths,
-      tableOfContents,
-    );
+    const allTexts = this.readDocumentTexts(archive, allPaths, tableOfContents);
 
-    return allTexts.length > 1 ? [allTexts.join('\n\n')] : allTexts;
+    if (allTexts.length <= 1) return allTexts;
+
+    // Vários documentos juntados viram um capítulo artificial: o título de um
+    // deles não representa o conjunto, então o capítulo fica sem título.
+    const joinedText = allTexts.map((document) => document.text).join('\n\n');
+
+    return [{ title: null, text: joinedText }];
   }
 
   private listSpinePaths(packageDocument: EpubPackageDocument): string[] {
@@ -123,7 +123,7 @@ export class EpubParser {
     archive: EpubArchive,
     paths: string[],
     tableOfContents: EpubTableOfContents,
-  ): string[] {
+  ): Array<{ title: string | null; text: string }> {
     const chapterPaths = paths.filter(
       (path) => !tableOfContents.excludedPaths.has(path),
     );
@@ -131,30 +131,39 @@ export class EpubParser {
       chapterPaths,
       tableOfContents.orderedPaths,
     );
-    const texts: string[] = [];
+    const documents: Array<{ title: string | null; text: string }> = [];
 
     for (const path of orderedPaths) {
       const html = archive.tryReadText(path);
 
       if (html === undefined) {
-        this.logger.warn(`Documento do EPUB não encontrado, ignorando: ${path}`);
+        this.logger.warn(
+          `Documento do EPUB não encontrado, ignorando: ${path}`,
+        );
         continue;
       }
 
       const isNavigationDocument =
         EpubTableOfContentsReader.isTableOfContentsDocument(html);
       const isVisibleContents =
-        EpubTableOfContentsReader.isLinkHeavyContentsDocument(html, paths, path);
+        EpubTableOfContentsReader.isLinkHeavyContentsDocument(
+          html,
+          paths,
+          path,
+        );
 
       if (isNavigationDocument || isVisibleContents) continue;
 
       const text = HtmlToText.convert(html);
       if (text.length === 0) continue;
 
-      texts.push(text);
+      const title =
+        tableOfContents.labelsByPath.get(path) ?? HtmlToText.firstHeading(html);
+
+      documents.push({ title, text });
     }
 
-    return texts;
+    return documents;
   }
 
   private joinChapters(chapters: ExtractedChapter[]): string {
