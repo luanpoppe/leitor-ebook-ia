@@ -90,6 +90,28 @@ export class ChapterReadingRepository {
     return this.toChapterPage(row);
   }
 
+  // Tamanho em caracteres do capítulo, usado para validar o offset antes de
+  // gravar o progresso. `null` quando a posição não existe no ebook.
+  async findChapterLength(
+    bookId: string,
+    position: number,
+  ): Promise<number | null> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ length: number | string }>
+    >`
+      SELECT char_length("text") AS "length"
+      FROM "chapters"
+      WHERE "book_id" = ${bookId}::uuid
+        AND "position" = ${position}
+    `;
+
+    const row = rows[0];
+    const hasRow = row !== undefined;
+    if (!hasRow) return null;
+
+    return Number(row.length);
+  }
+
   async findAdjacentPositions(
     bookId: string,
     position: number,
