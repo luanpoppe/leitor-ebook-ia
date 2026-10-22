@@ -8,8 +8,8 @@ export interface SaveReadingProgressInput {
 }
 
 /**
- * Persistência do progresso de leitura por ebook: um registro por livro
- * (o progresso mais avançado é o que interessa para retomar a leitura).
+ * Persistência do progresso de leitura por ebook: um registro por livro,
+ * sempre com o último ponto salvo (não há lógica de "maior offset").
  */
 @Injectable()
 export class ReadingProgressRepository {
@@ -20,7 +20,8 @@ export class ReadingProgressRepository {
   }
 
   // O contrato usa `offset`, mas a coluna é `char_offset` porque OFFSET é
-  // palavra-chave SQL; a tradução acontece só aqui, na borda do banco.
+  // palavra-chave SQL. A tradução de entrada acontece aqui; a de saída fica em
+  // `ReadingProgressService.toResponse`.
   async upsert(
     bookId: string,
     input: SaveReadingProgressInput,

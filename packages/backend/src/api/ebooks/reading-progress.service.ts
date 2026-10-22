@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   ChapterNotFoundError,
   EbookNotFoundError,
@@ -18,6 +18,8 @@ import type { ReadingProgressResponse } from './progress.schemas';
  */
 @Injectable()
 export class ReadingProgressService {
+  private readonly logger = new Logger(ReadingProgressService.name);
+
   constructor(
     private readonly ebookRepository: EbookRepository,
     private readonly progressRepository: ReadingProgressRepository,
@@ -51,6 +53,9 @@ export class ReadingProgressService {
     // o tamanho é inválido.
     const isOffsetBeyondChapter = input.offset > chapterLength;
     if (isOffsetBeyondChapter) {
+      this.logger.warn(
+        `Offset recusado no ebook ${bookId}: capítulo ${input.chapterPosition}, offset ${input.offset}, tamanho ${chapterLength}.`,
+      );
       throw new InvalidReadingProgressError(
         bookId,
         input.chapterPosition,
@@ -60,6 +65,9 @@ export class ReadingProgressService {
     }
 
     const saved = await this.progressRepository.upsert(bookId, input);
+    this.logger.log(
+      `Progresso salvo no ebook ${bookId}: capítulo ${input.chapterPosition}, offset ${input.offset}.`,
+    );
 
     return this.toResponse(saved);
   }
