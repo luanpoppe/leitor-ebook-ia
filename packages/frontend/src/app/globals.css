@@ -3,19 +3,52 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --ground: #f8f8f6;
+  --surface: #ffffff;
+  --raised: #f4f2ea;
+  --border: #e9e7e0;
+  --rule: #f3f1ea;
+
+  --text: #111827;
+  --muted: #5f6672;
+  --positive: #247b50;
+  --negative: #b42318;
+
+  --accent: #e9c46a;
+  --accent-hover: #ddb654;
+  --accent-soft: #fbf3dc;
+  --accent-track: #f3e3b9;
+  --accent-ink: #5b4508;
+  --on-accent: #241c05;
+
+  --radius: 8px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: var(--accent-track);
 }

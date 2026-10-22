@@ -1,0 +1,154 @@
+.root {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--ground);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 28px 18px 40px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 18px;
+  height: 18px;
+  color: var(--accent-ink);
+}
+
+.scope {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.scopeName {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.scopeMeta {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navLabel {
+  padding: 0 12px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.navItem:hover {
+  color: var(--text);
+}
+
+.navItemActive {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+.navItemMuted {
+  opacity: 0.55;
+}
+
+.navCount {
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebarFoot {
+  margin-top: auto;
+  padding: 0 12px;
+}
+
+.footerNote {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.canvas {
+  min-width: 0;
+  padding: 32px 36px 48px;
+}
+
+.content {
+  max-width: 1240px;
+}
+
+@media (max-width: 900px) {
+  .root {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    overflow: visible;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--surface);
+  }
+
+  .scope,
+  .navLabel,
+  .navItemMuted,
+  .sidebarFoot {
+    display: none;
+  }
+
+  .nav {
+    flex-direction: row;
+    margin-left: auto;
+  }
+
+  .canvas {
+    padding: 24px 22px 40px;
+  }
+}

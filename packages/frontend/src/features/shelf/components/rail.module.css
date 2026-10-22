@@ -1,0 +1,185 @@
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.railSection {
+  min-width: 0;
+}
+
+.railHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.railCount {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.upload {
+  padding: 18px;
+  border: 1px dashed transparent;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  cursor: pointer;
+}
+
+.upload:hover {
+  background: var(--accent-track);
+}
+
+.upload:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.uploadDragging {
+  border-color: var(--accent);
+}
+
+.uploadBusy {
+  cursor: progress;
+}
+
+.uploadTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.uploadHint {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.uploadButton {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.progressTrack {
+  height: 3px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--accent-track);
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+.uploadError {
+  margin: 8px 0 0;
+  color: var(--negative);
+  font-size: 12px;
+}
+
+.railCard {
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.railList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.railItem {
+  border-bottom: 1px solid var(--rule);
+}
+
+.railItem:last-child {
+  border-bottom: 0;
+}
+
+.railItemButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.railItemButton:hover {
+  background: var(--accent-soft);
+}
+
+.railItemButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.railBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.railTitle {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.railMeta {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.railEmpty {
+  padding: 16px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .railSection:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .railSection:last-child {
+    grid-column: auto;
+  }
+}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { Providers } from "./providers";
@@ -7,19 +7,23 @@ import { Providers } from "./providers";
 // layout (servidor), falhando o build cedo se NEXT_PUBLIC_API_URL faltar/for inválida.
 import "@/env";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
+// Geist Mono carrega só o identificador curto na ficha do livro.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Leitor de Ebooks com IA",
-  description: "Plataforma de leitura de ebooks com IA.",
+  title: "Folio · Leitor de ebooks com IA",
+  description:
+    "Sua estante pessoal de ebooks, com ingestão acompanhada e leitura assistida por IA.",
 };
 
 export default function RootLayout({
@@ -30,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${dmSans.variable} ${geistMono.variable} antialiased`}
       >
         <Toaster />
         <Providers>{children}</Providers>
