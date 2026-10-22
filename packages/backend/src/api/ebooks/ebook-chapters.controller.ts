@@ -22,6 +22,7 @@ export class EbookChaptersController {
   @ApiOperation({ summary: 'Lista o sumário de capítulos do ebook' })
   @ApiResponse({ status: 200, description: 'Sumário de capítulos.' })
   @ApiResponse({ status: 404, description: 'Ebook não encontrado.' })
+  @ApiResponse({ status: 409, description: 'Ebook ainda não está pronto.' })
   list(@Param('bookId') bookId: string): Promise<ChapterListResponse> {
     return this.readingService.listChapters(bookId);
   }

@@ -56,10 +56,7 @@ export class ChapterReadingRepository {
         "id",
         "position",
         "title",
-        COALESCE(
-          array_length(regexp_split_to_array(btrim("text"), '\\s+'), 1),
-          0
-        ) AS "word_count"
+        regexp_count(btrim("text"), '\\s+') + 1 AS "word_count"
       FROM "chapters"
       WHERE "book_id" = ${bookId}::uuid
       ORDER BY "position" ASC
