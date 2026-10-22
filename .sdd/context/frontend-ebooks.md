@@ -1,33 +1,37 @@
 # Frontend de ebooks
 
-> Atualizado em 2026-10-21 · fontes: `packages/frontend/src/features/ebooks/**`, `packages/frontend/src/app/**`
+> Atualizado em 2026-10-21 · fontes: `packages/frontend/src/features/shelf/**`, `packages/frontend/src/features/ebooks/**`, `packages/frontend/src/app/**`
 
 ## O que é
 
-A tela inicial do produto: a home virou a estante, onde o leitor arrasta o ebook, vê o progresso do envio e acompanha sozinho o processamento de cada livro. Cada livro abre em painel (e em página própria por link), e quem falhou pode ser reprocessado sem reenviar o arquivo.
+A home é a estante: o leitor envia o ebook, acompanha o preparo e abre a ficha de cada livro. O visual segue a direção **Vitrine editorial** (composição da Vitrine + prateleira de capas grandes do Editorial) com o amarelo **Manteiga** como cor de destaque.
 
 ## Como funciona
 
-- `Estante` (`components/estante.tsx`) compõe a tela: `UploadDropzone`, estados de carregamento/vazio/erro, grade de `EbookCard`, botão "Carregar mais" e `EbookDetailPanel` quando há livro selecionado. A home (`src/app/page.tsx`) é só um componente de servidor que renderiza `<Estante />`.
-- `useEbooks` (`use-ebooks.ts`) usa `useInfiniteQuery` com `pageSize` 20, achata as páginas e refaz a lista a cada 3s **somente** enquanto algum item carregado está `pending`/`processing`.
-- `useEbookDetail` (`use-ebook-detail.ts`) busca por id, mantém o polling no mesmo critério e expõe `notFound` (404) separado de falha de rede.
-- `useUploadEbook` envia com `onUploadProgress`, expõe percentual, `errorInfo` normalizado e callbacks `onSuccess`/`onDuplicate`; invalida a estante ao concluir.
-- `useReprocessEbook` mantém um conjunto de ids em voo (`isReprocessingFor`), ignora clique repetido no mesmo livro e invalida estante e detalhe tanto no sucesso quanto no erro.
-- A camada de API (`api.ts`) envolve as quatro rotas na instância axios de `@/utils/http`; `getApiErrorInfo` traduz `{ statusCode, message, id }` e erros de rede, e é a fonte das mensagens de erro na tela.
-- `format.ts` formata data/hora, bytes (B/KB/MB/GB) e extensão em pt-BR; `constants.ts` concentra 50 MB, extensões aceitas, `accept` e o tamanho de página.
+- `ShelfPage` (`features/shelf/components/shelf-page.tsx`) compõe a home: `AppShell` (sidebar + canvas), `ShelfHeader`, `LeadCard` (livro mais recente pronto), `StatsStrip`, `BookGrid` e `ShelfRail` (envio, fila de preparo e últimos envios). A home (`src/app/page.tsx`) só renderiza `<ShelfPage />`.
+- `AppShell` centraliza a marca **Folio** (`product.ts`), a navegação e o rodapé; a mesma casca é usada pela ficha em `/ebooks/[id]`. No celular a sidebar vira uma barra no topo.
+- `useShelf` (`hooks/use-shelf.ts`) junta `useEbooks` + `useReprocessEbook`, calcula `ShelfStats` e cuida do livro selecionado e do destaque de duplicata.
+- `useEbookFileDrop` (`hooks/use-ebook-file-drop.ts`) é o comportamento da área de envio: validação local, drag-and-drop, progresso, erros e duplicata. `UploadFileValidator` é compartilhado com a API.
+- `BookCover` (`components/book-cover.tsx`) mostra a capa pré-assinada e, quando não há capa, uma capa tipográfica (título + formato) em vez de um ícone ou espaço vazio.
+- `BookDetailDialog` (modal na estante) e `BookDetailPage` (`/ebooks/[id]`) compartilham `useEbookDetail`, `DetailFacts` e `StatusMark`; ambos usam o mesmo cache React Query.
+- `format.ts` formata data/hora, bytes e extensão; `constants.ts` concentra 50 MB, extensões e o tamanho de página.
 
 ## Decisões e porquês
 
-- **Validação local antes do upload** — extensão e tamanho são barrados no navegador para o aviso ser imediato; a API continua sendo a autoridade.
-- **Polling condicionado** — 3s enquanto há livro em ingestão, `false` nos estados finais; sem isso a tela consultaria para sempre, e com isso cumpre o "atualiza sozinho".
-- **Duplicata destacada** — o 409 traz o id do livro existente; a estante rola até o cartão e o destaca por 4s. Se o cartão não estiver nas páginas carregadas, abre o painel daquele livro.
-- **Mensagem de erro do cartão vem do detalhe** — a listagem original não trazia `errorMessage`; o cartão busca `GET /ebooks/:id` só quando o status é `failed`.
-- **Capa na listagem** — o resumo da API passou a incluir `coverUrl` (presign por item, falha isolada vira `null`), então a grade mostra capa real.
-- **Painel e página usam os mesmos hooks** — o detalhe em modal e em `/ebooks/[id]` compartilha cache; o painel é modal com foco preso, Esc, clique fora e restauração de foco.
-- **Um componente por arquivo em `src/features/ebooks/components/`** — o `content` do Tailwind ganhou `./src/features/**` para as classes existirem em produção.
+- **Tokens no `globals.css`** — cor, tipografia e espaçamento vivem em custom properties (`--accent`, `--accent-soft`, `--on-accent`, …). Trocar o amarelo é trocar cinco valores; a interface não espalha hex.
+- **Somente tema claro** — o `prefers-color-scheme` antigo pintava o fundo de escuro e deixava o texto escuro (contraste 1.1:1). O produto agora fixa `color-scheme: light` e seus próprios tokens.
+- **Texto sobre o amarelo é escuro** — branco sobre Manteiga não passa em contraste; `--on-accent` resolve botão, chips e ação primária.
+- **Destaque = livro mais recente pronto** — se nenhum estiver pronto, cai para o primeiro da lista. O título é encurtado no destaque (`ShortTitle`) e completo na ficha.
+- **Grade de capas 4/3/2** — a largura máxima da estante com o trilho de 340px comporta quatro capas em 1440, três em tablets e duas no celular.
+- **Trilho de 340px** — o padrão estudado era 384px; reduzimos para as capas ganharem ~207px de largura sem perder o painel de envio.
+- **Duplicata destacada** — o 409 traz o id existente; a estante rola até o cartão e o destaca por 4s. Fora das páginas carregadas, abre a ficha.
+- **Ficha conta a preparação** — a página do livro explica em uma frase o estado real (`pending`/`processing`/`ready`/`failed`) e mantém o motivo do erro e o “Tentar de novo” no mesmo painel.
+- **Modal sempre com fechar visível** — o botão de fechar fica fixo no canto do diálogo em qualquer estado (carregando, erro, sucesso), garantindo o foco inicial do `useDialogPanel`.
+- **Capa sem imagem vira capa tipográfica** — título e formato no lugar da arte, na cor de destaque; não há placeholder cinza nem ícone.
 
 ## Notas
 
-- `npm`/`pnpm` scripts: `pnpm --filter @leitor-ebook-ia/frontend run lint` e `run build`.
-- Rotas: `/` (estante, estática) e `/ebooks/[id]` (detalhe, dinâmica).
-- Pendências adiadas do code review: paginação por offset pode duplicar item entre abas; polling refaz todas as páginas carregadas; `<h3>` dentro de `<button>` no cartão (a11y); detalhe duplicado entre painel e página.
+- Rode `pnpm --filter @leitor-ebook-ia/frontend run lint` e `run build`; tipos com `exec tsc --noEmit`.
+- Rotas: `/` (estante) e `/ebooks/[id]` (ficha do livro).
+- Nome e assinatura do produto ficam em `features/shelf/product.ts`; o título do documento em `app/layout.tsx`.
+- Pendências antigas ainda válidas: paginação por offset pode duplicar item entre abas; o polling refaz todas as páginas carregadas. O `<h3>` dentro de `<button>` foi resolvido (títulos viraram `span`).
