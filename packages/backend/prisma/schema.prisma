@@ -50,6 +50,7 @@ model Chapter {
   id       String @id @default(uuid(7)) @db.Uuid
   bookId   String @map("book_id") @db.Uuid
   position Int
+  title    String? @db.VarChar(200)
   text     String
 
   book   Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
