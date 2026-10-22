@@ -230,6 +230,7 @@ export class EbookContentRepository {
         data: {
           bookId,
           position: chapter.position,
+          title: chapter.title ?? null,
           text: chapter.text,
         },
         select: { id: true },

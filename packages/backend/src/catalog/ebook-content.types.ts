@@ -14,6 +14,7 @@ export interface ReplaceContentChunkInput {
 
 export interface ReplaceContentChapterInput {
   position: number;
+  title?: string | null;
   text: string;
   chunks: ReplaceContentChunkInput[];
 }
