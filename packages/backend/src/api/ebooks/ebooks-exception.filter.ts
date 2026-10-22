@@ -3,8 +3,10 @@ import { BaseExceptionFilter } from '@nestjs/core';
 import type { Response } from 'express';
 import { MulterError } from 'multer';
 import {
+  ChapterNotFoundError,
   DuplicateEbookError,
   EbookNotFoundError,
+  EbookNotReadyError,
   InvalidEbookContentError,
   InvalidEbookInputError,
 } from '../../catalog/catalog.errors';
@@ -36,6 +38,8 @@ interface ErrorBody {
  */
 @Catch(
   EbookNotFoundError,
+  EbookNotReadyError,
+  ChapterNotFoundError,
   DuplicateEbookError,
   InvalidEbookContentError,
   InvalidEbookInputError,
@@ -94,10 +98,12 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
 
   private resolveStatusCode(exception: unknown): number | null {
     if (exception instanceof EbookNotFoundError) return HttpStatus.NOT_FOUND;
+    if (exception instanceof ChapterNotFoundError) return HttpStatus.NOT_FOUND;
     if (exception instanceof StorageObjectNotFoundError) {
       return HttpStatus.NOT_FOUND;
     }
     if (exception instanceof DuplicateEbookError) return HttpStatus.CONFLICT;
+    if (exception instanceof EbookNotReadyError) return HttpStatus.CONFLICT;
     if (exception instanceof InvalidEbookStatusError) {
       return HttpStatus.CONFLICT;
     }
