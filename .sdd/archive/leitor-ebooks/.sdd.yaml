@@ -2,6 +2,7 @@
 id: leitor-ebooks
 title: Leitor de ebooks
 created: 2026-10-22
+archived: 2026-10-22
 format: md
 lang: pt-BR
 chunk_size: medium
