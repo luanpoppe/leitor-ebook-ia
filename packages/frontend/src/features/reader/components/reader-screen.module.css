@@ -7,6 +7,11 @@
   color: var(--text);
 }
 
+.screen[data-theme="sepia"] {
+  background: #f4ecd8;
+  color: #3f3428;
+}
+
 .main {
   display: flex;
   flex: 1;

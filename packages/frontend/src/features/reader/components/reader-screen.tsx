@@ -31,7 +31,6 @@ export function ReaderScreen({
     chapters,
     chapter,
     currentPosition,
-    isLoading,
     errorKind,
     resumeOffset,
     hasPrevious,
@@ -84,6 +83,7 @@ export function ReaderScreen({
   }, [goNext, hasNext]);
 
   const handlePrevious = useCallback(() => {
+    setHasReachedEnd(false);
     goPrevious();
   }, [goPrevious]);
 
@@ -158,7 +158,9 @@ export function ReaderScreen({
       );
     }
 
-    const isOpeningBook = isLoading && chapter === null;
+    // Erro e fim do livro já saíram acima; sem capítulo e sem erro, ainda
+    // estamos abrindo o livro — inclusive se a query ainda nem começou.
+    const isOpeningBook = chapter === null;
     if (isOpeningBook) {
       return (
         <div className={styles.loading} aria-live="polite">
@@ -181,7 +183,7 @@ export function ReaderScreen({
   };
 
   return (
-    <div className={styles.screen}>
+    <div className={styles.screen} data-theme={theme}>
       <ReaderToolbar
         bookTitle={readerTitle}
         backHref={backHref}

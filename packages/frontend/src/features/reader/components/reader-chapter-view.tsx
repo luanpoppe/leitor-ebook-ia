@@ -46,8 +46,16 @@ export function ReaderChapterView({
     const viewport = viewportRef.current;
     if (viewport === null) return;
 
-    scrollToOffset(viewport, resumeOffset);
-  }, [chapter.id, resumeOffset]);
+    // Offset além do texto (capítulo encurtou) volta ao início em vez de
+    // grudar no último parágrafo.
+    const isOffsetBeyondChapter = resumeOffset >= chapter.totalLength;
+    const appliedOffset = isOffsetBeyondChapter ? 0 : resumeOffset;
+    scrollToOffset(viewport, appliedOffset);
+
+    // Reportar o ponto restaurado grava a troca de capítulo mesmo sem rolagem.
+    const reportPosition = onPositionChangeRef.current;
+    reportPosition(chapter.position, appliedOffset);
+  }, [chapter.id, chapter.position, chapter.totalLength, resumeOffset]);
 
   useEffect(() => {
     return () => {

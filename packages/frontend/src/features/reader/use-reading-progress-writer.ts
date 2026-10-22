@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { saveReadingProgress } from "./api";
+import { ReaderProgressBeacon } from "./reader-progress-beacon";
 
 // Ficar 2 s parado no mesmo ponto já conta como "terminei de rolar".
 export const SAVE_DEBOUNCE_MS = 2_000;
@@ -87,6 +88,31 @@ export function useReadingProgressWriter(bookId: string): {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [flush]);
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      const pending = pendingRef.current;
+      if (pending === null) return;
+
+      pendingRef.current = null;
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      const input = {
+        chapterPosition: pending.chapterPosition,
+        offset: pending.offset,
+      };
+      // `flush` normal pode ser abortado no unload; o beacon é o caminho seguro.
+      ReaderProgressBeacon.send(bookId, input);
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [bookId]);
 
   useEffect(() => {
     return () => {

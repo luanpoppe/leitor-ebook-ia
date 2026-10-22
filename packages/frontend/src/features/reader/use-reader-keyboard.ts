@@ -53,6 +53,13 @@ export function useReaderKeyboard({
       const isPageScrollKey = isPageDown || isPageUp || isSpace;
       if (!isPageScrollKey) return;
 
+      // Com o sumário aberto, rolar o capítulo por trás do drawer confunde.
+      if (isTocOpen) return;
+
+      // Em botão/link, a ativação nativa (Espaço/Enter) deve acontecer.
+      const isActivationTarget = isButtonOrLinkTarget(event.target);
+      if (isActivationTarget) return;
+
       scrollChapterByPage(isPageUp, event);
     },
     [isReadingBlocked, isTocOpen, onCloseToc, onNext, onPrevious]
@@ -74,6 +81,13 @@ function isEditableTarget(target: EventTarget | null): boolean {
     tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
   const isEditable = isFormField || target.isContentEditable;
   return isEditable;
+}
+
+function isButtonOrLinkTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  const tagName = target.tagName;
+  return tagName === "BUTTON" || tagName === "A";
 }
 
 function scrollChapterByPage(

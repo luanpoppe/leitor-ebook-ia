@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getApiErrorInfo } from "@/features/ebooks/api";
 import {
-  getChapter,
+  getFullChapter,
   getReadingProgress,
   listChapters,
 } from "./api";
@@ -99,6 +99,7 @@ export function useReader(
   const chapter = chapterQuery.data ?? null;
   const errorKind = resolveErrorKind(
     chaptersQuery.error,
+    progressQuery.error,
     chapterQuery.error
   );
 
@@ -177,7 +178,7 @@ async function fetchChapter(
   bookId: string,
   position: number
 ): Promise<ChapterPage> {
-  const chapter = await getChapter(bookId, position);
+  const chapter = await getFullChapter(bookId, position);
   return chapter;
 }
 
@@ -208,6 +209,7 @@ function resolveFirstChapterPosition(chapters: ChapterSummary[]): number {
 
 function resolveErrorKind(
   chaptersError: Error | null,
+  progressError: Error | null,
   chapterError: Error | null
 ): ReaderErrorKind | null {
   if (chaptersError) {
@@ -216,6 +218,10 @@ function resolveErrorKind(
     if (chaptersErrorInfo.statusCode === 409) return "not-ready";
     return "unknown";
   }
+
+  // O progresso salvo decide a abertura; se ele falhar, não dá para retomar com
+  // segurança, então a tela oferece "Tentar de novo" em vez de abrir do zero.
+  if (progressError) return "unknown";
 
   if (chapterError) {
     const chapterErrorInfo = getApiErrorInfo(chapterError);
