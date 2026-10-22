@@ -1,0 +1,29 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: #fdfcf9;
+  color: var(--text);
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.loadingText {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
