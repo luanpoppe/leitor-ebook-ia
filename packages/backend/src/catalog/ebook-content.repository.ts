@@ -22,6 +22,11 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_FAILURE_MESSAGE = 'Falha na ingestão sem detalhe informado.';
 
+// Livros grandes (EPUB com dezenas de capítulos e centenas de chunks) passam
+// dos 5s padrão do Prisma dentro da transação de substituição de conteúdo.
+const REPLACE_CONTENT_TRANSACTION_TIMEOUT_MS = 60_000;
+const REPLACE_CONTENT_TRANSACTION_MAX_WAIT_MS = 10_000;
+
 /**
  * Substitui capítulos e chunks de um ebook de forma atômica. A vetorização
  * (leitura dos chunks sem embedding e gravação dos vetores) fica no
@@ -50,16 +55,22 @@ export class EbookContentRepository {
     let chunkCount = 0;
 
     try {
-      await this.prisma.$transaction(async (tx) => {
-        await this.lockBookOrThrow(tx, bookId);
-        await tx.chapter.deleteMany({ where: { bookId } });
+      await this.prisma.$transaction(
+        async (tx) => {
+          await this.lockBookOrThrow(tx, bookId);
+          await tx.chapter.deleteMany({ where: { bookId } });
 
-        const createdChapters = await this.createChapters(tx, bookId, chapters);
-        chunkCount = await this.insertAllChunks(tx, createdChapters);
-        chapterCount = createdChapters.length;
+          const createdChapters = await this.createChapters(tx, bookId, chapters);
+          chunkCount = await this.insertAllChunks(tx, createdChapters);
+          chapterCount = createdChapters.length;
 
-        await this.updateBookMetadata(tx, bookId, input);
-      });
+          await this.updateBookMetadata(tx, bookId, input);
+        },
+        {
+          timeout: REPLACE_CONTENT_TRANSACTION_TIMEOUT_MS,
+          maxWait: REPLACE_CONTENT_TRANSACTION_MAX_WAIT_MS,
+        },
+      );
     } catch (error) {
       const reason = this.describeError(error);
       this.logger.error(
