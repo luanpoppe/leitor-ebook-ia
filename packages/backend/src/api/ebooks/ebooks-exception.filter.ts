@@ -9,6 +9,7 @@ import {
   EbookNotReadyError,
   InvalidEbookContentError,
   InvalidEbookInputError,
+  InvalidReadingProgressError,
 } from '../../catalog/catalog.errors';
 import { QueueUnavailableError } from '../../ingestion/ingestion.errors';
 import {
@@ -43,6 +44,7 @@ interface ErrorBody {
   DuplicateEbookError,
   InvalidEbookContentError,
   InvalidEbookInputError,
+  InvalidReadingProgressError,
   StorageUnavailableError,
   StorageObjectNotFoundError,
   InvalidStorageInputError,
@@ -117,6 +119,9 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
       return HttpStatus.UNPROCESSABLE_ENTITY;
     }
     if (exception instanceof InvalidEbookInputError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof InvalidReadingProgressError) {
       return HttpStatus.UNPROCESSABLE_ENTITY;
     }
     if (exception instanceof StorageUnavailableError) {

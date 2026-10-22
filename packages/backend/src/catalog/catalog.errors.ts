@@ -51,6 +51,29 @@ export class ChapterNotFoundError extends Error {
   }
 }
 
+export class InvalidReadingProgressError extends Error {
+  readonly bookId: string;
+  readonly chapterPosition: number;
+  readonly offset: number;
+  readonly chapterLength: number;
+
+  constructor(
+    bookId: string,
+    chapterPosition: number,
+    offset: number,
+    chapterLength: number,
+  ) {
+    super(
+      `Offset ${offset} excede o capítulo ${chapterPosition} do ebook ${bookId} (${chapterLength} caracteres).`,
+    );
+    this.name = 'InvalidReadingProgressError';
+    this.bookId = bookId;
+    this.chapterPosition = chapterPosition;
+    this.offset = offset;
+    this.chapterLength = chapterLength;
+  }
+}
+
 export class EbookNotReadyError extends Error {
   readonly bookId: string;
   readonly status: string;
