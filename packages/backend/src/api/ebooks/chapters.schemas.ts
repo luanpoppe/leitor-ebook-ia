@@ -6,6 +6,9 @@ const DEFAULT_CHAPTER_PAGE_SIZE = 50_000;
 const MAX_CHAPTER_PAGE_SIZE = 100_000;
 // Teto do int4 do Postgres, usado nos parâmetros numéricos do SQL.
 const MAX_DATABASE_INTEGER = 2_147_483_647;
+// O recorte faz `offset + 1` no SQL; com o teto do int4 o +1 estoura e o
+// Postgres devolve 500. Um a menos mantém a soma dentro do int4.
+const MAX_PAGE_OFFSET = MAX_DATABASE_INTEGER - 1;
 
 export const chapterPositionParamsSchema = z.object({
   position: z.coerce.number().int().min(1).max(MAX_DATABASE_INTEGER),
@@ -20,7 +23,7 @@ export const chapterPageQuerySchema = z.object({
     .number()
     .int()
     .min(0)
-    .max(MAX_DATABASE_INTEGER)
+    .max(MAX_PAGE_OFFSET)
     .default(FIRST_OFFSET),
   limit: z.coerce
     .number()

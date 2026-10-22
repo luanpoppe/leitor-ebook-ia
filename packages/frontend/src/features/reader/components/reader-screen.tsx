@@ -33,6 +33,7 @@ export function ReaderScreen({
     currentPosition,
     errorKind,
     resumeOffset,
+    savedProgress,
     hasPrevious,
     hasNext,
     goToChapter,
@@ -49,7 +50,7 @@ export function ReaderScreen({
     decreaseFont,
     toggleTheme,
   } = useReaderPreferences();
-  const { scheduleSave } = useReadingProgressWriter(bookId);
+  const { scheduleSave } = useReadingProgressWriter(bookId, savedProgress);
   const { ebook } = useEbookDetail(bookId);
 
   const [isTocOpen, setIsTocOpen] = useState(false);

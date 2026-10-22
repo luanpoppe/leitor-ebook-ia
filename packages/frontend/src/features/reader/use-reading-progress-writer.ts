@@ -12,12 +12,25 @@ interface ReadingPoint {
   offset: number;
 }
 
-export function useReadingProgressWriter(bookId: string): {
+export function useReadingProgressWriter(
+  bookId: string,
+  savedPoint: ReadingPoint | null = null
+): {
   scheduleSave: (chapterPosition: number, offset: number) => void;
 } {
   const pendingRef = useRef<ReadingPoint | null>(null);
-  const lastSavedRef = useRef<ReadingPoint | null>(null);
+  const lastSavedRef = useRef<ReadingPoint | null>(savedPoint);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // O progresso salvo chega depois da primeira renderização; marcá-lo como
+  // "já gravado" evita um PUT redundante quando a tela reporta o ponto restaurado.
+  const savedPosition = savedPoint?.chapterPosition ?? null;
+  const savedOffset = savedPoint?.offset ?? null;
+  useEffect(() => {
+    if (savedPosition === null || savedOffset === null) return;
+
+    lastSavedRef.current = { chapterPosition: savedPosition, offset: savedOffset };
+  }, [savedPosition, savedOffset]);
 
   const flush = useCallback(() => {
     if (timerRef.current !== null) {
@@ -41,9 +54,7 @@ export function useReadingProgressWriter(bookId: string): {
     request.catch(() => {
       // Gravação é best-effort: engolir o erro mantém a leitura fluindo, e
       // liberar a marca permite que a próxima mudança tente o mesmo ponto.
-      const isStillMarked =
-        lastSavedRef.current?.chapterPosition === pending.chapterPosition &&
-        lastSavedRef.current?.offset === pending.offset;
+      const isStillMarked = isSamePoint(lastSavedRef.current, pending);
       if (isStillMarked) lastSavedRef.current = null;
     });
   }, [bookId]);
@@ -57,18 +68,13 @@ export function useReadingProgressWriter(bookId: string): {
       // senão um flush posterior perderia a posição do capítulo que ficou para trás.
       if (isChapterChange) flush();
 
-      const lastSaved = lastSavedRef.current;
+      const nextPoint = { chapterPosition, offset };
       const isSameAsPending =
-        pending !== null &&
-        pending.chapterPosition === chapterPosition &&
-        pending.offset === offset;
-      const isAlreadySaved =
-        lastSaved !== null &&
-        lastSaved.chapterPosition === chapterPosition &&
-        lastSaved.offset === offset;
+        pending !== null && isSamePoint(pending, nextPoint);
+      const isAlreadySaved = isSamePoint(lastSavedRef.current, nextPoint);
       if (isSameAsPending || isAlreadySaved) return;
 
-      pendingRef.current = { chapterPosition, offset };
+      pendingRef.current = nextPoint;
 
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
@@ -121,4 +127,15 @@ export function useReadingProgressWriter(bookId: string): {
   }, [flush]);
 
   return { scheduleSave };
+}
+
+function isSamePoint(
+  left: ReadingPoint | null,
+  right: ReadingPoint
+): boolean {
+  if (left === null) return false;
+
+  return (
+    left.chapterPosition === right.chapterPosition && left.offset === right.offset
+  );
 }

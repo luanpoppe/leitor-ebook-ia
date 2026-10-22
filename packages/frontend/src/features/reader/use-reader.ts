@@ -40,6 +40,7 @@ export interface UseReaderResult {
   isLoading: boolean;
   errorKind: ReaderErrorKind | null;
   resumeOffset: number;
+  savedProgress: ReadingProgress | null;
   hasPrevious: boolean;
   hasNext: boolean;
   goToChapter(position: number): void;
@@ -153,6 +154,7 @@ export function useReader(
     isLoading,
     errorKind,
     resumeOffset,
+    savedProgress,
     hasPrevious,
     hasNext,
     goToChapter,
