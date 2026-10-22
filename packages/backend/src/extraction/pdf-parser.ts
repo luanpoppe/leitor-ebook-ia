@@ -5,7 +5,10 @@ import {
   type ExtractedChapter,
   type ExtractionResult,
 } from './content.types';
-import { PdfChapterBuilder } from './pdf/pdf-chapter-builder';
+import {
+  PdfChapterBuilder,
+  type PdfChapterDraft,
+} from './pdf/pdf-chapter-builder';
 import { PdfDocument } from './pdf/pdf-document';
 import { PdfOutlinePlanner, type PdfOutlineEntry } from './pdf/pdf-outline';
 import { TextNormalizer } from './text-normalizer';
@@ -47,9 +50,9 @@ export class PdfParser {
     }
 
     const outline = await document.readOutline();
-    const chapterTexts = this.buildChapterTexts(pageTexts, outline);
+    const chapterDrafts = this.buildChapterTexts(pageTexts, outline);
     const chapters = TextNormalizer.normalizeChapters(
-      this.toChapters(chapterTexts),
+      this.toChapters(chapterDrafts),
     );
 
     if (chapters.length === 0) {
@@ -102,16 +105,25 @@ export class PdfParser {
   private buildChapterTexts(
     pageTexts: string[],
     outline: PdfOutlineEntry[],
-  ): string[] {
+  ): PdfChapterDraft[] {
     const contentOutline = this.discardNavigationEntries(outline);
     if (contentOutline.length === 0) {
       return PdfChapterBuilder.fromHeadings(pageTexts);
     }
 
-    const startPages = contentOutline.map((entry) => entry.pageIndex);
-    const ranges = PdfOutlinePlanner.planRanges(startPages, pageTexts.length);
+    // Título e faixa precisam passar pela mesma seleção, senão o outline com
+    // páginas repetidas desalinha os títulos dos capítulos.
+    const entries = PdfOutlinePlanner.selectEntries(
+      contentOutline,
+      pageTexts.length,
+    );
+    const ranges = PdfOutlinePlanner.planRanges(
+      entries.map((entry) => entry.pageIndex),
+      pageTexts.length,
+    );
+    const titles = entries.map((entry) => entry.title);
 
-    return PdfChapterBuilder.fromRanges(pageTexts, ranges);
+    return PdfChapterBuilder.fromRanges(pageTexts, ranges, titles);
   }
 
   private discardNavigationEntries(
@@ -122,10 +134,11 @@ export class PdfParser {
     );
   }
 
-  private toChapters(chapterTexts: string[]): ExtractedChapter[] {
-    return chapterTexts.map((text, index) => ({
+  private toChapters(chapterDrafts: PdfChapterDraft[]): ExtractedChapter[] {
+    return chapterDrafts.map((draft, index) => ({
       position: index + 1,
-      text,
+      title: draft.title,
+      text: draft.text,
     }));
   }
 

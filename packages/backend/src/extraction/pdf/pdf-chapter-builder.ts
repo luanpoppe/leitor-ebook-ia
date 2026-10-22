@@ -1,7 +1,4 @@
-import {
-  PdfOutlinePlanner,
-  type PdfChapterRange,
-} from './pdf-outline';
+import { PdfOutlinePlanner, type PdfChapterRange } from './pdf-outline';
 
 const CHAPTER_HEADING_PATTERN =
   /^(cap[íi]tulo|cap\.?|chapter|ch\.?)\s+(\d+|[ivxlcdm]+)\b/i;
@@ -14,6 +11,11 @@ const TITLE_CASE_MAX_WORDS = 8;
 const UPPERCASE_RATIO = 0.6;
 const TITLE_CASE_MIN_CAPITALIZED_RATIO = 0.5;
 
+export interface PdfChapterDraft {
+  title: string | null;
+  text: string;
+}
+
 /**
  * Monta o texto dos capítulos a partir das páginas. Quando existe outline, as
  * faixas mandam; sem outline, tenta reconhecer títulos no início das páginas.
@@ -22,22 +24,53 @@ export class PdfChapterBuilder {
   static fromRanges(
     pageTexts: string[],
     ranges: PdfChapterRange[],
-  ): string[] {
-    return ranges.map((range) => {
+    titles: Array<string | null> = [],
+  ): PdfChapterDraft[] {
+    return ranges.map((range, index) => {
       const chapterPages = pageTexts.slice(range.startPage, range.endPage + 1);
-      return chapterPages.join('\n\n');
+      const title = titles[index] ?? null;
+
+      return { title, text: chapterPages.join('\n\n') };
     });
   }
 
-  static fromHeadings(pageTexts: string[]): string[] {
+  static fromHeadings(pageTexts: string[]): PdfChapterDraft[] {
     const headingPages = PdfChapterBuilder.findHeadingPages(pageTexts);
 
     if (headingPages.length === 0) {
-      return [pageTexts.join('\n\n')];
+      return [{ title: null, text: pageTexts.join('\n\n') }];
     }
 
     const ranges = PdfChapterBuilder.buildRanges(headingPages, pageTexts);
-    return PdfChapterBuilder.fromRanges(pageTexts, ranges);
+    const titles = PdfChapterBuilder.readRangeTitles(
+      ranges,
+      headingPages,
+      pageTexts,
+    );
+
+    return PdfChapterBuilder.fromRanges(pageTexts, ranges, titles);
+  }
+
+  /**
+   * Só a página reconhecida como início de capítulo fornece título; a faixa
+   * inicial, anterior ao primeiro título, fica sem título.
+   */
+  private static readRangeTitles(
+    ranges: PdfChapterRange[],
+    headingPages: number[],
+    pageTexts: string[],
+  ): Array<string | null> {
+    const headingPageSet = new Set(headingPages);
+
+    return ranges.map((range) => {
+      const isHeadingStart = headingPageSet.has(range.startPage);
+      if (!isHeadingStart) return null;
+
+      const pageText = pageTexts[range.startPage] ?? '';
+      const lines = PdfChapterBuilder.readMeaningfulLines(pageText);
+
+      return lines[0] ?? null;
+    });
   }
 
   /**

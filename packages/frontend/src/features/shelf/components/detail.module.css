@@ -242,6 +242,10 @@
   cursor: progress;
 }
 
+.readAction {
+  display: inline-block;
+}
+
 .secondaryButton {
   display: inline-block;
   padding: 8px 14px;

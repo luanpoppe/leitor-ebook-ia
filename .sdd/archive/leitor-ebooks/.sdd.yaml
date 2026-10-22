@@ -1,0 +1,22 @@
+---
+id: leitor-ebooks
+title: Leitor de ebooks
+created: 2026-10-22
+archived: 2026-10-22
+format: md
+lang: pt-BR
+chunk_size: medium
+features:
+  - slug: titulos-de-capitulo
+    title: Títulos de capítulo
+    summary: Persistir o título do capítulo na extração e reingerir os livros existentes
+  - slug: api-de-capitulos
+    title: API de capítulos
+    summary: Expor sumário e conteúdo de capítulo para o leitor
+  - slug: progresso-de-leitura
+    title: Progresso de leitura
+    summary: Gravar e devolver onde o leitor parou em cada livro
+  - slug: tela-de-leitura
+    title: Tela de leitura
+    summary: Rota de leitura com sumário, tipografia, teclado e retomada
+---

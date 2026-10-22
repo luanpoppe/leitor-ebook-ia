@@ -85,7 +85,9 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
     }
 
     const isFailed = ebook.status === "failed";
+    const isReady = ebook.status === "ready";
     const isReprocessing = isReprocessingFor(ebook.id);
+    const readingHref = `/ebooks/${ebook.id}/ler`;
 
     return (
       <article className={styles.page}>
@@ -111,6 +113,18 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             <p className={styles.statusRow}>
               <StatusMark status={ebook.status} variant="pill" />
             </p>
+
+            {isReady && (
+              <div>
+                <Link
+                  href={readingHref}
+                  className={`${styles.primaryButton} ${styles.readAction}`}
+                  aria-label="Ler este livro"
+                >
+                  Ler
+                </Link>
+              </div>
+            )}
 
             <div className={styles.panels}>
               <section

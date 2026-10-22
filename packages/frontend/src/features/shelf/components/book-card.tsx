@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { formatDate, formatExtension } from "@/features/ebooks/format";
 import type { EbookSummary } from "@/features/ebooks/types";
 import { BookCover } from "./book-cover";
@@ -22,6 +23,8 @@ export function BookCard({
   onReprocess,
 }: BookCardProps) {
   const isFailed = ebook.status === "failed";
+  const isReady = ebook.status === "ready";
+  const readingHref = `/ebooks/${ebook.id}/ler`;
 
   const cardClassName = [
     styles.card,
@@ -63,6 +66,16 @@ export function BookCard({
           </span>
         </span>
       </button>
+
+      {isReady && (
+        <Link
+          href={readingHref}
+          className={styles.readLink}
+          aria-label={`Ler ${ebook.title}`}
+        >
+          Ler
+        </Link>
+      )}
 
       {isFailed && (
         <button

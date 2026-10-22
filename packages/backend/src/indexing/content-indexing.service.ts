@@ -17,6 +17,7 @@ export interface IndexedChunk {
 
 export interface IndexedChapter {
   position: number;
+  title?: string | null;
   text: string;
   chunks: IndexedChunk[];
 }
@@ -226,6 +227,7 @@ export class ContentIndexingService {
     vectors: number[][],
   ): IndexedChapter[] {
     const textByPosition = new Map(chapters.map((c) => [c.position, c.text]));
+    const titleByPosition = new Map(chapters.map((c) => [c.position, c.title]));
     const indexedChapters: IndexedChapter[] = [];
     let vectorIndex = 0;
 
@@ -244,6 +246,7 @@ export class ContentIndexingService {
       const chapterText = textByPosition.get(chapterChunk.chapterPosition) ?? '';
       indexedChapters.push({
         position: chapterChunk.chapterPosition,
+        title: titleByPosition.get(chapterChunk.chapterPosition) ?? null,
         text: chapterText,
         chunks,
       });

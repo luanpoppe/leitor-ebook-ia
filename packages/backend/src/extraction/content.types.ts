@@ -16,6 +16,7 @@ export class ContentExtractionError extends Error {
 
 export interface ExtractedChapter {
   position: number;
+  title?: string | null;
   text: string;
 }
 

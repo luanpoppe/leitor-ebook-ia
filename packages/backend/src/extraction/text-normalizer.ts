@@ -1,3 +1,4 @@
+import { ChapterTitle } from './chapter-title';
 import type { ExtractedChapter } from './content.types';
 
 const SHORT_LINE_MAX_LENGTH = 80;
@@ -33,12 +34,14 @@ export class TextNormalizer {
     const normalizedChapters = chapters
       .map((chapter) => ({
         position: chapter.position,
+        title: ChapterTitle.normalize(chapter.title),
         text: TextNormalizer.normalizeText(chapter.text),
       }))
       .filter((chapter) => chapter.text.length > 0);
 
     return normalizedChapters.map((chapter, index) => ({
       position: index + 1,
+      title: chapter.title,
       text: chapter.text,
     }));
   }

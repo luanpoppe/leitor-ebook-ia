@@ -41,6 +41,7 @@ model Book {
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   chapters Chapter[]
+  readingProgress ReadingProgress?
 
   @@index([createdAt(sort: Desc), id(sort: Desc)], map: "books_created_at_idx")
   @@map("books")
@@ -50,6 +51,7 @@ model Chapter {
   id       String @id @default(uuid(7)) @db.Uuid
   bookId   String @map("book_id") @db.Uuid
   position Int
+  title    String? @db.VarChar(200)
   text     String
 
   book   Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
@@ -72,4 +74,18 @@ model Chunk {
 
   @@unique([chapterId, position])
   @@map("chunks")
+}
+
+model ReadingProgress {
+  bookId          String   @id @map("book_id") @db.Uuid
+  chapterPosition Int      @map("chapter_position")
+  // Offset em caracteres dentro do capítulo. A coluna não se chama "offset"
+  // porque OFFSET é palavra-chave da cláusula LIMIT/OFFSET em SQL bruto;
+  // o campo do contrato da API continua `offset`.
+  charOffset      Int      @map("char_offset")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@map("reading_progress")
 }

@@ -82,6 +82,14 @@ export class EbookRepository {
     return this.prisma.book.count();
   }
 
+  // Base do backfill manual de títulos: só livros `ready` têm conteúdo extraído.
+  async findReadyForTitleBackfill(): Promise<Book[]> {
+    return this.prisma.book.findMany({
+      where: { status: BookStatus.READY },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+  }
+
   async updateStatus(
     id: string,
     status: BookStatus,

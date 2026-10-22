@@ -38,3 +38,52 @@ export class InvalidEbookInputError extends Error {
     this.name = 'InvalidEbookInputError';
   }
 }
+
+export class ChapterNotFoundError extends Error {
+  readonly bookId: string;
+  readonly position: number;
+
+  constructor(bookId: string, position: number) {
+    super(`Capítulo ${position} não encontrado no ebook ${bookId}.`);
+    this.name = 'ChapterNotFoundError';
+    this.bookId = bookId;
+    this.position = position;
+  }
+}
+
+export class InvalidReadingProgressError extends Error {
+  readonly bookId: string;
+  readonly chapterPosition: number;
+  readonly offset: number;
+  readonly chapterLength: number;
+
+  constructor(
+    bookId: string,
+    chapterPosition: number,
+    offset: number,
+    chapterLength: number,
+  ) {
+    super(
+      `Offset ${offset} excede o capítulo ${chapterPosition} do ebook ${bookId} (${chapterLength} caracteres).`,
+    );
+    this.name = 'InvalidReadingProgressError';
+    this.bookId = bookId;
+    this.chapterPosition = chapterPosition;
+    this.offset = offset;
+    this.chapterLength = chapterLength;
+  }
+}
+
+export class EbookNotReadyError extends Error {
+  readonly bookId: string;
+  readonly status: string;
+
+  constructor(bookId: string, status: string) {
+    super(
+      `O ebook ${bookId} ainda não está pronto para leitura (status: ${status}).`,
+    );
+    this.name = 'EbookNotReadyError';
+    this.bookId = bookId;
+    this.status = status;
+  }
+}

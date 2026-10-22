@@ -3,10 +3,13 @@ import { BaseExceptionFilter } from '@nestjs/core';
 import type { Response } from 'express';
 import { MulterError } from 'multer';
 import {
+  ChapterNotFoundError,
   DuplicateEbookError,
   EbookNotFoundError,
+  EbookNotReadyError,
   InvalidEbookContentError,
   InvalidEbookInputError,
+  InvalidReadingProgressError,
 } from '../../catalog/catalog.errors';
 import { QueueUnavailableError } from '../../ingestion/ingestion.errors';
 import {
@@ -36,9 +39,12 @@ interface ErrorBody {
  */
 @Catch(
   EbookNotFoundError,
+  EbookNotReadyError,
+  ChapterNotFoundError,
   DuplicateEbookError,
   InvalidEbookContentError,
   InvalidEbookInputError,
+  InvalidReadingProgressError,
   StorageUnavailableError,
   StorageObjectNotFoundError,
   InvalidStorageInputError,
@@ -94,10 +100,12 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
 
   private resolveStatusCode(exception: unknown): number | null {
     if (exception instanceof EbookNotFoundError) return HttpStatus.NOT_FOUND;
+    if (exception instanceof ChapterNotFoundError) return HttpStatus.NOT_FOUND;
     if (exception instanceof StorageObjectNotFoundError) {
       return HttpStatus.NOT_FOUND;
     }
     if (exception instanceof DuplicateEbookError) return HttpStatus.CONFLICT;
+    if (exception instanceof EbookNotReadyError) return HttpStatus.CONFLICT;
     if (exception instanceof InvalidEbookStatusError) {
       return HttpStatus.CONFLICT;
     }
@@ -111,6 +119,9 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
       return HttpStatus.UNPROCESSABLE_ENTITY;
     }
     if (exception instanceof InvalidEbookInputError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof InvalidReadingProgressError) {
       return HttpStatus.UNPROCESSABLE_ENTITY;
     }
     if (exception instanceof StorageUnavailableError) {

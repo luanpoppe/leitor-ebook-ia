@@ -13,6 +13,19 @@ const MIN_LINK_TEXT_RATIO = 0.5;
 export interface EpubTableOfContents {
   orderedPaths: string[];
   excludedPaths: Set<string>;
+  /** Rótulo do sumário por caminho do zip (sem fragmento). */
+  labelsByPath: Map<string, string>;
+}
+
+interface NcxNavPointEntry {
+  source: string;
+  label: string | null;
+  depth: number;
+}
+
+interface LabelCandidate {
+  label: string;
+  depth: number;
 }
 
 /**
@@ -46,7 +59,11 @@ export class EpubTableOfContentsReader {
       );
     }
 
-    return { orderedPaths: [], excludedPaths: new Set() };
+    return {
+      orderedPaths: [],
+      excludedPaths: new Set(),
+      labelsByPath: new Map(),
+    };
   }
 
   /**
@@ -108,9 +125,7 @@ export class EpubTableOfContentsReader {
     packageDocument: EpubPackageDocument,
   ): EpubManifestItem | undefined {
     if (packageDocument.tocId) {
-      const tocItem = packageDocument.manifestById.get(
-        packageDocument.tocId,
-      );
+      const tocItem = packageDocument.manifestById.get(packageDocument.tocId);
       if (tocItem) return tocItem;
     }
 
@@ -134,17 +149,89 @@ export class EpubTableOfContentsReader {
     );
 
     if (!navMatch) {
-      return { orderedPaths: [], excludedPaths: new Set([navPath]) };
+      return {
+        orderedPaths: [],
+        excludedPaths: new Set([navPath]),
+        labelsByPath: new Map(),
+      };
     }
 
-    const hrefs = [...navMatch[1].matchAll(/href\s*=\s*["']([^"']+)["']/gi)]
+    const navContent = navMatch[1];
+    const hrefs = [...navContent.matchAll(/href\s*=\s*["']([^"']+)["']/gi)]
       .map((match) => EpubArchive.resolveHref(navPath, match[1]))
       .filter((path) => path.length > 0);
+    const labelsByPath = EpubTableOfContentsReader.collectNavigationLabels(
+      navPath,
+      navContent,
+    );
 
     return {
       orderedPaths: hrefs,
       excludedPaths: new Set([navPath]),
+      labelsByPath,
     };
+  }
+
+  private static collectNavigationLabels(
+    navPath: string,
+    navContent: string,
+  ): Map<string, string> {
+    const candidatesByPath = new Map<string, LabelCandidate>();
+
+    for (const match of navContent.matchAll(ANCHOR_PATTERN)) {
+      const path = EpubArchive.resolveHref(navPath, match[1]);
+      if (path.length === 0) continue;
+
+      const label = HtmlToText.convert(match[2]);
+      if (label.length === 0) continue;
+
+      const anchorIndex = match.index ?? 0;
+      const prefix = navContent.slice(0, anchorIndex);
+      const depth = EpubTableOfContentsReader.countListDepth(prefix);
+
+      EpubTableOfContentsReader.keepMoreSpecificLabel(candidatesByPath, path, {
+        label,
+        depth,
+      });
+    }
+
+    return EpubTableOfContentsReader.toLabelsByPath(candidatesByPath);
+  }
+
+  private static countListDepth(prefix: string): number {
+    const openings = prefix.match(/<(?:ol|ul)\b/gi)?.length ?? 0;
+    const closings = prefix.match(/<\/(?:ol|ul)\s*>/gi)?.length ?? 0;
+
+    return openings - closings;
+  }
+
+  /**
+   * Entrada mais profunda vence (parte → capítulo); em empate de profundidade
+   * a primeira vence, pois irmãos costumam apontar para o mesmo arquivo.
+   */
+  private static keepMoreSpecificLabel(
+    candidatesByPath: Map<string, LabelCandidate>,
+    path: string,
+    candidate: LabelCandidate,
+  ): void {
+    const current = candidatesByPath.get(path);
+    const isMoreSpecific =
+      current === undefined || candidate.depth > current.depth;
+    if (!isMoreSpecific) return;
+
+    candidatesByPath.set(path, candidate);
+  }
+
+  private static toLabelsByPath(
+    candidatesByPath: Map<string, LabelCandidate>,
+  ): Map<string, string> {
+    const labelsByPath = new Map<string, string>();
+
+    for (const [path, candidate] of candidatesByPath) {
+      labelsByPath.set(path, candidate.label);
+    }
+
+    return labelsByPath;
   }
 
   private static readNcxDocument(
@@ -159,35 +246,65 @@ export class EpubTableOfContentsReader {
     const ncxXml = archive.readText(ncxPath);
     const ncx = EpubXml.toRecord(EpubXml.parse(ncxXml).ncx);
     const navMap = EpubXml.toRecord(ncx.navMap);
-    const sources: string[] = [];
+    const entries: NcxNavPointEntry[] = [];
 
-    EpubTableOfContentsReader.collectNavPointSources(
+    EpubTableOfContentsReader.collectNavPointEntries(
       navMap.navPoint,
-      sources,
+      entries,
+      0,
     );
 
+    const orderedPaths: string[] = [];
+    const candidatesByPath = new Map<string, LabelCandidate>();
+
+    for (const entry of entries) {
+      const path = EpubArchive.resolveHref(ncxPath, entry.source);
+      orderedPaths.push(path);
+
+      if (entry.label === null) continue;
+      if (path.length === 0) continue;
+
+      EpubTableOfContentsReader.keepMoreSpecificLabel(candidatesByPath, path, {
+        label: entry.label,
+        depth: entry.depth,
+      });
+    }
+
     return {
-      orderedPaths: sources.map((source) =>
-        EpubArchive.resolveHref(ncxPath, source),
-      ),
+      orderedPaths,
       excludedPaths: new Set([ncxPath]),
+      labelsByPath: EpubTableOfContentsReader.toLabelsByPath(candidatesByPath),
     };
   }
 
-  private static collectNavPointSources(
+  private static collectNavPointEntries(
     navPoints: unknown,
-    sources: string[],
+    entries: NcxNavPointEntry[],
+    depth: number,
   ): void {
     for (const navPoint of EpubXml.toArray(navPoints)) {
       const record = EpubXml.toRecord(navPoint);
       const source = EpubXml.readAttribute(record.content, '@_src');
+      const navLabel = EpubXml.toRecord(record.navLabel);
+      const label = EpubTableOfContentsReader.convertNcxLabel(navLabel.text);
 
-      if (typeof source === 'string') sources.push(source);
+      if (typeof source === 'string') {
+        entries.push({ source, label, depth });
+      }
 
-      EpubTableOfContentsReader.collectNavPointSources(
+      EpubTableOfContentsReader.collectNavPointEntries(
         record.navPoint,
-        sources,
+        entries,
+        depth + 1,
       );
     }
+  }
+
+  private static convertNcxLabel(rawLabel: unknown): string | null {
+    const labelText = EpubXml.readText(rawLabel);
+    if (labelText === undefined) return null;
+
+    const convertedLabel = HtmlToText.convert(labelText);
+    return convertedLabel.length > 0 ? convertedLabel : null;
   }
 }

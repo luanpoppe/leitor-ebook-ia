@@ -61,6 +61,8 @@ const NAMED_HTML_ENTITIES: Record<string, string> = {
   Uuml: 'Ü',
 };
 
+const HEADING_PATTERN = /<(h[1-3])\b[^>]*>([\s\S]*?)<\/\1>/i;
+
 /**
  * Converte o XHTML de um capítulo em texto puro.
  * Blocos viram quebras de linha para o `TextNormalizer` conseguir separar
@@ -68,24 +70,33 @@ const NAMED_HTML_ENTITIES: Record<string, string> = {
  */
 export class HtmlToText {
   static convert(html: string): string {
-    const withoutComments = html.replace(/<!--[\s\S]*?-->/g, ' ');
-    const withoutHead = withoutComments.replace(
-      /<head[\s\S]*?<\/head>/gi,
-      ' ',
-    );
-    const withoutScripts = withoutHead.replace(
-      /<(script|style)[\s\S]*?<\/\1>/gi,
-      ' ',
-    );
-    const withLineBreaks = withoutScripts
+    const withoutNonContent = HtmlToText.stripNonContentBlocks(html);
+    const withLineBreaks = withoutNonContent
       .replace(/<br\s*\/?>/gi, '\n')
-      .replace(
-        /<\/(p|div|h[1-6]|li|tr|blockquote|section|article)>/gi,
-        '\n\n',
-      );
+      .replace(/<\/(p|div|h[1-6]|li|tr|blockquote|section|article)>/gi, '\n\n');
     const withoutTags = withLineBreaks.replace(/<[^>]+>/g, ' ');
 
     return HtmlToText.decodeEntities(withoutTags).trim();
+  }
+
+  /**
+   * Usado quando o sumário não tem rótulo para o documento: devolve o texto do
+   * primeiro heading de nível 1 a 3 do corpo, ou `null` se não houver.
+   */
+  static firstHeading(html: string): string | null {
+    const withoutNonContent = HtmlToText.stripNonContentBlocks(html);
+    const headingMatch = withoutNonContent.match(HEADING_PATTERN);
+    if (!headingMatch) return null;
+
+    const headingText = HtmlToText.convert(headingMatch[2]);
+    return headingText.length > 0 ? headingText : null;
+  }
+
+  private static stripNonContentBlocks(html: string): string {
+    const withoutComments = html.replace(/<!--[\s\S]*?-->/g, ' ');
+    const withoutHead = withoutComments.replace(/<head[\s\S]*?<\/head>/gi, ' ');
+
+    return withoutHead.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ');
   }
 
   private static decodeEntities(text: string): string {
@@ -105,10 +116,7 @@ export class HtmlToText {
     );
   }
 
-  private static decodeNumericEntity(
-    entity: string,
-    fallback: string,
-  ): string {
+  private static decodeNumericEntity(entity: string, fallback: string): string {
     const isHexadecimal = entity[1]?.toLowerCase() === 'x';
     const digits = isHexadecimal ? entity.slice(2) : entity.slice(1);
     const codePoint = Number.parseInt(digits, isHexadecimal ? 16 : 10);
