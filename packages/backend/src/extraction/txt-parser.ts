@@ -18,6 +18,11 @@ const NO_TEXT_MESSAGE = 'O arquivo não contém texto extraível.';
 const MAX_TXT_BYTES = 64 * 1024 * 1024;
 const TXT_SIZE_MESSAGE = 'Arquivo de texto maior que o limite suportado.';
 
+interface TxtChapterDraft {
+  title: string | null;
+  text: string;
+}
+
 /**
  * Extrai o conteúdo de TXT/Markdown puro. Não há sumário nem metadados no
  * formato, então os capítulos saem dos marcadores de título do próprio texto
@@ -32,9 +37,9 @@ export class TxtParser {
       TXT_SIZE_MESSAGE,
     );
     const rawText = TxtParser.decodeText(buffer);
-    const chapterTexts = this.splitIntoChapterTexts(rawText);
+    const chapterDrafts = this.splitIntoChapterTexts(rawText);
 
-    const rawChapters = this.toChapters(chapterTexts);
+    const rawChapters = this.toChapters(chapterDrafts);
     const chapters = TextNormalizer.normalizeChapters(rawChapters);
 
     if (chapters.length === 0) {
@@ -50,13 +55,15 @@ export class TxtParser {
 
   /**
    * O texto do marcador não entra no capítulo: ele só delimita onde o capítulo
-   * começa. O que vem antes do primeiro marcador é sumário/front matter e é
-   * descartado. Linhas dentro de bloco cercado (```/~~~) são código, não título.
+   * começa e vira o título do capítulo aberto por ele. O que vem antes do
+   * primeiro marcador é sumário/front matter e é descartado. Linhas dentro de
+   * bloco cercado (```/~~~) são código, não título.
    */
-  private splitIntoChapterTexts(rawText: string): string[] {
+  private splitIntoChapterTexts(rawText: string): TxtChapterDraft[] {
     const lines = rawText.split('\n');
-    const chapterTexts: string[] = [];
+    const chapterDrafts: TxtChapterDraft[] = [];
     let currentChapterLines: string[] = [];
+    let currentTitle: string | null = null;
     let foundMarker = false;
     let insideFence = false;
 
@@ -78,16 +85,25 @@ export class TxtParser {
       }
 
       if (foundMarker) {
-        this.pushChapter(currentChapterLines, chapterTexts);
+        this.pushChapter(currentTitle, currentChapterLines, chapterDrafts);
       }
 
       foundMarker = true;
+      currentTitle = TxtParser.extractMarkerTitle(line);
       currentChapterLines = [];
     }
 
-    if (foundMarker) this.pushChapter(currentChapterLines, chapterTexts);
+    if (foundMarker) {
+      this.pushChapter(currentTitle, currentChapterLines, chapterDrafts);
+    }
 
-    return foundMarker ? chapterTexts : [rawText];
+    return foundMarker ? chapterDrafts : [{ title: null, text: rawText }];
+  }
+
+  private static extractMarkerTitle(line: string): string | null {
+    const title = TxtParser.stripDecoration(line.trim());
+
+    return title.length > 0 ? title : null;
   }
 
   private static isChapterMarker(line: string): boolean {
@@ -104,19 +120,24 @@ export class TxtParser {
     return withoutLeading.replace(TRAILING_DECORATION, '');
   }
 
-  private pushChapter(lines: string[], chapterTexts: string[]): void {
+  private pushChapter(
+    title: string | null,
+    lines: string[],
+    chapterDrafts: TxtChapterDraft[],
+  ): void {
     const chapterText = lines.join('\n');
     const normalizedText = TextNormalizer.normalizeText(chapterText);
 
     if (normalizedText.length === 0) return;
 
-    chapterTexts.push(normalizedText);
+    chapterDrafts.push({ title, text: normalizedText });
   }
 
-  private toChapters(chapterTexts: string[]): ExtractedChapter[] {
-    return chapterTexts.map((text, index) => ({
+  private toChapters(chapterDrafts: TxtChapterDraft[]): ExtractedChapter[] {
+    return chapterDrafts.map((draft, index) => ({
       position: index + 1,
-      text,
+      title: draft.title,
+      text: draft.text,
     }));
   }
 
