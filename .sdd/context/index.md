@@ -17,3 +17,4 @@
 - [api-ebooks](./api-ebooks.md) — borda HTTP da estante: upload multipart com compensação, listagem/detalhe com capa pré-assinada, reprocess e filtro de erro `{ statusCode, message }`
 - [frontend-ebooks](./frontend-ebooks.md) — estante na home: upload com progresso, lista com polling condicionado, cartão, painel de detalhe e página `/ebooks/[id]`
 - [titulos-de-capitulo](./titulos-de-capitulo.md) — nome de cada capítulo extraído do arquivo, persistido em `chapters.title` e backfill dos livros antigos
+- [api-de-capitulos](./api-de-capitulos.md) — rotas de sumário e de página de capítulo, com paginação por offset e vizinhos
