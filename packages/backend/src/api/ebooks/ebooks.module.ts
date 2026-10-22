@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, HttpAdapterHost } from '@nestjs/core';
 import { CatalogModule } from '../../catalog/catalog.module';
+import { ChapterReadingRepository } from '../../catalog/chapter-reading.repository';
 import { IngestionModule } from '../../ingestion/ingestion.module';
 import { FileStorageModule } from '../../storage/file-storage.module';
+import { EbookChaptersController } from './ebook-chapters.controller';
 import { EbookQueryService } from './ebook-query.service';
+import { EbookReadingService } from './ebook-reading.service';
 import { EbookUploadService } from './ebook-upload.service';
 import { EbooksController } from './ebooks.controller';
 import { EbooksExceptionFilter } from './ebooks-exception.filter';
@@ -15,10 +18,12 @@ import { EbooksExceptionFilter } from './ebooks-exception.filter';
  */
 @Module({
   imports: [CatalogModule, FileStorageModule, IngestionModule],
-  controllers: [EbooksController],
+  controllers: [EbooksController, EbookChaptersController],
   providers: [
     EbookUploadService,
     EbookQueryService,
+    EbookReadingService,
+    ChapterReadingRepository,
     {
       provide: APP_FILTER,
       inject: [HttpAdapterHost],
