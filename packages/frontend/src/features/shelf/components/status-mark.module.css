@@ -1,0 +1,45 @@
+.ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--positive);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pillReady {
+  background: #dcfae5;
+  color: #04250e;
+}
+
+.pillProcessing {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.pillPending {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.pillFailed {
+  background: #ffedea;
+  color: #831c1e;
+}

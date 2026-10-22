@@ -1,0 +1,204 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 26px 16px;
+}
+
+.card {
+  min-width: 0;
+  border-radius: 8px;
+}
+
+.cardHighlighted {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+}
+
+.cardButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cardButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.cardBody {
+  min-width: 0;
+  padding-top: 10px;
+}
+
+.cardTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cardAuthor {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cardMeta {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardStatus {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.retryText {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.retryText:disabled {
+  color: var(--muted);
+  cursor: progress;
+}
+
+.skeletonCard {
+  display: block;
+}
+
+.skeletonCover {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.skeletonLine {
+  height: 9px;
+  margin-top: 10px;
+  border-radius: 2px;
+  background: var(--surface);
+}
+
+.skeletonLineShort {
+  width: 55%;
+}
+
+.errorBox {
+  padding: 18px;
+  border-radius: var(--radius);
+  background: #ffedea;
+}
+
+.errorText {
+  margin: 0;
+  color: #831c1e;
+  font-size: 13px;
+}
+
+.errorDetail {
+  margin: 4px 0 0;
+  color: #831c1e;
+  font-size: 12px;
+}
+
+.retryButton {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px solid #e9b9b4;
+  border-radius: 6px;
+  background: transparent;
+  color: #831c1e;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.empty {
+  padding: 26px 22px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.emptyHint {
+  max-width: 44ch;
+  margin: 6px auto 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.emptyAction {
+  margin-top: 16px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.emptyAction:hover {
+  background: var(--accent-hover);
+}
+
+.loadMore {
+  display: block;
+  margin: 18px auto 0;
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.loadMore:disabled {
+  color: var(--muted);
+  cursor: progress;
+}
+
+@media (max-width: 1180px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 14px;
+  }
+}

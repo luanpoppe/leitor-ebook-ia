@@ -1,5 +1,5 @@
-import { Estante } from "@/features/ebooks/components/estante";
+import { ShelfPage } from "@/features/shelf/components/shelf-page";
 
 export default function Home() {
-  return <Estante />;
+  return <ShelfPage />;
 }

@@ -47,3 +47,7 @@ Thumbs.db
 *.pem
 .temp/
 .tmp/
+
+# Ferramentas de design (taste-skill) e automação de browser
+.taste-skill/
+.playwright-mcp/
