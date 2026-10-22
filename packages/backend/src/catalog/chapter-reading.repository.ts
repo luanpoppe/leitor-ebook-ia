@@ -1,0 +1,151 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../core/prisma.service';
+
+export interface ChapterSummary {
+  id: string;
+  position: number;
+  title: string | null;
+  wordCount: number;
+}
+
+export interface ChapterPage {
+  id: string;
+  position: number;
+  title: string | null;
+  text: string;
+  totalLength: number;
+}
+
+export interface AdjacentPositions {
+  previousPosition: number | null;
+  nextPosition: number | null;
+}
+
+interface ChapterSummaryRow {
+  id: string;
+  position: number;
+  title: string | null;
+  word_count: number | string;
+}
+
+interface ChapterPageRow {
+  id: string;
+  position: number;
+  title: string | null;
+  text: string;
+  total_length: number | string;
+}
+
+interface AdjacentPositionsRow {
+  previous_position: number | null;
+  next_position: number | null;
+}
+
+/**
+ * Leitura dos capítulos para o leitor: sumário sem trazer o texto e uma página
+ * de texto por offset de caractere. A contagem de palavras é feita no banco,
+ * não em memória, para não transportar o capítulo inteiro só para contá-lo.
+ */
+@Injectable()
+export class ChapterReadingRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async listSummaries(bookId: string): Promise<ChapterSummary[]> {
+    const rows = await this.prisma.$queryRaw<ChapterSummaryRow[]>`
+      SELECT
+        "id",
+        "position",
+        "title",
+        COALESCE(
+          array_length(regexp_split_to_array(btrim("text"), '\\s+'), 1),
+          0
+        ) AS "word_count"
+      FROM "chapters"
+      WHERE "book_id" = ${bookId}::uuid
+      ORDER BY "position" ASC
+    `;
+
+    return rows.map((row) => this.toChapterSummary(row));
+  }
+
+  async findPage(
+    bookId: string,
+    position: number,
+    offset: number,
+    limit: number,
+  ): Promise<ChapterPage | null> {
+    const rows = await this.prisma.$queryRaw<ChapterPageRow[]>`
+      SELECT
+        "id",
+        "position",
+        "title",
+        substr("text", ${offset} + 1, ${limit}) AS "text",
+        char_length("text") AS "total_length"
+      FROM "chapters"
+      WHERE "book_id" = ${bookId}::uuid
+        AND "position" = ${position}
+    `;
+
+    const row = rows[0];
+    const hasRow = row !== undefined;
+    if (!hasRow) return null;
+
+    return this.toChapterPage(row);
+  }
+
+  async findAdjacentPositions(
+    bookId: string,
+    position: number,
+  ): Promise<AdjacentPositions> {
+    const rows = await this.prisma.$queryRaw<AdjacentPositionsRow[]>`
+      SELECT
+        (
+          SELECT MAX("position")
+          FROM "chapters"
+          WHERE "book_id" = ${bookId}::uuid
+            AND "position" < ${position}
+        ) AS "previous_position",
+        (
+          SELECT MIN("position")
+          FROM "chapters"
+          WHERE "book_id" = ${bookId}::uuid
+            AND "position" > ${position}
+        ) AS "next_position"
+    `;
+
+    const row = rows[0];
+    const hasRow = row !== undefined;
+    if (!hasRow) {
+      return { previousPosition: null, nextPosition: null };
+    }
+
+    return {
+      previousPosition: this.toNullableNumber(row.previous_position),
+      nextPosition: this.toNullableNumber(row.next_position),
+    };
+  }
+
+  private toChapterSummary(row: ChapterSummaryRow): ChapterSummary {
+    return {
+      id: row.id,
+      position: Number(row.position),
+      title: row.title,
+      wordCount: Number(row.word_count),
+    };
+  }
+
+  private toChapterPage(row: ChapterPageRow): ChapterPage {
+    return {
+      id: row.id,
+      position: Number(row.position),
+      title: row.title,
+      text: row.text,
+      totalLength: Number(row.total_length),
+    };
+  }
+
+  private toNullableNumber(value: number | string | null): number | null {
+    if (value == null) return null;
+    return Number(value);
+  }
+}
