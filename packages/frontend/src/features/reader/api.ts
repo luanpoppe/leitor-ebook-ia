@@ -29,13 +29,14 @@ export async function getChapter(
   return response.data;
 }
 
-async function fetchChapterPage(
+export async function getChapterPage(
   bookId: string,
   position: number,
-  offset: number
+  offset: number,
+  limit: number = CHAPTER_TEXT_LIMIT
 ): Promise<ChapterPage> {
   const path = `/ebooks/${bookId}/chapters/${position}`;
-  const params = { offset, limit: CHAPTER_TEXT_LIMIT };
+  const params = { offset, limit };
   const response = await api.get<ChapterPage>(path, { params });
   return response.data;
 }
@@ -46,14 +47,14 @@ export async function getFullChapter(
   bookId: string,
   position: number
 ): Promise<ChapterPage> {
-  const firstPage = await fetchChapterPage(bookId, position, 0);
+  const firstPage = await getChapterPage(bookId, position, 0);
   const collectedText: string[] = [firstPage.text];
   let lastPage = firstPage;
   let nextOffset = firstPage.nextOffset;
 
   while (nextOffset !== null) {
     const requestedOffset = nextOffset;
-    const page = await fetchChapterPage(bookId, position, requestedOffset);
+    const page = await getChapterPage(bookId, position, requestedOffset);
     collectedText.push(page.text);
     lastPage = page;
     nextOffset = page.nextOffset;
