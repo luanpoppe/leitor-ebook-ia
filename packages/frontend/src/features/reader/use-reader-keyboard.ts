@@ -1,26 +1,35 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
+import type { ReaderMode } from "./reader-preferences";
 import type { PageTurnDirection } from "./use-reader-page";
 
 const FORWARD_KEYS = ["ArrowRight", "PageDown"];
 const BACKWARD_KEYS = ["ArrowLeft", "PageUp"];
+const SCROLL_FORWARD_KEYS = ["PageDown", "ArrowDown"];
+const SCROLL_BACKWARD_KEYS = ["PageUp", "ArrowUp"];
+const SCROLL_PAGE_FRACTION = 0.9;
 
 interface UseReaderKeyboardOptions {
+  mode: ReaderMode;
   isTocOpen: boolean;
   isReadingBlocked: boolean;
   onCloseToc: () => void;
   onNext: () => void;
   onPrevious: () => void;
+  /** Rola uma tela na direção pedida; o modo página ignora. */
+  onScrollPage(direction: -1 | 1, fraction?: number): void;
 }
 
-// O teclado virou página quando a leitura deixou de rolar (NT-4).
+// Página vira; rolagem desce e sobe uma tela (NT-4 e NT-5).
 export function useReaderKeyboard({
+  mode,
   isTocOpen,
   isReadingBlocked,
   onCloseToc,
   onNext,
   onPrevious,
+  onScrollPage,
 }: UseReaderKeyboardOptions): void {
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -41,6 +50,15 @@ export function useReaderKeyboard({
       const isActivationTarget = isButtonOrLinkTarget(event.target);
       if (isActivationTarget) return;
 
+      if (mode === "scroll") {
+        const scrollDirection = resolveScrollDirection(event);
+        if (scrollDirection === null) return;
+
+        event.preventDefault();
+        onScrollPage(scrollDirection, SCROLL_PAGE_FRACTION);
+        return;
+      }
+
       const turnDirection = resolveTurnDirection(event);
       if (turnDirection === null) return;
 
@@ -53,7 +71,15 @@ export function useReaderKeyboard({
 
       onPrevious();
     },
-    [isReadingBlocked, isTocOpen, onCloseToc, onNext, onPrevious]
+    [
+      isReadingBlocked,
+      isTocOpen,
+      mode,
+      onCloseToc,
+      onNext,
+      onPrevious,
+      onScrollPage,
+    ]
   );
 
   useEffect(() => {
@@ -64,12 +90,24 @@ export function useReaderKeyboard({
   }, [handleKeyDown]);
 }
 
+// Setas horizontais ficam de fora: na rolagem não há página a virar.
+function resolveScrollDirection(event: KeyboardEvent): -1 | 1 | null {
+  // Alt/Cmd/Ctrl pertencem ao navegador e ao sistema (Alt+← volta história).
+  if (hasBlockingModifier(event)) return null;
+
+  const isSpace = event.key === " " || event.key === "Space";
+  if (isSpace) return event.shiftKey ? -1 : 1;
+
+  if (SCROLL_FORWARD_KEYS.includes(event.key)) return 1;
+  if (SCROLL_BACKWARD_KEYS.includes(event.key)) return -1;
+
+  return null;
+}
+
 function resolveTurnDirection(
   event: KeyboardEvent
 ): PageTurnDirection | null {
-  // Alt/Cmd/Ctrl pertencem ao navegador e ao sistema (Alt+← volta história).
-  const hasModifier = event.altKey || event.metaKey || event.ctrlKey;
-  if (hasModifier) return null;
+  if (hasBlockingModifier(event)) return null;
 
   const isSpace = event.key === " " || event.key === "Space";
   if (isSpace) return event.shiftKey ? "previous" : "next";
@@ -78,6 +116,10 @@ function resolveTurnDirection(
   if (BACKWARD_KEYS.includes(event.key)) return "previous";
 
   return null;
+}
+
+function hasBlockingModifier(event: KeyboardEvent): boolean {
+  return event.altKey || event.metaKey || event.ctrlKey;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {

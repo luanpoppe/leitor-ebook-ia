@@ -18,6 +18,9 @@ const SEGMENT_KEY_ATTRIBUTE = "data-segment-key";
 const SEGMENT_ROOT_MARGIN = "150% 0px";
 const LOAD_MORE_SCREENS = 1.5;
 const LOAD_PREVIOUS_SCREENS = 1;
+// Uma tela de teclado fica um pouco menor que a área para o leitor não perder
+// a linha de referência entre uma rolagem e outra.
+const SCROLL_PAGE_FRACTION = 0.9;
 const EMPTY_SPACERS: ReadonlyMap<string, number> = new Map();
 
 interface ScrollPoint {
@@ -28,6 +31,8 @@ interface ScrollPoint {
 export interface ReaderScrollViewHandle {
   /** Rola até o parágrafo do offset pedido, se ele estiver carregado. */
   scrollToOffset(position: number, offset: number): void;
+  /** Rola uma fração da tela: 1 desce, -1 sobe. */
+  scrollByPage(direction: -1 | 1, fraction?: number): void;
 }
 
 export interface ReaderScrollViewProps {
@@ -82,6 +87,17 @@ export const ReaderScrollView = forwardRef<
     viewport.scrollTop += paragraphRect.top - viewportRect.top;
     return true;
   }, []);
+
+  const scrollByPage = useCallback(
+    (direction: -1 | 1, fraction: number = SCROLL_PAGE_FRACTION): void => {
+      const viewport = viewportRef.current;
+      if (viewport === null) return;
+
+      const distance = viewport.clientHeight * fraction * direction;
+      viewport.scrollTop += distance;
+    },
+    []
+  );
   // Assinatura só muda quando o conjunto de trechos muda: gatilho para
   // recriar o observer, não para cada parágrafo novo no mesmo trecho.
   const segmentsSignature = segments.map((segment) => segment.key).join("|");
@@ -140,7 +156,10 @@ export const ReaderScrollView = forwardRef<
     scrollToOffset(position: number, offset: number): void {
       scrollToOffset(position, offset);
     },
-  }), [scrollToOffset]);
+    scrollByPage(direction: -1 | 1, fraction?: number): void {
+      scrollByPage(direction, fraction);
+    },
+  }), [scrollByPage, scrollToOffset]);
 
   const evaluateScroll = useCallback((): void => {
     const viewport = viewportRef.current;
