@@ -1,0 +1,254 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TextPage } from "./window/page-paginator";
+import { WindowFetcher } from "./window/window-fetcher";
+import {
+  WindowPager,
+  type PageLanding,
+  type PageMetrics,
+} from "./window/window-pager";
+import { WindowTrail } from "./window/window-trail";
+import type { TextWindow, WindowPoint } from "./window/window-types";
+
+// Menos de 2 páginas à frente é a aproximação de "menos de 1,5 tela" para
+// disparar a pré-busca do trecho seguinte.
+const PREFETCH_PAGE_THRESHOLD = 2;
+const LOAD_ERROR_MESSAGE = "Falha ao carregar o trecho do capítulo.";
+
+interface ReaderSession {
+  window: TextWindow;
+  pages: TextPage[];
+}
+
+export interface UseReaderWindowOptions {
+  bookId: string;
+  /** Capítulo atual. */
+  position: number;
+  /** Offset de retomada ao abrir o capítulo. Default 0. */
+  initialOffset?: number;
+  /** Altura útil da página em px; 0 ou menos = medição ainda não pronta. */
+  pageHeight: number;
+  /**
+   * Altura em px de um pedaço de texto na tipografia atual. O consumidor deve
+   * memoizar: uma função nova a cada render dispara repaginação sem motivo.
+   */
+  measure: (text: string) => number;
+  /** Default true. Falso = não busca nada. */
+  enabled?: boolean;
+}
+
+export interface UseReaderWindowResult {
+  pages: TextPage[];
+  pageIndex: number;
+  page: TextPage | null;
+  isLoading: boolean;
+  error: Error | null;
+  isAtChapterStart: boolean;
+  isAtChapterEnd: boolean;
+  goToPage(index: number): void;
+  goToNextPage(): void;
+  goToPreviousPage(): void;
+  retry(): void;
+}
+
+export function useReaderWindow({
+  bookId,
+  position,
+  initialOffset = 0,
+  pageHeight,
+  measure,
+  enabled = true,
+}: UseReaderWindowOptions): UseReaderWindowResult {
+  const [session, setSession] = useState<ReaderSession | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetcher = useMemo(() => new WindowFetcher(bookId), [bookId]);
+
+  const sessionRef = useRef<ReaderSession | null>(null);
+  const pageIndexRef = useRef(0);
+  const trailRef = useRef<WindowTrail>(
+    new WindowTrail({ position, offset: initialOffset })
+  );
+  // Métricas em ref para a carga não refazer a busca quando a fonte muda.
+  const paginationRef = useRef<PageMetrics>({ pageHeight, measure });
+  const requestIdRef = useRef(0);
+  const failedLoadRef = useRef<{
+    point: WindowPoint;
+    landing: PageLanding;
+  } | null>(null);
+
+  useEffect(() => {
+    paginationRef.current = { pageHeight, measure };
+  }, [pageHeight, measure]);
+
+  const showPage = useCallback(
+    (nextSession: ReaderSession, index: number, shouldPrefetch: boolean) => {
+      sessionRef.current = nextSession;
+      pageIndexRef.current = index;
+      setSession(nextSession);
+      setPageIndex(index);
+
+      if (!shouldPrefetch) return;
+
+      const { position: windowPosition, nextOffset } = nextSession.window;
+      if (nextOffset === null) return;
+
+      const pagesAhead = nextSession.pages.length - 1 - index;
+      const isNearWindowEnd = pagesAhead < PREFETCH_PAGE_THRESHOLD;
+      if (!isNearWindowEnd) return;
+
+      fetcher.prefetch({ position: windowPosition, offset: nextOffset });
+    },
+    [fetcher]
+  );
+
+  const loadWindow = useCallback(
+    async (point: WindowPoint, landing: PageLanding) => {
+      const requestId = (requestIdRef.current += 1);
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        let window = await fetcher.get(point);
+        const isEmptyAtOffset = window.text.length === 0 && point.offset > 0;
+        if (isEmptyAtOffset) {
+          // Progresso antigo além do texto atual do capítulo: recomeça do zero,
+          // uma vez só, para a leitura não abrir numa página vazia.
+          const startPoint = { position: point.position, offset: 0 };
+          window = await fetcher.get(startPoint);
+        }
+        if (requestId !== requestIdRef.current) return;
+
+        const pages = WindowPager.paginate(window, paginationRef.current);
+        const landingIndex = WindowPager.resolveLandingIndex(pages, landing);
+        failedLoadRef.current = null;
+        showPage({ window, pages }, landingIndex, true);
+      } catch (cause) {
+        // Resposta de uma carga anterior não pode derrubar a leitura atual.
+        if (requestId !== requestIdRef.current) return;
+
+        // Guarda o destino para o retry repetir a mesma virada.
+        failedLoadRef.current = { point, landing };
+        const loadError =
+          cause instanceof Error ? cause : new Error(LOAD_ERROR_MESSAGE);
+        setError(loadError);
+      } finally {
+        if (requestId === requestIdRef.current) setIsLoading(false);
+      }
+    },
+    [fetcher, showPage]
+  );
+
+  const loadChapterStart = useCallback(() => {
+    const startPoint = { position, offset: initialOffset };
+    trailRef.current.reset(startPoint);
+    // Trocar de capítulo não pode manter o texto do capítulo anterior na tela.
+    sessionRef.current = null;
+    pageIndexRef.current = 0;
+    setSession(null);
+    setPageIndex(0);
+    void loadWindow(startPoint, { kind: "offset", offset: initialOffset });
+  }, [initialOffset, loadWindow, position]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    loadChapterStart();
+  }, [enabled, loadChapterStart]);
+
+  useEffect(() => {
+    const currentSession = sessionRef.current;
+    if (pageHeight <= 0 || currentSession === null) return;
+
+    const settings = { pageHeight, measure };
+    const pages = WindowPager.paginate(currentSession.window, settings);
+    if (pages.length === 0) return;
+
+    const currentPage = currentSession.pages[pageIndexRef.current];
+    const anchorOffset = currentPage?.startOffset ?? currentSession.window.offset;
+    const nextIndex = WindowPager.resolveAnchorIndex(pages, anchorOffset);
+    showPage({ window: currentSession.window, pages }, nextIndex, false);
+  }, [measure, pageHeight, showPage]);
+
+  const goToPage = useCallback(
+    (index: number) => {
+      const currentSession = sessionRef.current;
+      if (currentSession === null) return;
+
+      const isOutOfRange = index < 0 || index > currentSession.pages.length - 1;
+      if (isOutOfRange) return;
+
+      showPage(currentSession, index, true);
+    },
+    [showPage]
+  );
+
+  const goToNextPage = useCallback(() => {
+    const currentSession = sessionRef.current;
+    if (currentSession === null) return;
+
+    const nextIndex = pageIndexRef.current + 1;
+    if (nextIndex < currentSession.pages.length) {
+      showPage(currentSession, nextIndex, true);
+      return;
+    }
+
+    const chapterWindow = currentSession.window;
+    const nextOffset = chapterWindow.nextOffset;
+    // Fim do capítulo: quem vira para o próximo capítulo é a tela de leitura.
+    if (nextOffset === null) return;
+
+    const nextPoint = { position: chapterWindow.position, offset: nextOffset };
+    trailRef.current.advance(nextPoint);
+
+    void loadWindow(nextPoint, { kind: "first" });
+  }, [loadWindow, showPage]);
+
+  const goToPreviousPage = useCallback(() => {
+    const currentSession = sessionRef.current;
+    if (currentSession === null) return;
+
+    const previousIndex = pageIndexRef.current - 1;
+    if (previousIndex >= 0) {
+      showPage(currentSession, previousIndex, true);
+      return;
+    }
+
+    const chapterWindow = currentSession.window;
+    const previousPoint = trailRef.current.back(chapterWindow);
+    // Início do capítulo: quem volta para o capítulo anterior é a tela.
+    if (previousPoint === null) return;
+
+    void loadWindow(previousPoint, { kind: "last" });
+  }, [loadWindow, showPage]);
+
+  const retry = useCallback(() => {
+    const failedLoad = failedLoadRef.current;
+    if (failedLoad !== null) {
+      void loadWindow(failedLoad.point, failedLoad.landing);
+      return;
+    }
+
+    // Sem falha registrada, refaz a abertura do capítulo.
+    loadChapterStart();
+  }, [loadChapterStart, loadWindow]);
+
+  const pages = session?.pages ?? [];
+  return {
+    pages,
+    pageIndex,
+    page: pages[pageIndex] ?? null,
+    isLoading,
+    error,
+    isAtChapterStart: session?.window.offset === 0 && pageIndex === 0,
+    isAtChapterEnd:
+      session?.window.nextOffset === null && pageIndex === pages.length - 1,
+    goToPage,
+    goToNextPage,
+    goToPreviousPage,
+    retry,
+  };
+}
