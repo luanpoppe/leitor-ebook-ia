@@ -1,0 +1,34 @@
+/*
+ * Fora do fluxo e invisível: continua tendo layout (visibility: hidden preserva
+ * a medição, display: none não), mas não aparece nem recebe toque.
+ */
+.layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/*
+ * Espelha a tipografia da página de leitura (reader-chapter-view.module.css).
+ * Se a página mudar fonte, entrelinha, largura de coluna ou espaçamento entre
+ * parágrafos, estes valores precisam acompanhar — senão a página medida deixa
+ * de caber no viewport.
+ */
+.block {
+  /* flow-root impede que a margem do último parágrafo escape do bloco: sem
+     isso a altura medida ficaria 1,25em menor que a da página de verdade. */
+  display: flow-root;
+  font-size: var(--reader-font-size, 18px);
+  line-height: 1.75;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.paragraph {
+  margin: 0 0 1.25em;
+  font-size: inherit;
+  line-height: inherit;
+}
