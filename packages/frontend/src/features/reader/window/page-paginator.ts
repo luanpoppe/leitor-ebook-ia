@@ -188,7 +188,7 @@ export class PagePaginator {
 
   // Conta code points no intervalo [start, end) sem montar array: um par de
   // surrogates conta como um caractere só, como no offset do backend.
-  private static countCodePoints(
+  static countCodePoints(
     text: string,
     start: number,
     end: number

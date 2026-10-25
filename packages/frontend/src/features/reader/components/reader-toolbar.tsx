@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, JSX } from "react";
-import type { ReaderTheme } from "../reader-preferences";
+import type { ReaderMode, ReaderTheme } from "../reader-preferences";
 import styles from "./reader-toolbar.module.css";
 
 interface ReaderToolbarProps {
@@ -25,6 +25,8 @@ interface ReaderToolbarProps {
   onIncreaseFont: () => void;
   theme: ReaderTheme;
   onToggleTheme: () => void;
+  mode: ReaderMode;
+  onToggleMode: () => void;
 }
 
 const BACK_LABEL = "Voltar para a ficha do livro";
@@ -58,6 +60,19 @@ function resolveThemeActionLabel(theme: ReaderTheme): string {
   return SEPIA_THEME_ACTION_LABEL;
 }
 
+/** Mostra o modo para onde o botão leva, não o modo atual. */
+function resolveModeTargetLabel(mode: ReaderMode): string {
+  if (mode === "page") return "Rolagem";
+
+  return "Página";
+}
+
+function resolveModeActionLabel(mode: ReaderMode): string {
+  const targetLabel = resolveModeTargetLabel(mode);
+
+  return `Mudar para ${targetLabel.toLowerCase()}`;
+}
+
 function resolveIsTocButtonActive(isTocOpen: boolean): string {
   if (!isTocOpen) return styles.button;
 
@@ -84,10 +99,14 @@ export function ReaderToolbar({
   onIncreaseFont,
   theme,
   onToggleTheme,
+  mode,
+  onToggleMode,
 }: ReaderToolbarProps): JSX.Element {
   const progressPercent = resolveProgress(chapterProgress);
   const chapterLabel = resolveChapterLabel(currentPosition, chaptersCount);
   const themeActionLabel = resolveThemeActionLabel(theme);
+  const modeTargetLabel = resolveModeTargetLabel(mode);
+  const modeActionLabel = resolveModeActionLabel(mode);
   const progressFillStyle = {
     "--reader-progress": `${progressPercent}%`,
   } as CSSProperties;
@@ -203,6 +222,16 @@ export function ReaderToolbar({
           className={styles.themeButton}
         >
           {themeActionLabel}
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleMode}
+          aria-label={modeActionLabel}
+          title={modeActionLabel}
+          className={styles.themeButton}
+        >
+          {modeTargetLabel}
         </button>
       </div>
     </header>

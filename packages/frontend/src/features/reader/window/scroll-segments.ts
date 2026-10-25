@@ -1,0 +1,138 @@
+import { PagePaginator } from "./page-paginator";
+import type { TextWindow } from "./window-types";
+
+export interface ScrollParagraph {
+  /** Offset absoluto no capítulo (code points). */
+  offset: number;
+  text: string;
+}
+
+export interface ScrollSegment {
+  /** `${position}:${offset}` — estável para o React. */
+  key: string;
+  position: number;
+  offset: number;
+  paragraphs: ScrollParagraph[];
+  /** Próximo offset dentro do mesmo capítulo, ou null no fim dele. */
+  nextOffset: number | null;
+  totalLength: number;
+}
+
+/** Teto de trechos vivos na rolagem: os dois lados do visível e folga. */
+export const MAX_SCROLL_SEGMENTS = 5;
+
+const PARAGRAPH_SEPARATOR = "\n\n";
+
+/**
+ * Matemática dos trechos da rolagem: divide uma janela em parágrafos com offset
+ * absoluto e resolve a ordem entre capítulos. Fica fora do hook porque não
+ * depende de React nem de rede.
+ */
+export class ScrollSegments {
+  static fromWindow(textWindow: TextWindow): ScrollSegment {
+    return {
+      key: `${textWindow.position}:${textWindow.offset}`,
+      position: textWindow.position,
+      offset: textWindow.offset,
+      paragraphs: ScrollSegments.toParagraphs(
+        textWindow.text,
+        textWindow.offset
+      ),
+      nextOffset: textWindow.nextOffset,
+      totalLength: textWindow.totalLength,
+    };
+  }
+
+  /** Offset do fim do trecho, em code points. */
+  static endOffset(segment: ScrollSegment): number {
+    const last = segment.paragraphs[segment.paragraphs.length - 1];
+    if (last === undefined) return segment.offset;
+
+    return last.offset + countCodePoints(last.text);
+  }
+
+  /**
+   * O trecho preposto não pode reescrever texto que já está na tela: ele é
+   * cortado para terminar exatamente onde o primeiro trecho começa.
+   */
+  static trimEnd(
+    segment: ScrollSegment,
+    endOffset: number
+  ): ScrollSegment {
+    const isAlreadyShort = ScrollSegments.endOffset(segment) <= endOffset;
+    if (isAlreadyShort) return segment;
+
+    const paragraphs: ScrollParagraph[] = [];
+    for (const paragraph of segment.paragraphs) {
+      const availableLength = endOffset - paragraph.offset;
+      if (availableLength <= 0) break;
+
+      const paragraphLength = countCodePoints(paragraph.text);
+      const fitsEntirely = paragraphLength <= availableLength;
+      const text = fitsEntirely
+        ? paragraph.text
+        : sliceByCodePoints(paragraph.text, availableLength);
+      paragraphs.push({ offset: paragraph.offset, text });
+      if (!fitsEntirely) break;
+    }
+
+    return { ...segment, paragraphs, nextOffset: endOffset };
+  }
+
+  static findNextPosition(
+    chapterPositions: number[],
+    position: number
+  ): number | null {
+    const next = chapterPositions.find((candidate) => candidate > position);
+    return next ?? null;
+  }
+
+  static findPreviousPosition(
+    chapterPositions: number[],
+    position: number
+  ): number | null {
+    const earlier = chapterPositions.filter(
+      (candidate) => candidate < position
+    );
+    const previous = earlier[earlier.length - 1];
+    return previous ?? null;
+  }
+
+  // Divide por `\n\n` somando também o separador: sem ele, o offset de um
+  // parágrafo distante do começo ficaria menor que o do mesmo ponto no backend.
+  private static toParagraphs(
+    text: string,
+    baseOffset: number
+  ): ScrollParagraph[] {
+    const paragraphs: ScrollParagraph[] = [];
+    let codePointOffset = baseOffset;
+    let cursor = 0;
+
+    while (cursor <= text.length) {
+      const separatorIndex = text.indexOf(PARAGRAPH_SEPARATOR, cursor);
+      const blockEnd = separatorIndex === -1 ? text.length : separatorIndex;
+      const block = text.slice(cursor, blockEnd);
+
+      if (block.length > 0) {
+        paragraphs.push({ offset: codePointOffset, text: block });
+      }
+
+      codePointOffset += PagePaginator.countCodePoints(text, cursor, blockEnd);
+      if (separatorIndex === -1) break;
+
+      codePointOffset += PARAGRAPH_SEPARATOR.length;
+      cursor = blockEnd + PARAGRAPH_SEPARATOR.length;
+    }
+
+    return paragraphs;
+  }
+}
+
+function countCodePoints(text: string): number {
+  return PagePaginator.countCodePoints(text, 0, text.length);
+}
+
+function sliceByCodePoints(text: string, length: number): string {
+  const codePoints = Array.from(text);
+  return codePoints.slice(0, length).join("");
+}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEbookDetail } from "@/features/ebooks/use-ebook-detail";
 import { useReader } from "../use-reader";
 import { useReaderKeyboard } from "../use-reader-keyboard";
+import { useReaderMode } from "../use-reader-mode";
 import { useReaderPage, type ReaderPageMetrics } from "../use-reader-page";
 import { useReaderPreferences } from "../use-reader-preferences";
 import { useReadingProgressWriter } from "../use-reading-progress-writer";
@@ -59,6 +60,7 @@ export function ReaderScreen({
     decreaseFont,
     toggleTheme,
   } = useReaderPreferences();
+  const { mode, toggleMode } = useReaderMode();
   const { scheduleSave } = useReadingProgressWriter(bookId, savedProgress);
   const { ebook } = useEbookDetail(bookId);
 
@@ -311,6 +313,8 @@ export function ReaderScreen({
         onIncreaseFont={increaseFont}
         theme={theme}
         onToggleTheme={toggleTheme}
+        mode={mode}
+        onToggleMode={toggleMode}
       />
 
       <main className={styles.main}>
