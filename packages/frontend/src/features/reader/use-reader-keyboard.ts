@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
+import type { PageTurnDirection } from "./use-reader-page";
 
-const SCROLL_PAGE_RATIO = 0.9;
-const CHAPTER_TEXT_SELECTOR = '[aria-label="Texto do capítulo"]';
+const FORWARD_KEYS = ["ArrowRight", "PageDown"];
+const BACKWARD_KEYS = ["ArrowLeft", "PageUp"];
 
 interface UseReaderKeyboardOptions {
   isTocOpen: boolean;
@@ -13,6 +14,7 @@ interface UseReaderKeyboardOptions {
   onPrevious: () => void;
 }
 
+// O teclado virou página quando a leitura deixou de rolar (NT-4).
 export function useReaderKeyboard({
   isTocOpen,
   isReadingBlocked,
@@ -31,36 +33,25 @@ export function useReaderKeyboard({
         return;
       }
 
-      if (isReadingBlocked) return;
+      // Sumário por cima ou trecho ainda carregando: a tecla não vira nada.
+      const isReadingLocked = isTocOpen || isReadingBlocked;
+      if (isReadingLocked) return;
 
-      const isArrowRight = event.key === "ArrowRight";
-      if (isArrowRight && !isTocOpen) {
-        event.preventDefault();
+      // Em botão/link, as setas e o Espaço pertencem ao próprio controle.
+      const isActivationTarget = isButtonOrLinkTarget(event.target);
+      if (isActivationTarget) return;
+
+      const turnDirection = resolveTurnDirection(event);
+      if (turnDirection === null) return;
+
+      event.preventDefault();
+
+      if (turnDirection === "next") {
         onNext();
         return;
       }
 
-      const isArrowLeft = event.key === "ArrowLeft";
-      if (isArrowLeft && !isTocOpen) {
-        event.preventDefault();
-        onPrevious();
-        return;
-      }
-
-      const isSpace = event.key === " " || event.key === "Space";
-      const isPageDown = event.key === "PageDown";
-      const isPageUp = event.key === "PageUp";
-      const isPageScrollKey = isPageDown || isPageUp || isSpace;
-      if (!isPageScrollKey) return;
-
-      // Com o sumário aberto, rolar o capítulo por trás do drawer confunde.
-      if (isTocOpen) return;
-
-      // Em botão/link, a ativação nativa (Espaço/Enter) deve acontecer.
-      const isActivationTarget = isButtonOrLinkTarget(event.target);
-      if (isActivationTarget) return;
-
-      scrollChapterByPage(isPageUp, event);
+      onPrevious();
     },
     [isReadingBlocked, isTocOpen, onCloseToc, onNext, onPrevious]
   );
@@ -71,6 +62,18 @@ export function useReaderKeyboard({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [handleKeyDown]);
+}
+
+function resolveTurnDirection(
+  event: KeyboardEvent
+): PageTurnDirection | null {
+  const isSpace = event.key === " " || event.key === "Space";
+  if (isSpace) return event.shiftKey ? "previous" : "next";
+
+  if (FORWARD_KEYS.includes(event.key)) return "next";
+  if (BACKWARD_KEYS.includes(event.key)) return "previous";
+
+  return null;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -88,25 +91,4 @@ function isButtonOrLinkTarget(target: EventTarget | null): boolean {
 
   const tagName = target.tagName;
   return tagName === "BUTTON" || tagName === "A";
-}
-
-function scrollChapterByPage(
-  isPageUp: boolean,
-  event: KeyboardEvent
-): void {
-  const viewport = document.querySelector<HTMLElement>(CHAPTER_TEXT_SELECTOR);
-  if (viewport === null) return;
-
-  // Com o container já focado, o navegador rola sozinho; rolar aqui duplicaria.
-  const isViewportFocused = document.activeElement === viewport;
-  if (isViewportFocused) return;
-
-  event.preventDefault();
-
-  const direction = isPageUp ? -1 : 1;
-  const distance = viewport.clientHeight * SCROLL_PAGE_RATIO;
-  viewport.scrollBy({
-    top: direction * distance,
-    behavior: "smooth",
-  });
 }

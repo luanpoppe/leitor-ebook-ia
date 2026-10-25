@@ -9,7 +9,7 @@ implementer: subagent
 scribe: subagent
 tasks_format: md
 tasks_autocontinue: on
-parallel: off
+parallel: on
 chunk_order: inside-out
 tests: off
 code_review: on

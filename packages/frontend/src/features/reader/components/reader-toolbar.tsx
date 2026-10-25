@@ -10,6 +10,7 @@ interface ReaderToolbarProps {
   backHref: string;
   currentPosition: number | null;
   chaptersCount: number;
+  pageLabel?: string | null;
   chapterProgress: number;
   isTocOpen: boolean;
   onToggleToc: () => void;
@@ -68,6 +69,7 @@ export function ReaderToolbar({
   backHref,
   currentPosition,
   chaptersCount,
+  pageLabel,
   chapterProgress,
   isTocOpen,
   onToggleToc,
@@ -107,6 +109,11 @@ export function ReaderToolbar({
             {bookTitle}
           </span>
           <span className={styles.chapterLabel}>{chapterLabel}</span>
+          {pageLabel ? (
+            <span className={styles.pageLabel} title={pageLabel}>
+              {pageLabel}
+            </span>
+          ) : null}
         </div>
       </div>
 
