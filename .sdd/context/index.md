@@ -20,3 +20,4 @@
 - [api-de-capitulos](./api-de-capitulos.md) — rotas de sumário e de página de capítulo, com paginação por offset e vizinhos
 - [progresso-de-leitura](./progresso-de-leitura.md) — ponto de retomada por livro (capítulo + offset em caracteres), rotas GET/PUT e as decisões de 204 e PK por livro
 - [tela-de-leitura](./tela-de-leitura.md) — rota `/ebooks/[id]/ler`: sumário em drawer, tipografia, teclado, retomada, gravação com debounce/beacon e estados de erro/fim
+- [motor-de-janelas](./motor-de-janelas.md) — trechos de até 20 mil caracteres, páginas medidas, pré-busca, âncora de repaginação e camada de medição
