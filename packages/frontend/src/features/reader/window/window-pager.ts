@@ -20,7 +20,8 @@ export type PageLanding =
 export class WindowPager {
   /** Divide o trecho em páginas; sem altura útil ainda não há página. */
   static paginate(window: TextWindow, settings: PageMetrics): TextPage[] {
-    const hasNoHeight = settings.pageHeight <= 0;
+    const hasNoHeight =
+      !Number.isFinite(settings.pageHeight) || settings.pageHeight <= 0;
     if (hasNoHeight) return [];
 
     const pages = PagePaginator.paginate({

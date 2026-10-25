@@ -35,8 +35,17 @@ export class PagePaginator {
       ];
     }
 
+    // Medição ainda não pronta (0/NaN) devolve lista vazia; o chamador trata
+    // como "repaginar quando a medição ficar válida".
+    const probeHeight = measure(text.slice(0, 1));
+    const isMeasurementReady = Number.isFinite(probeHeight) && probeHeight > 0;
+    if (!isMeasurementReady) return [];
+
     const pages: TextPage[] = [];
     let cursor = 0;
+    // `cursor`/`end` são índices UTF-16 (para fatiar); os offsets da página
+    // contam code points, como `window.offset` e `totalLength` do backend.
+    let codePointCursor = window.offset;
 
     while (cursor < text.length) {
       const rawEnd = PagePaginator.findPageEnd(
@@ -51,14 +60,21 @@ export class PagePaginator {
         rawEnd
       );
       const pageText = text.slice(cursor, end);
+      const pageCodePointLength = PagePaginator.countCodePoints(
+        text,
+        cursor,
+        end
+      );
+      const endCodePoint = codePointCursor + pageCodePointLength;
 
       pages.push({
         index: pages.length,
-        startOffset: window.offset + cursor,
-        endOffset: window.offset + end,
+        startOffset: codePointCursor,
+        endOffset: endCodePoint,
         text: pageText,
       });
 
+      codePointCursor = endCodePoint;
       cursor = end;
     }
 
@@ -110,26 +126,35 @@ export class PagePaginator {
     const total = text.length;
     const remaining = total - start;
 
-    const wholeText = text.slice(start);
-    const wholeHeight = measure(wholeText);
-    const wholeFits = wholeHeight <= pageHeight;
-    if (wholeFits) return total;
-
     // O salto exponencial encontra um limite superior conhecido em O(log n)
     // medições; a busca binária refina dentro dele sem medir o trecho inteiro
     // de novo a cada caractere.
     let fittedEnd = start;
     let probeLength = 1;
+    let hasOverflowingProbe = false;
 
     while (probeLength < remaining) {
       const probeEnd = start + probeLength;
       const probeText = text.slice(start, probeEnd);
       const probeHeight = measure(probeText);
       const probeFits = probeHeight <= pageHeight;
-      if (!probeFits) break;
+      if (!probeFits) {
+        hasOverflowingProbe = true;
+        break;
+      }
 
       fittedEnd = probeEnd;
       probeLength *= 2;
+    }
+
+    // Só quando nenhum probe estourou o resto inteiro pode caber (última
+    // página do trecho); medir o sufixo aqui, e não em toda página, evita
+    // remedir o texto todo a cada página.
+    if (!hasOverflowingProbe) {
+      const wholeText = text.slice(start);
+      const wholeHeight = measure(wholeText);
+      const wholeFits = wholeHeight <= pageHeight;
+      if (wholeFits) return total;
     }
 
     const upperBound = Math.min(start + probeLength, total);
@@ -159,6 +184,31 @@ export class PagePaginator {
     // Nenhum pedaço coube: a página recebe 1 caractere para garantir que o
     // cursor sempre avance, mesmo que esse caractere estoure a altura.
     return minimumEnd;
+  }
+
+  // Conta code points no intervalo [start, end) sem montar array: um par de
+  // surrogates conta como um caractere só, como no offset do backend.
+  private static countCodePoints(
+    text: string,
+    start: number,
+    end: number
+  ): number {
+    let count = 0;
+    let index = start;
+
+    while (index < end) {
+      count += 1;
+
+      const code = text.charCodeAt(index);
+      const isHighSurrogate = code >= 0xd800 && code <= 0xdbff;
+      const nextCode = index + 1 < end ? text.charCodeAt(index + 1) : 0;
+      const isLowSurrogate = nextCode >= 0xdc00 && nextCode <= 0xdfff;
+      const isSurrogatePair = isHighSurrogate && isLowSurrogate;
+
+      index += isSurrogatePair ? 2 : 1;
+    }
+
+    return count;
   }
 
   // Cortar entre as metades de um par de surrogates quebraria o emoji; recua

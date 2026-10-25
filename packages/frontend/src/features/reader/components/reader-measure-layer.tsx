@@ -5,6 +5,9 @@ import type { CSSProperties, JSX, Ref } from "react";
 import styles from "./reader-measure-layer.module.css";
 
 const PARAGRAPH_SEPARATOR = "\n\n";
+// Repaginações repetidas reusam a altura do mesmo texto; ao passar do limite,
+// o cache inteiro é descartado em vez de fazer LRU por entrada.
+const MEASURE_CACHE_LIMIT = 300;
 
 export interface ReaderMeasureLayerHandle {
   /** Altura em px que o texto ocupa na largura e tipografia da página. */
@@ -30,16 +33,44 @@ export function ReaderMeasureLayer({
   ref,
 }: ReaderMeasureLayerProps): JSX.Element {
   const blockRef = useRef<HTMLDivElement | null>(null);
+  // Altura medida só vale para a fonte e a largura em que foi lida; a chave
+  // guarda a tipografia atual para descartar o cache quando ela mudar.
+  const heightCacheRef = useRef(new Map<string, number>());
+  const cacheKeyRef = useRef("");
 
-  const measure = useCallback((text: string): number => {
-    const block = blockRef.current;
-    if (block === null) return 0;
+  const measure = useCallback(
+    (text: string): number => {
+      // Antes do primeiro layout não há largura útil para medir.
+      if (width <= 0) return 0;
 
-    renderParagraphs(block, text);
+      const cacheKey = `${fontSize}:${width}`;
+      const isCacheStale = cacheKeyRef.current !== cacheKey;
+      if (isCacheStale) {
+        cacheKeyRef.current = cacheKey;
+        heightCacheRef.current.clear();
+      }
 
-    const blockRect = block.getBoundingClientRect();
-    return blockRect.height;
-  }, []);
+      const heightCache = heightCacheRef.current;
+      const cachedHeight = heightCache.get(text);
+      if (cachedHeight !== undefined) return cachedHeight;
+
+      const block = blockRef.current;
+      if (block === null) return 0;
+
+      renderParagraphs(block, text);
+
+      const blockRect = block.getBoundingClientRect();
+      const height = blockRect.height;
+
+      const isCacheOverLimit = heightCache.size >= MEASURE_CACHE_LIMIT;
+      if (isCacheOverLimit) heightCache.clear();
+
+      heightCache.set(text, height);
+
+      return height;
+    },
+    [fontSize, width]
+  );
 
   useImperativeHandle(ref, () => ({ measure }), [measure]);
 

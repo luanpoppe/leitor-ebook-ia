@@ -9,7 +9,12 @@ import {
   type PageMetrics,
 } from "./window/window-pager";
 import { WindowTrail } from "./window/window-trail";
-import type { TextWindow, WindowPoint } from "./window/window-types";
+import {
+  WINDOW_SIZE,
+  isSamePoint,
+  type TextWindow,
+  type WindowPoint,
+} from "./window/window-types";
 
 // Menos de 2 páginas à frente é a aproximação de "menos de 1,5 tela" para
 // disparar a pré-busca do trecho seguinte.
@@ -19,6 +24,12 @@ const LOAD_ERROR_MESSAGE = "Falha ao carregar o trecho do capítulo.";
 interface ReaderSession {
   window: TextWindow;
   pages: TextPage[];
+}
+
+/** Capítulo efetivamente carregado, para religar `enabled` sem recomeçar. */
+interface LoadedChapter {
+  position: number;
+  initialOffset: number;
 }
 
 export interface UseReaderWindowOptions {
@@ -79,6 +90,9 @@ export function useReaderWindow({
     point: WindowPoint;
     landing: PageLanding;
   } | null>(null);
+  // Só entra no rastro depois que a carga confirma o trecho novo.
+  const pendingAdvanceRef = useRef<WindowPoint | null>(null);
+  const loadedChapterRef = useRef<LoadedChapter | null>(null);
 
   useEffect(() => {
     paginationRef.current = { pageHeight, measure };
@@ -90,6 +104,10 @@ export function useReaderWindow({
       pageIndexRef.current = index;
       setSession(nextSession);
       setPageIndex(index);
+      // Navegar para longe da fronteira que falhou não pode manter o aviso nem
+      // o destino antigo do retry.
+      failedLoadRef.current = null;
+      setError(null);
 
       if (!shouldPrefetch) return;
 
@@ -122,6 +140,19 @@ export function useReaderWindow({
         }
         if (requestId !== requestIdRef.current) return;
 
+        const returnedPoint = {
+          position: window.position,
+          offset: window.offset,
+        };
+        const pendingAdvance = pendingAdvanceRef.current;
+        const isPendingLoaded =
+          pendingAdvance !== null &&
+          isSamePoint(pendingAdvance, returnedPoint);
+        if (isPendingLoaded) {
+          trailRef.current.advance(returnedPoint);
+        }
+        pendingAdvanceRef.current = null;
+
         const pages = WindowPager.paginate(window, paginationRef.current);
         const landingIndex = WindowPager.resolveLandingIndex(pages, landing);
         failedLoadRef.current = null;
@@ -130,6 +161,8 @@ export function useReaderWindow({
         // Resposta de uma carga anterior não pode derrubar a leitura atual.
         if (requestId !== requestIdRef.current) return;
 
+        // Falha não avança o rastro: ele continua apontando para o trecho atual.
+        pendingAdvanceRef.current = null;
         // Guarda o destino para o retry repetir a mesma virada.
         failedLoadRef.current = { point, landing };
         const loadError =
@@ -143,7 +176,12 @@ export function useReaderWindow({
   );
 
   const loadChapterStart = useCallback(() => {
-    const startPoint = { position, offset: initialOffset };
+    // Busca uma janela antes do offset salvo para haver texto anterior para
+    // paginar acima; o pouso continua sendo no offset de retomada.
+    const fetchOffset = Math.max(0, initialOffset - WINDOW_SIZE);
+    const startPoint = { position, offset: fetchOffset };
+    loadedChapterRef.current = { position, initialOffset };
+    pendingAdvanceRef.current = null;
     trailRef.current.reset(startPoint);
     // Trocar de capítulo não pode manter o texto do capítulo anterior na tela.
     sessionRef.current = null;
@@ -156,21 +194,46 @@ export function useReaderWindow({
   useEffect(() => {
     if (!enabled) return;
 
+    const loadedChapter = loadedChapterRef.current;
+    const isChapterLoaded =
+      loadedChapter !== null &&
+      loadedChapter.position === position &&
+      loadedChapter.initialOffset === initialOffset;
+    // Religar `enabled` na mesma sessão continua na página atual.
+    if (isChapterLoaded) return;
+
     loadChapterStart();
-  }, [enabled, loadChapterStart]);
+  }, [enabled, initialOffset, loadChapterStart, position]);
 
   useEffect(() => {
     const currentSession = sessionRef.current;
     if (pageHeight <= 0 || currentSession === null) return;
 
-    const settings = { pageHeight, measure };
-    const pages = WindowPager.paginate(currentSession.window, settings);
-    if (pages.length === 0) return;
+    // Uma repaginação por frame: eventos de resize em rajada não empilham
+    // medições do texto inteiro.
+    const frameId = requestAnimationFrame(() => {
+      const sessionToRepaginate = sessionRef.current;
+      if (sessionToRepaginate === null) return;
 
-    const currentPage = currentSession.pages[pageIndexRef.current];
-    const anchorOffset = currentPage?.startOffset ?? currentSession.window.offset;
-    const nextIndex = WindowPager.resolveAnchorIndex(pages, anchorOffset);
-    showPage({ window: currentSession.window, pages }, nextIndex, false);
+      const settings = { pageHeight, measure };
+      const pages = WindowPager.paginate(
+        sessionToRepaginate.window,
+        settings
+      );
+      if (pages.length === 0) return;
+
+      const currentPage = sessionToRepaginate.pages[pageIndexRef.current];
+      const anchorOffset =
+        currentPage?.startOffset ?? sessionToRepaginate.window.offset;
+      const nextIndex = WindowPager.resolveAnchorIndex(pages, anchorOffset);
+      showPage(
+        { window: sessionToRepaginate.window, pages },
+        nextIndex,
+        false
+      );
+    });
+
+    return () => cancelAnimationFrame(frameId);
   }, [measure, pageHeight, showPage]);
 
   const goToPage = useCallback(
@@ -202,7 +265,8 @@ export function useReaderWindow({
     if (nextOffset === null) return;
 
     const nextPoint = { position: chapterWindow.position, offset: nextOffset };
-    trailRef.current.advance(nextPoint);
+    // O rastro só avança quando a carga confirmar este ponto.
+    pendingAdvanceRef.current = nextPoint;
 
     void loadWindow(nextPoint, { kind: "first" });
   }, [loadWindow, showPage]);
@@ -218,11 +282,11 @@ export function useReaderWindow({
     }
 
     const chapterWindow = currentSession.window;
-    const previousPoint = trailRef.current.back(chapterWindow);
+    const backStep = trailRef.current.back(chapterWindow);
     // Início do capítulo: quem volta para o capítulo anterior é a tela.
-    if (previousPoint === null) return;
+    if (backStep === null) return;
 
-    void loadWindow(previousPoint, { kind: "last" });
+    void loadWindow(backStep.point, backStep.landing);
   }, [loadWindow, showPage]);
 
   const retry = useCallback(() => {
