@@ -1,0 +1,19 @@
+---
+id: leitor-paginado
+title: Leitura paginada
+created: 2026-10-22
+archived: 2026-10-25
+format: md
+lang: pt-BR
+chunk_size: medium
+features:
+  - slug: motor-de-janelas
+    title: Motor de janelas
+    summary: Buscar trechos por offset, medir parágrafos e gerar páginas com offset exato, com a janela seguinte pré-buscada
+  - slug: modo-pagina
+    title: Modo página
+    summary: Virada horizontal com animação, swipe, zonas de toque e teclado, atravessando capítulos e retomando por offset
+  - slug: modo-rolagem
+    title: Modo rolagem
+    summary: Rolagem contínua virtualizada que anexa e descarta trechos, com preferência de modo persistida
+---
