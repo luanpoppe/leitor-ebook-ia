@@ -46,6 +46,9 @@
 
 .segment {
   width: 100%;
+  /* A margem do último parágrafo passa a contar no offsetHeight medido, senão
+     o espaçador fica mais baixo que o trecho e a rolagem pula ao remontar. */
+  display: flow-root;
 }
 
 /* Sem conteúdo: só a altura medida do trecho que saiu, para a barra não pular. */
@@ -59,6 +62,16 @@
   line-height: 1.75;
   overflow-wrap: break-word;
   hyphens: auto;
+}
+
+/* Trecho cortado no meio de um parágrafo: some a margem da fronteira para o
+   texto não abrir um vão que o autor não escreveu. */
+.paragraphFlushTop {
+  margin-top: 0;
+}
+
+.paragraphFlushBottom {
+  margin-bottom: 0;
 }
 
 .status {

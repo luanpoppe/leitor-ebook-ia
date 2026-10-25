@@ -16,10 +16,12 @@ export interface ScrollSegment {
   /** Próximo offset dentro do mesmo capítulo, ou null no fim dele. */
   nextOffset: number | null;
   totalLength: number;
+  /** Último caractere do texto: `"\n"` avisa que a janela fechou um parágrafo. */
+  lastChar: string;
 }
 
-/** Teto de trechos vivos na rolagem: os dois lados do visível e folga. */
-export const MAX_SCROLL_SEGMENTS = 5;
+/** Teto de trechos vivos na rolagem: anterior, atual e próximo. */
+export const MAX_SCROLL_SEGMENTS = 3;
 
 const PARAGRAPH_SEPARATOR = "\n\n";
 
@@ -40,6 +42,7 @@ export class ScrollSegments {
       ),
       nextOffset: textWindow.nextOffset,
       totalLength: textWindow.totalLength,
+      lastChar: ScrollSegments.resolveLastChar(textWindow.text),
     };
   }
 
@@ -76,7 +79,18 @@ export class ScrollSegments {
       if (!fitsEntirely) break;
     }
 
-    return { ...segment, paragraphs, nextOffset: endOffset };
+    const lastParagraph = paragraphs[paragraphs.length - 1];
+    return {
+      ...segment,
+      paragraphs,
+      nextOffset: endOffset,
+      // O corte muda onde o trecho termina: o sinal de parágrafo aberto tem
+      // que vir do texto que sobrou, não do fim da janela original.
+      lastChar:
+        lastParagraph === undefined
+          ? ""
+          : ScrollSegments.resolveLastChar(lastParagraph.text),
+    };
   }
 
   static findNextPosition(
@@ -96,6 +110,13 @@ export class ScrollSegments {
     );
     const previous = earlier[earlier.length - 1];
     return previous ?? null;
+  }
+
+  private static resolveLastChar(text: string): string {
+    if (text.length === 0) return "";
+
+    const codePoints = Array.from(text);
+    return codePoints[codePoints.length - 1] ?? "";
   }
 
   // Divide por `\n\n` somando também o separador: sem ele, o offset de um

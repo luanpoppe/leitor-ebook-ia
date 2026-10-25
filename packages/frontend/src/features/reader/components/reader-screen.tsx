@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, JSX } from "react";
 import Link from "next/link";
 import { useEbookDetail } from "@/features/ebooks/use-ebook-detail";
@@ -197,6 +197,7 @@ export function ReaderScreen({
     segments,
     isLoading: isScrollLoading,
     error: scrollError,
+    errorDirection: scrollErrorDirection,
     hasReachedEnd: hasScrollReachedEnd,
     loadMore,
     loadPrevious,
@@ -229,6 +230,7 @@ export function ReaderScreen({
   // que só existe para a virada de página voltando do primeiro capítulo.
   const handleNextChapter = useCallback(() => {
     setPageOffset(0);
+    setScrollOffset(0);
     setLandAtEndPosition(null);
 
     if (!hasNext) {
@@ -250,6 +252,7 @@ export function ReaderScreen({
 
   const handlePreviousChapter = useCallback(() => {
     setPageOffset(0);
+    setScrollOffset(0);
     setLandAtEndPosition(null);
     setHasReachedEnd(false);
 
@@ -324,6 +327,8 @@ export function ReaderScreen({
   const handleToggleMode = useCallback(() => {
     const isEnteringPageMode = isScrollMode;
     toggleMode();
+    // "Abrir no fim" pertence à virada de página: trocar de modo não herda.
+    setLandAtEndPosition(null);
 
     if (isEnteringPageMode) {
       const isVisibleChapterDifferent =
@@ -343,6 +348,17 @@ export function ReaderScreen({
     setScrollOffset(visiblePoint.offset);
     setScrollAnchor(visiblePoint);
   }, [currentPosition, goToChapter, isScrollMode, toggleMode, visiblePoint]);
+
+  // Abrir direto em rolagem (preferência salva) não passa pelo botão de modo:
+  // sem âncora a view mostraria o começo da janela e regravaria progresso menor.
+  useEffect(() => {
+    if (mode !== "scroll") return;
+    if (scrollAnchor !== null) return;
+    if (chapter === null) return;
+    if (currentPosition === null) return;
+
+    setScrollAnchor({ position: currentPosition, offset: resumeOffset });
+  }, [chapter, currentPosition, mode, resumeOffset, scrollAnchor]);
 
   const handleScrollPage = useCallback(
     (direction: -1 | 1, fraction?: number) => {
@@ -438,6 +454,7 @@ export function ReaderScreen({
           segments={segments}
           isLoading={isScrollLoading}
           error={scrollError}
+          errorDirection={scrollErrorDirection}
           hasReachedEnd={hasScrollReachedEnd}
           fontSize={fontSize}
           theme={theme}

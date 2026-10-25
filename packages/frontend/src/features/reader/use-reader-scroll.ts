@@ -11,6 +11,9 @@ import { WINDOW_SIZE, type WindowPoint } from "./window/window-types";
 
 export type { ScrollParagraph, ScrollSegment } from "./window/scroll-segments";
 
+/** Onde o texto parou de carregar: o aviso de falha acompanha esse lado. */
+export type ScrollErrorDirection = "append" | "prepend" | null;
+
 export interface UseReaderScrollOptions {
   bookId: string;
   /** Capítulo onde a leitura começou (muda quando a tela troca pelo sumário). */
@@ -29,6 +32,8 @@ export interface UseReaderScrollResult {
   segments: ScrollSegment[];
   isLoading: boolean;
   error: Error | null;
+  /** Lado da falha atual: a view põe o aviso acima ou abaixo do texto. */
+  errorDirection: ScrollErrorDirection;
   hasReachedEnd: boolean;
   /** Anexa o próximo trecho; no fim do capítulo, o primeiro do capítulo seguinte. */
   loadMore(): void;
@@ -312,10 +317,21 @@ export function useReaderScroll({
     segments,
     isLoading,
     error,
+    errorDirection: resolveErrorDirection(error, failedLoadRef.current),
     hasReachedEnd,
     loadMore,
     loadPrevious,
     retry,
     reportVisible,
   };
+}
+
+function resolveErrorDirection(
+  error: Error | null,
+  failedLoad: FailedLoad | null
+): ScrollErrorDirection {
+  if (error === null || failedLoad === null) return null;
+  if (failedLoad.direction === "prepend") return "prepend";
+
+  return "append";
 }

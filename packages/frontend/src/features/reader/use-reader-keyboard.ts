@@ -6,9 +6,21 @@ import type { PageTurnDirection } from "./use-reader-page";
 
 const FORWARD_KEYS = ["ArrowRight", "PageDown"];
 const BACKWARD_KEYS = ["ArrowLeft", "PageUp"];
-const SCROLL_FORWARD_KEYS = ["PageDown", "ArrowDown"];
-const SCROLL_BACKWARD_KEYS = ["PageUp", "ArrowUp"];
 const SCROLL_PAGE_FRACTION = 0.9;
+// Seta anda pouco: é navegação fina dentro do parágrafo, não virada de tela.
+const SCROLL_LINE_FRACTION = 0.05;
+
+interface ScrollStep {
+  direction: -1 | 1;
+  fraction: number;
+}
+
+const SCROLL_KEY_STEPS: ReadonlyMap<string, ScrollStep> = new Map([
+  ["PageDown", { direction: 1, fraction: SCROLL_PAGE_FRACTION }],
+  ["PageUp", { direction: -1, fraction: SCROLL_PAGE_FRACTION }],
+  ["ArrowDown", { direction: 1, fraction: SCROLL_LINE_FRACTION }],
+  ["ArrowUp", { direction: -1, fraction: SCROLL_LINE_FRACTION }],
+]);
 
 interface UseReaderKeyboardOptions {
   mode: ReaderMode;
@@ -51,11 +63,11 @@ export function useReaderKeyboard({
       if (isActivationTarget) return;
 
       if (mode === "scroll") {
-        const scrollDirection = resolveScrollDirection(event);
-        if (scrollDirection === null) return;
+        const scrollStep = resolveScrollStep(event);
+        if (scrollStep === null) return;
 
         event.preventDefault();
-        onScrollPage(scrollDirection, SCROLL_PAGE_FRACTION);
+        onScrollPage(scrollStep.direction, scrollStep.fraction);
         return;
       }
 
@@ -91,17 +103,18 @@ export function useReaderKeyboard({
 }
 
 // Setas horizontais ficam de fora: na rolagem não há página a virar.
-function resolveScrollDirection(event: KeyboardEvent): -1 | 1 | null {
+function resolveScrollStep(event: KeyboardEvent): ScrollStep | null {
   // Alt/Cmd/Ctrl pertencem ao navegador e ao sistema (Alt+← volta história).
   if (hasBlockingModifier(event)) return null;
 
   const isSpace = event.key === " " || event.key === "Space";
-  if (isSpace) return event.shiftKey ? -1 : 1;
+  if (isSpace) {
+    const direction = event.shiftKey ? -1 : 1;
+    return { direction, fraction: SCROLL_PAGE_FRACTION };
+  }
 
-  if (SCROLL_FORWARD_KEYS.includes(event.key)) return 1;
-  if (SCROLL_BACKWARD_KEYS.includes(event.key)) return -1;
-
-  return null;
+  const step = SCROLL_KEY_STEPS.get(event.key);
+  return step ?? null;
 }
 
 function resolveTurnDirection(
