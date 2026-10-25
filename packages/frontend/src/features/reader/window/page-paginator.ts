@@ -59,11 +59,12 @@ export class PagePaginator {
         cursor,
         rawEnd
       );
-      const pageText = text.slice(cursor, end);
+      const wordEnd = PagePaginator.retreatToWordBoundary(text, cursor, end);
+      const pageText = text.slice(cursor, wordEnd);
       const pageCodePointLength = PagePaginator.countCodePoints(
         text,
         cursor,
-        end
+        wordEnd
       );
       const endCodePoint = codePointCursor + pageCodePointLength;
 
@@ -75,7 +76,7 @@ export class PagePaginator {
       });
 
       codePointCursor = endCodePoint;
-      cursor = end;
+      cursor = wordEnd;
     }
 
     return pages;
@@ -236,4 +237,49 @@ export class PagePaginator {
 
     return retreatedEnd;
   }
+
+  // Cortar no meio da palavra deixaria a última linha da página com um pedaço
+  // ("...com os bra"). Recua até depois do último espaço, para a palavra
+  // inteira ir para a página seguinte; se não houver espaço depois do começo
+  // (palavra maior que a página), mantém o corte para não esvaziar a página.
+  private static retreatToWordBoundary(
+    text: string,
+    start: number,
+    end: number
+  ): number {
+    if (end <= start) return end;
+    if (end >= text.length) return end;
+
+    const charAfterCut = text[end];
+    const isAfterWhitespace = isWhitespace(charAfterCut);
+    if (isAfterWhitespace) return end;
+
+    const charBeforeCut = text[end - 1];
+    const isBeforeWhitespace = isWhitespace(charBeforeCut);
+    if (isBeforeWhitespace) return end;
+
+    const lastWhitespaceIndex = findLastWhitespaceIndex(text, start, end);
+    const hasRoomToRetreat = lastWhitespaceIndex > start;
+    if (!hasRoomToRetreat) return end;
+
+    // Mantém o espaço no fim da página; a seguinte começa na palavra inteira.
+    return lastWhitespaceIndex + 1;
+  }
+}
+
+function isWhitespace(char: string): boolean {
+  return char === " " || char === "\n" || char === "\r" || char === "\t";
+}
+
+function findLastWhitespaceIndex(
+  text: string,
+  start: number,
+  end: number
+): number {
+  for (let index = end - 1; index >= start; index -= 1) {
+    const isWhitespaceChar = isWhitespace(text[index]);
+    if (isWhitespaceChar) return index;
+  }
+
+  return -1;
 }

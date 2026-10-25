@@ -32,17 +32,28 @@ const PARAGRAPH_SEPARATOR = "\n\n";
  */
 export class ScrollSegments {
   static fromWindow(textWindow: TextWindow): ScrollSegment {
+    // O próximo trecho só existe se a janela não fechou o capítulo: nesse caso,
+    // corta o fim no último espaço para a palavra partida não aparecer na
+    // emenda entre trechos.
+    const hasNextWindow = textWindow.nextOffset !== null;
+    const text = hasNextWindow
+      ? trimTrailingPartialWord(textWindow.text)
+      : textWindow.text;
+    const didTrim = text.length !== textWindow.text.length;
+    const trimmedCodePoints = didTrim
+      ? countCodePoints(text)
+      : 0;
+
     return {
       key: `${textWindow.position}:${textWindow.offset}`,
       position: textWindow.position,
       offset: textWindow.offset,
-      paragraphs: ScrollSegments.toParagraphs(
-        textWindow.text,
-        textWindow.offset
-      ),
-      nextOffset: textWindow.nextOffset,
+      paragraphs: ScrollSegments.toParagraphs(text, textWindow.offset),
+      nextOffset: didTrim
+        ? textWindow.offset + trimmedCodePoints
+        : textWindow.nextOffset,
       totalLength: textWindow.totalLength,
-      lastChar: ScrollSegments.resolveLastChar(textWindow.text),
+      lastChar: ScrollSegments.resolveLastChar(text),
     };
   }
 
@@ -151,6 +162,36 @@ export class ScrollSegments {
 
 function countCodePoints(text: string): number {
   return PagePaginator.countCodePoints(text, 0, text.length);
+}
+
+// A janela corta em 20 mil caracteres, sem respeitar palavras. Recua até depois
+// do último espaço para a palavra inteira ir para o trecho seguinte. O limite
+// evita empurrar adiante um "token" gigante (URL, sequência sem espaço).
+const MAX_TRIMMED_WORD_LENGTH = 80;
+
+function trimTrailingPartialWord(text: string): string {
+  const lastWhitespaceIndex = findLastWhitespaceIndex(text);
+  if (lastWhitespaceIndex === -1) return text;
+
+  const endsWithWhitespace = lastWhitespaceIndex === text.length - 1;
+  if (endsWithWhitespace) return text;
+
+  const partialWordLength = text.length - lastWhitespaceIndex - 1;
+  const isGiantToken = partialWordLength > MAX_TRIMMED_WORD_LENGTH;
+  if (isGiantToken) return text;
+
+  return text.slice(0, lastWhitespaceIndex + 1);
+}
+
+function findLastWhitespaceIndex(text: string): number {
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    const char = text[index];
+    const isWhitespace =
+      char === " " || char === "\n" || char === "\r" || char === "\t";
+    if (isWhitespace) return index;
+  }
+
+  return -1;
 }
 
 function sliceByCodePoints(text: string, length: number): string {
