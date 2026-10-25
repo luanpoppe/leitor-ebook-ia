@@ -1,0 +1,60 @@
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+
+export const conversationParamsSchema = z.object({
+  conversationId: z.string().uuid(),
+});
+
+export class ConversationParamsDto extends createZodDto(
+  conversationParamsSchema,
+) {}
+
+export const askQuestionSchema = z.object({
+  question: z.string().trim().min(1).max(2_000),
+  scope: z.enum(['up-to-current', 'whole-book']).default('up-to-current'),
+  position: z.coerce.number().int().min(1).default(1),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export class AskQuestionDto extends createZodDto(askQuestionSchema) {}
+
+export type ChatScope = z.infer<typeof askQuestionSchema>['scope'];
+
+export interface ChatCitationResponse {
+  index: number;
+  chapterPosition: number;
+  chapterTitle: string | null;
+  /** Offset do trecho dentro do capítulo, para o leitor pular até ele. */
+  offset: number;
+}
+
+export interface ChatMessageResponse {
+  id: string;
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+  citations: ChatCitationResponse[];
+  createdAt: string;
+}
+
+export interface ConversationSummaryResponse {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ConversationListResponse {
+  items: ConversationSummaryResponse[];
+}
+
+export interface ConversationResponse {
+  id: string;
+  title: string | null;
+  messages: ChatMessageResponse[];
+}
+
+export interface AskQuestionResponse {
+  conversationId: string;
+  /** Mensagem da pergunta e resposta da IA, na ordem. */
+  messages: ChatMessageResponse[];
+}

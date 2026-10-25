@@ -1,0 +1,45 @@
+export type ChatRole = "USER" | "ASSISTANT";
+
+export type ChatScope = "up-to-current" | "whole-book";
+
+export interface ChatCitation {
+  /** Número que aparece na resposta, entre colchetes. */
+  index: number;
+  chapterPosition: number;
+  chapterTitle: string | null;
+  /** Offset do trecho dentro do capítulo, para o leitor pular até ele. */
+  offset: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  citations: ChatCitation[];
+  createdAt: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface Conversation {
+  id: string;
+  title: string | null;
+  messages: ChatMessage[];
+}
+
+export interface AskQuestionInput {
+  question: string;
+  scope: ChatScope;
+  position: number;
+  offset: number;
+}
+
+export interface AskQuestionResponse {
+  conversationId: string;
+  messages: ChatMessage[];
+}

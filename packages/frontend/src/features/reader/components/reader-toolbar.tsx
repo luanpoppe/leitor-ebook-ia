@@ -27,12 +27,15 @@ interface ReaderToolbarProps {
   onToggleTheme: () => void;
   mode: ReaderMode;
   onToggleMode: () => void;
+  isChatOpen: boolean;
+  onToggleChat: () => void;
 }
 
 const BACK_LABEL = "Voltar para a ficha do livro";
 const PREVIOUS_LABEL = "Capítulo anterior";
 const NEXT_LABEL = "Próximo capítulo";
 const TOC_LABEL = "Sumário";
+const CHAT_LABEL = "Chat";
 const DECREASE_FONT_LABEL = "Diminuir fonte";
 const INCREASE_FONT_LABEL = "Aumentar fonte";
 const LIGHT_THEME_ACTION_LABEL = "Usar tema sépia";
@@ -79,6 +82,12 @@ function resolveIsTocButtonActive(isTocOpen: boolean): string {
   return `${styles.button} ${styles.buttonActive}`;
 }
 
+function resolveIsChatButtonActive(isChatOpen: boolean): string {
+  if (!isChatOpen) return styles.button;
+
+  return `${styles.button} ${styles.buttonActive}`;
+}
+
 export function ReaderToolbar({
   bookTitle,
   backHref,
@@ -101,6 +110,8 @@ export function ReaderToolbar({
   onToggleTheme,
   mode,
   onToggleMode,
+  isChatOpen,
+  onToggleChat,
 }: ReaderToolbarProps): JSX.Element {
   const progressPercent = resolveProgress(chapterProgress);
   const chapterLabel = resolveChapterLabel(currentPosition, chaptersCount);
@@ -192,6 +203,16 @@ export function ReaderToolbar({
           className={resolveIsTocButtonActive(isTocOpen)}
         >
           {TOC_LABEL}
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleChat}
+          aria-expanded={isChatOpen}
+          aria-label={CHAT_LABEL}
+          className={resolveIsChatButtonActive(isChatOpen)}
+        >
+          {CHAT_LABEL}
         </button>
 
         <div className={styles.controlGroup}>

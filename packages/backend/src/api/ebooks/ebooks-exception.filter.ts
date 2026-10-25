@@ -13,6 +13,11 @@ import {
 } from '../../catalog/catalog.errors';
 import { QueueUnavailableError } from '../../ingestion/ingestion.errors';
 import {
+  ChatContextUnavailableError,
+  ChatUnavailableError,
+  ConversationNotFoundError,
+} from '../../chat/chat.errors';
+import {
   InvalidStorageInputError,
   StorageObjectNotFoundError,
   StorageUnavailableError,
@@ -52,6 +57,9 @@ interface ErrorBody {
   UnsupportedEbookFormatError,
   EmptyEbookFileError,
   InvalidEbookStatusError,
+  ConversationNotFoundError,
+  ChatUnavailableError,
+  ChatContextUnavailableError,
   MulterError,
 )
 export class EbooksExceptionFilter extends BaseExceptionFilter {
@@ -132,6 +140,15 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
     }
     if (exception instanceof InvalidStorageInputError) {
       return HttpStatus.BAD_REQUEST;
+    }
+    if (exception instanceof ConversationNotFoundError) {
+      return HttpStatus.NOT_FOUND;
+    }
+    if (exception instanceof ChatContextUnavailableError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof ChatUnavailableError) {
+      return HttpStatus.SERVICE_UNAVAILABLE;
     }
     return null;
   }

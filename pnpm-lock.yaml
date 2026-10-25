@@ -11,8 +11,8 @@ importers:
   packages/backend:
     dependencies:
       '@luanpoppe/ai':
-        specifier: ^1.1.6
-        version: 1.1.6(@aws-sdk/credential-provider-node@3.972.86)(@aws-sdk/credential-providers@3.1150.0)(@langchain/langgraph-checkpoint@1.2.0(@langchain/core@1.2.17(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ws@8.22.0)))(@smithy/signature-v4@5.7.4)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(undici@7.30.0)(ws@8.22.0)
+        specifier: ^1.2.2
+        version: 1.2.2(@aws-sdk/credential-provider-node@3.972.86)(@aws-sdk/credential-providers@3.1150.0)(@langchain/langgraph-checkpoint@1.2.0(@langchain/core@1.2.17(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ws@8.22.0)))(@smithy/signature-v4@5.7.4)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(undici@7.30.0)(ws@8.22.0)
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.2.4(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -1057,8 +1057,9 @@ packages:
   '@langchain/protocol@0.0.19':
     resolution: {integrity: sha512-9hKcRrH7cBX6gfutdfXPoft1OCchHe4FEpALoDJMl5Qu+n/YG5ynZmyu8+8cxORlPwHBoKTxggvXz+76M1yX1Q==}
 
-  '@luanpoppe/ai@1.1.6':
-    resolution: {integrity: sha512-rb68vDatPej+SnvD9CJbU2uxYCnBjWN+njd6co54oY0pr5LQQ1lBfBe0fL7eAZ9kQj8onWKSElnaFFP5TJCe5A==}
+  '@luanpoppe/ai@1.2.2':
+    resolution: {integrity: sha512-OcKrd1qLz87oUy4ULCUVkN+OtDzJ8yPwL8Iuyzl6FVOh8CFTyP+V9L3AuS0AFMUX3x4i0yWjZaFKMdwOO2NImw==}
+    engines: {node: '>=20'}
 
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
@@ -7297,7 +7298,7 @@ snapshots:
 
   '@langchain/protocol@0.0.19': {}
 
-  '@luanpoppe/ai@1.1.6(@aws-sdk/credential-provider-node@3.972.86)(@aws-sdk/credential-providers@3.1150.0)(@langchain/langgraph-checkpoint@1.2.0(@langchain/core@1.2.17(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ws@8.22.0)))(@smithy/signature-v4@5.7.4)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(undici@7.30.0)(ws@8.22.0)':
+  '@luanpoppe/ai@1.2.2(@aws-sdk/credential-provider-node@3.972.86)(@aws-sdk/credential-providers@3.1150.0)(@langchain/langgraph-checkpoint@1.2.0(@langchain/core@1.2.17(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ws@8.22.0)))(@smithy/signature-v4@5.7.4)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(undici@7.30.0)(ws@8.22.0)':
     dependencies:
       '@langchain/core': 1.2.17(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ws@8.22.0)
       '@langchain/google-genai': 2.3.2(@langchain/core@1.2.17(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ws@8.22.0))

@@ -21,6 +21,8 @@ import {
   type ReaderScrollViewHandle,
 } from "./reader-scroll-view";
 import { ReaderTocDrawer } from "./reader-toc-drawer";
+import { ReaderChatDrawer } from "../chat/reader-chat-drawer";
+import type { ChatCitation } from "../chat/types";
 import { ReaderToolbar } from "./reader-toolbar";
 import styles from "./reader-screen.module.css";
 import messageStyles from "./reader-message.module.css";
@@ -76,6 +78,7 @@ export function ReaderScreen({
   const { ebook } = useEbookDetail(bookId);
 
   const [isTocOpen, setIsTocOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
   const [metrics, setMetrics] = useState<ReaderPageMetrics | null>(null);
   // Capítulo que abre na última página: voltar do começo do capítulo seguinte.
@@ -266,12 +269,46 @@ export function ReaderScreen({
   }, [chapter, goPrevious, isScrollMode]);
 
   const handleToggleToc = useCallback(() => {
+    setIsChatOpen(false);
     setIsTocOpen((isOpen) => !isOpen);
   }, []);
 
   const handleCloseToc = useCallback(() => {
     setIsTocOpen(false);
   }, []);
+
+  const handleToggleChat = useCallback(() => {
+    setIsTocOpen(false);
+    setIsChatOpen((isOpen) => !isOpen);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setIsChatOpen(false);
+  }, []);
+
+  // Citação do chat: fecha o painel e leva o leitor ao trecho citado.
+  const handleCitationSelect = useCallback(
+    (citation: ChatCitation) => {
+      setIsChatOpen(false);
+      setLandAtEndPosition(null);
+
+      if (isScrollMode) {
+        setScrollOffset(citation.offset);
+        setScrollAnchor({
+          position: citation.chapterPosition,
+          offset: citation.offset,
+        });
+      } else {
+        setPageOffset(citation.offset);
+      }
+
+      const isSameChapter = citation.chapterPosition === currentPosition;
+      if (isSameChapter) return;
+
+      goToChapter(citation.chapterPosition);
+    },
+    [currentPosition, goToChapter, isScrollMode]
+  );
 
   const handleSelectChapter = useCallback(
     (position: number) => {
@@ -407,6 +444,7 @@ export function ReaderScreen({
   const isReadingBlocked = isScrollMode
     ? isScrollReadingBlocked
     : isPageReadingBlocked;
+  const isReadingLocked = isReadingBlocked || isChatOpen;
   const isChunkErrorVisible =
     !isScrollMode && pageError !== null && errorKind === null && !hasReachedEnd;
   // Falha tem o aviso do rodapé; página nula sem falha é carga em andamento.
@@ -416,7 +454,7 @@ export function ReaderScreen({
   useReaderKeyboard({
     mode,
     isTocOpen,
-    isReadingBlocked,
+    isReadingBlocked: isReadingLocked,
     onCloseToc: handleCloseToc,
     onNext: goToNextPage,
     onPrevious: goToPreviousPage,
@@ -551,6 +589,8 @@ export function ReaderScreen({
         onToggleTheme={toggleTheme}
         mode={mode}
         onToggleMode={handleToggleMode}
+        isChatOpen={isChatOpen}
+        onToggleChat={handleToggleChat}
       />
 
       <main className={styles.main}>
@@ -570,6 +610,20 @@ export function ReaderScreen({
           currentPosition={toolbarPosition}
           onSelect={handleSelectChapter}
           onClose={handleCloseToc}
+        />
+      )}
+
+      {isChatOpen && (
+        <ReaderChatDrawer
+          bookId={bookId}
+          position={
+            isScrollMode
+              ? visiblePoint.position
+              : toolbarPosition ?? FIRST_CHAPTER_POSITION
+          }
+          offset={isScrollMode ? visiblePoint.offset : page?.startOffset ?? 0}
+          onClose={handleCloseChat}
+          onCitationSelect={handleCitationSelect}
         />
       )}
     </div>

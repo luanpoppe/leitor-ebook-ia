@@ -89,6 +89,37 @@ export class EmbeddingService {
     return batchVectors;
   }
 
+  /**
+   * Vetoriza uma pergunta para a busca por similaridade. Usa `embedQuery`
+   * (task de consulta), não `embedDocuments`, porque a pergunta não é um
+   * documento do índice.
+   */
+  async embedQuery(text: string): Promise<number[]> {
+    const openRouterApiKey = this.requireOpenRouterApiKey();
+
+    try {
+      return await AIEmbeddings.embedQuery(
+        text,
+        {
+          model: EMBEDDING_MODEL,
+          dimensions: EMBEDDING_DIMENSIONS,
+        },
+        { openRouterApiKey },
+      );
+    } catch (error) {
+      const normalizedError = this.toError(error);
+      this.logger.error(
+        `Falha ao gerar o vetor da consulta: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+
+      throw new EmbeddingUnavailableError(
+        normalizedError.message,
+        normalizedError,
+      );
+    }
+  }
+
   private requireOpenRouterApiKey(): string {
     if (!this.client) {
       throw new EmbeddingUnavailableError(EMBEDDINGS_DISABLED_MESSAGE);

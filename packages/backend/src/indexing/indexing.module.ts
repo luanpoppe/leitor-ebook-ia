@@ -6,6 +6,6 @@ import { EmbeddingService } from './embedding.service';
 @Module({
   imports: [CatalogModule],
   providers: [EmbeddingService, ContentIndexingService],
-  exports: [ContentIndexingService],
+  exports: [ContentIndexingService, EmbeddingService],
 })
 export class IndexingModule {}
