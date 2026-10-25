@@ -1,22 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { JSX } from "react";
 import Link from "next/link";
 import { useEbookDetail } from "@/features/ebooks/use-ebook-detail";
 import { useReader } from "../use-reader";
 import { useReaderKeyboard } from "../use-reader-keyboard";
+import { useReaderPage, type ReaderPageMetrics } from "../use-reader-page";
 import { useReaderPreferences } from "../use-reader-preferences";
 import { useReadingProgressWriter } from "../use-reading-progress-writer";
-import { ReaderChapterView } from "./reader-chapter-view";
 import { ReaderErrorMessage } from "./reader-error-message";
+import { ReaderFooterNotice } from "./reader-footer-notice";
 import { ReaderMessage } from "./reader-message";
+import { ReaderPageInteraction } from "./reader-page-interaction";
+import { ReaderPageView } from "./reader-page-view";
 import { ReaderTocDrawer } from "./reader-toc-drawer";
 import { ReaderToolbar } from "./reader-toolbar";
 import styles from "./reader-screen.module.css";
 import messageStyles from "./reader-message.module.css";
 
 const FIRST_CHAPTER_POSITION = 1;
+const CHUNK_ERROR_MESSAGE = "Falha ao carregar o trecho do capítulo.";
 
 interface ReaderScreenProps {
   bookId: string;
@@ -54,26 +58,80 @@ export function ReaderScreen({
   const { ebook } = useEbookDetail(bookId);
 
   const [isTocOpen, setIsTocOpen] = useState(false);
-  const [lastOffset, setLastOffset] = useState(0);
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
+  const [metrics, setMetrics] = useState<ReaderPageMetrics | null>(null);
+  // Capítulo que abre na última página: voltar do começo do capítulo seguinte.
+  const [landAtEndPosition, setLandAtEndPosition] = useState<number | null>(
+    null
+  );
 
-  const firstChapterPosition =
-    chapters[0]?.position ?? FIRST_CHAPTER_POSITION;
+  // A view mede a área e publica a régua; uma identidade nova a cada render
+  // dispararia repaginação em loop.
+  const handleMetricsChange = useCallback((nextMetrics: ReaderPageMetrics) => {
+    setMetrics(nextMetrics);
+  }, []);
 
-  // Cada capítulo novo começa do ponto de retomada que o leitor informou.
-  useEffect(() => {
-    setLastOffset(resumeOffset);
-  }, [chapter?.id, resumeOffset]);
+  const isLandingAtChapterEnd =
+    chapter !== null && landAtEndPosition === chapter.position;
+  const initialOffset = isLandingAtChapterEnd
+    ? chapter.totalLength
+    : resumeOffset;
 
-  const handlePositionChange = useCallback(
+  const handlePageChange = useCallback(
     (position: number, offset: number) => {
-      setLastOffset(offset);
       scheduleSave(position, offset);
     },
     [scheduleSave]
   );
 
-  const handleNext = useCallback(() => {
+  const handleTurnPastEnd = useCallback(() => {
+    if (!hasNext) {
+      setHasReachedEnd(true);
+      return;
+    }
+
+    setLandAtEndPosition(null);
+    goNext();
+    setHasReachedEnd(false);
+  }, [goNext, hasNext]);
+
+  const handleTurnPastStart = useCallback(() => {
+    const previousPosition = chapter?.previousPosition ?? null;
+    if (!hasPrevious || previousPosition === null) return;
+
+    setLandAtEndPosition(previousPosition);
+    goPrevious();
+    setHasReachedEnd(false);
+  }, [chapter, goPrevious, hasPrevious]);
+
+  const {
+    page,
+    pageIndex,
+    totalPages,
+    direction,
+    error: pageError,
+    goToNextPage,
+    goToPreviousPage,
+    retry: retryPage,
+  } = useReaderPage({
+    bookId,
+    position: currentPosition ?? FIRST_CHAPTER_POSITION,
+    initialOffset,
+    metrics,
+    enabled: chapter !== null && errorKind === null && !hasReachedEnd,
+    onTurnPastEnd: handleTurnPastEnd,
+    onTurnPastStart: handleTurnPastStart,
+    onPageChange: handlePageChange,
+  });
+
+  const firstChapterPosition =
+    chapters[0]?.position ?? FIRST_CHAPTER_POSITION;
+
+  // Pular capítulo pela barra é navegação explícita: não herda o "abrir no fim"
+  // que só existe para a virada de página voltando do primeiro capítulo.
+  const handleNextChapter = useCallback(() => {
+    setLandAtEndPosition(null);
+
     if (hasNext) {
       goNext();
       setHasReachedEnd(false);
@@ -83,7 +141,8 @@ export function ReaderScreen({
     setHasReachedEnd(true);
   }, [goNext, hasNext]);
 
-  const handlePrevious = useCallback(() => {
+  const handlePreviousChapter = useCallback(() => {
+    setLandAtEndPosition(null);
     setHasReachedEnd(false);
     goPrevious();
   }, [goPrevious]);
@@ -98,6 +157,7 @@ export function ReaderScreen({
 
   const handleSelectChapter = useCallback(
     (position: number) => {
+      setLandAtEndPosition(null);
       goToChapter(position);
       setIsTocOpen(false);
       setHasReachedEnd(false);
@@ -106,6 +166,7 @@ export function ReaderScreen({
   );
 
   const handleOpenFirstChapter = useCallback(() => {
+    setLandAtEndPosition(null);
     goToChapter(firstChapterPosition);
     setHasReachedEnd(false);
   }, [firstChapterPosition, goToChapter]);
@@ -113,17 +174,24 @@ export function ReaderScreen({
   const readerTitle = ebook?.title ?? "Leitura";
   const backHref = `/ebooks/${bookId}`;
   const chaptersCount = chapters.length;
+  const pageLabel =
+    page === null ? null : `Página ${pageIndex + 1} de ${totalPages}`;
   const chapterProgress =
     chapter === null
       ? 0
-      : resolveChapterProgress(lastOffset, chapter.totalLength);
+      : resolveChapterProgress(page?.startOffset ?? 0, chapter.totalLength);
+
+  const isReadingBlocked =
+    hasReachedEnd || errorKind !== null || pageError !== null || chapter === null;
+  const isChunkErrorVisible =
+    pageError !== null && errorKind === null && !hasReachedEnd;
 
   useReaderKeyboard({
     isTocOpen,
-    isReadingBlocked: hasReachedEnd || errorKind !== null,
+    isReadingBlocked,
     onCloseToc: handleCloseToc,
-    onNext: handleNext,
-    onPrevious: handlePrevious,
+    onNext: goToNextPage,
+    onPrevious: goToPreviousPage,
   });
 
   const renderBody = () => {
@@ -161,8 +229,7 @@ export function ReaderScreen({
 
     // Erro e fim do livro já saíram acima; sem capítulo e sem erro, ainda
     // estamos abrindo o livro — inclusive se a query ainda nem começou.
-    const isOpeningBook = chapter === null;
-    if (isOpeningBook) {
+    if (chapter === null) {
       return (
         <div className={styles.loading} aria-live="polite">
           <p className={styles.loadingText}>Carregando livro…</p>
@@ -170,16 +237,22 @@ export function ReaderScreen({
       );
     }
 
-    if (chapter === null) return null;
-
     return (
-      <ReaderChapterView
-        chapter={chapter}
-        fontSize={fontSize}
-        theme={theme}
-        resumeOffset={resumeOffset}
-        onPositionChange={handlePositionChange}
-      />
+      <ReaderPageInteraction
+        pageKey={`${chapter.position}:${pageIndex}`}
+        direction={direction}
+        isBlocked={isReadingBlocked}
+        onNext={goToNextPage}
+        onPrevious={goToPreviousPage}
+        onOpenToc={handleToggleToc}
+      >
+        <ReaderPageView
+          page={page}
+          fontSize={fontSize}
+          theme={theme}
+          onMetricsChange={handleMetricsChange}
+        />
+      </ReaderPageInteraction>
     );
   };
 
@@ -190,13 +263,14 @@ export function ReaderScreen({
         backHref={backHref}
         currentPosition={currentPosition}
         chaptersCount={chaptersCount}
+        pageLabel={pageLabel}
         chapterProgress={chapterProgress}
         isTocOpen={isTocOpen}
         onToggleToc={handleToggleToc}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
-        onPrevious={handlePrevious}
-        onNext={handleNext}
+        onPrevious={handlePreviousChapter}
+        onNext={handleNextChapter}
         fontSize={fontSize}
         canDecreaseFont={canDecrease}
         canIncreaseFont={canIncrease}
@@ -206,7 +280,16 @@ export function ReaderScreen({
         onToggleTheme={toggleTheme}
       />
 
-      <main className={styles.main}>{renderBody()}</main>
+      <main className={styles.main}>
+        {renderBody()}
+
+        {isChunkErrorVisible && (
+          <ReaderFooterNotice
+            message={CHUNK_ERROR_MESSAGE}
+            onRetry={retryPage}
+          />
+        )}
+      </main>
 
       {isTocOpen && (
         <ReaderTocDrawer
