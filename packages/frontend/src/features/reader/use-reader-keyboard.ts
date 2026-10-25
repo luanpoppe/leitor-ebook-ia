@@ -67,6 +67,10 @@ export function useReaderKeyboard({
 function resolveTurnDirection(
   event: KeyboardEvent
 ): PageTurnDirection | null {
+  // Alt/Cmd/Ctrl pertencem ao navegador e ao sistema (Alt+← volta história).
+  const hasModifier = event.altKey || event.metaKey || event.ctrlKey;
+  if (hasModifier) return null;
+
   const isSpace = event.key === " " || event.key === "Space";
   if (isSpace) return event.shiftKey ? "previous" : "next";
 

@@ -38,11 +38,16 @@ export interface UseReaderPageResult {
   goToNextPage(): void;
   goToPreviousPage(): void;
   retry(): void;
+  restart(): void;
 }
 
 // Régua estável enquanto a view não mediu: dentro do motor, uma função nova a
 // cada render dispararia repaginação sem motivo.
 const NO_MEASURE = (): number => 0;
+
+// A animação de entrada dura 220 ms; a folga evita que a direção sobreviva a
+// uma repaginação que não é virada de página.
+const DIRECTION_ANIMATION_MS = 260;
 
 export function useReaderPage({
   bookId,
@@ -57,11 +62,15 @@ export function useReaderPage({
   const [direction, setDirection] = useState<PageTurnDirection | null>(null);
   // Última página reportada, para não regravar o mesmo offset a cada render.
   const lastReportedPointRef = useRef<string | null>(null);
+  const directionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const {
     pages,
     page,
     pageIndex,
+    windowPosition,
     isLoading,
     error,
     isAtChapterStart,
@@ -69,6 +78,7 @@ export function useReaderPage({
     goToNextPage: goToNextPageInWindow,
     goToPreviousPage: goToPreviousPageInWindow,
     retry,
+    restart,
   } = useReaderWindow({
     bookId,
     position,
@@ -77,6 +87,29 @@ export function useReaderPage({
     measure: metrics?.measure ?? NO_MEASURE,
     enabled,
   });
+
+  const clearDirectionTimeout = useCallback(() => {
+    if (directionTimeoutRef.current === null) return;
+
+    clearTimeout(directionTimeoutRef.current);
+    directionTimeoutRef.current = null;
+  }, []);
+
+  const applyDirection = useCallback(
+    (nextDirection: PageTurnDirection) => {
+      clearDirectionTimeout();
+      setDirection(nextDirection);
+      // A direção é do evento, não da página: sem expirá-la, uma repaginação
+      // posterior (fonte, resize) animaria de novo uma página que já está na tela.
+      directionTimeoutRef.current = setTimeout(() => {
+        directionTimeoutRef.current = null;
+        setDirection(null);
+      }, DIRECTION_ANIMATION_MS);
+    },
+    [clearDirectionTimeout]
+  );
+
+  useEffect(() => clearDirectionTimeout, [clearDirectionTimeout]);
 
   // Capítulo novo abre na direção neutra: a virada de ontem não é a de hoje.
   useEffect(() => {
@@ -88,13 +121,19 @@ export function useReaderPage({
   useEffect(() => {
     if (pageStartOffset === null) return;
 
-    const pointKey = `${position}:${pageStartOffset}`;
+    // Enquanto a sessão for do capítulo anterior, a página é dele: reportar
+    // aqui gravaria o offset antigo no capítulo novo.
+    const isCurrentChapter =
+      windowPosition !== null && windowPosition === position;
+    if (!isCurrentChapter) return;
+
+    const pointKey = `${windowPosition}:${pageStartOffset}`;
     const isSamePoint = lastReportedPointRef.current === pointKey;
     if (isSamePoint) return;
 
     lastReportedPointRef.current = pointKey;
     onPageChange(position, pageStartOffset);
-  }, [onPageChange, pageStartOffset, position]);
+  }, [onPageChange, pageStartOffset, position, windowPosition]);
 
   const goToNextPage = useCallback(() => {
     // Fim do capítulo é da tela de leitura: aqui só avisamos quem sabe virar.
@@ -103,9 +142,9 @@ export function useReaderPage({
       return;
     }
 
-    setDirection("next");
+    applyDirection("next");
     goToNextPageInWindow();
-  }, [goToNextPageInWindow, isAtChapterEnd, onTurnPastEnd]);
+  }, [applyDirection, goToNextPageInWindow, isAtChapterEnd, onTurnPastEnd]);
 
   const goToPreviousPage = useCallback(() => {
     // Início do capítulo é da tela de leitura, como o fim.
@@ -114,9 +153,14 @@ export function useReaderPage({
       return;
     }
 
-    setDirection("previous");
+    applyDirection("previous");
     goToPreviousPageInWindow();
-  }, [goToPreviousPageInWindow, isAtChapterStart, onTurnPastStart]);
+  }, [
+    applyDirection,
+    goToPreviousPageInWindow,
+    isAtChapterStart,
+    onTurnPastStart,
+  ]);
 
   return {
     page,
@@ -130,5 +174,6 @@ export function useReaderPage({
     goToNextPage,
     goToPreviousPage,
     retry,
+    restart,
   };
 }

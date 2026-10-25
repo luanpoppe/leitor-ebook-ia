@@ -18,6 +18,11 @@ interface ReaderMeasureLayerProps {
   fontSize: number;
   /** Largura útil do texto em px — a mesma da página de leitura. */
   width: number;
+  /**
+   * Muda quando a tipografia real muda sem fonte/largura novas (ex.: a fonte
+   * terminou de carregar); invalida o cache de alturas.
+   */
+  cacheEpoch?: number;
   ref?: Ref<ReaderMeasureLayerHandle>;
 }
 
@@ -30,6 +35,7 @@ interface ReaderMeasureLayerProps {
 export function ReaderMeasureLayer({
   fontSize,
   width,
+  cacheEpoch = 0,
   ref,
 }: ReaderMeasureLayerProps): JSX.Element {
   const blockRef = useRef<HTMLDivElement | null>(null);
@@ -43,7 +49,7 @@ export function ReaderMeasureLayer({
       // Antes do primeiro layout não há largura útil para medir.
       if (width <= 0) return 0;
 
-      const cacheKey = `${fontSize}:${width}`;
+      const cacheKey = `${fontSize}:${width}:${cacheEpoch}`;
       const isCacheStale = cacheKeyRef.current !== cacheKey;
       if (isCacheStale) {
         cacheKeyRef.current = cacheKey;
@@ -69,7 +75,7 @@ export function ReaderMeasureLayer({
 
       return height;
     },
-    [fontSize, width]
+    [cacheEpoch, fontSize, width]
   );
 
   useImperativeHandle(ref, () => ({ measure }), [measure]);

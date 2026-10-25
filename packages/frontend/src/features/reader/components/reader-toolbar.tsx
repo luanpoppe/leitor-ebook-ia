@@ -110,7 +110,12 @@ export function ReaderToolbar({
           </span>
           <span className={styles.chapterLabel}>{chapterLabel}</span>
           {pageLabel ? (
-            <span className={styles.pageLabel} title={pageLabel}>
+            <span
+              className={styles.pageLabel}
+              title={pageLabel}
+              role="status"
+              aria-live="polite"
+            >
               {pageLabel}
             </span>
           ) : null}

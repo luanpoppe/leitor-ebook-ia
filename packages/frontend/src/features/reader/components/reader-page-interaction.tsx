@@ -10,9 +10,6 @@ import {
 import styles from "./reader-page-interaction.module.css";
 
 interface ReaderPageInteractionProps {
-  /** Muda a cada página (ex.: `${position}:${pageIndex}`) para remontar e animar. */
-  pageKey: string;
-  direction: "next" | "previous" | null;
   /** Sumário aberto, erro ou fim do livro: nada vira página. */
   isBlocked: boolean;
   onNext(): void;
@@ -28,8 +25,6 @@ interface PointerStart {
 }
 
 export function ReaderPageInteraction({
-  pageKey,
-  direction,
   isBlocked,
   onNext,
   onPrevious,
@@ -41,6 +36,9 @@ export function ReaderPageInteraction({
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      // Só o botão principal inicia gesto; o direito abre menu do navegador.
+      if (event.button !== 0) return;
+
       pointerStartRef.current = {
         x: event.clientX,
         y: event.clientY,
@@ -76,7 +74,7 @@ export function ReaderPageInteraction({
       const pointerStart = pointerStartRef.current;
       pointerStartRef.current = null;
 
-      // Dedo/mouse secundário ou um up sem down anterior não viram página.
+      // Up sem down guardado (outro botão, cancelado ou fora do palco) não vira.
       if (pointerStart === null) return;
       if (pointerStart.pointerId !== event.pointerId) return;
       if (isBlocked) return;
@@ -115,13 +113,7 @@ export function ReaderPageInteraction({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
     >
-      <div
-        key={pageKey}
-        className={styles.page}
-        data-direction={direction ?? "none"}
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

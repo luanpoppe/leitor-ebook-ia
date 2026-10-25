@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { JSX } from "react";
+import type { CSSProperties, JSX } from "react";
 import Link from "next/link";
 import { useEbookDetail } from "@/features/ebooks/use-ebook-detail";
 import { useReader } from "../use-reader";
@@ -21,6 +21,11 @@ import messageStyles from "./reader-message.module.css";
 
 const FIRST_CHAPTER_POSITION = 1;
 const CHUNK_ERROR_MESSAGE = "Falha ao carregar o trecho do capítulo.";
+// O carregamento cobre a área sem desmontar a view que a mede.
+const PAGE_LOADING_STYLE: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+};
 
 interface ReaderScreenProps {
   bookId: string;
@@ -113,6 +118,7 @@ export function ReaderScreen({
     goToNextPage,
     goToPreviousPage,
     retry: retryPage,
+    restart: restartChapter,
   } = useReaderPage({
     bookId,
     position: currentPosition ?? FIRST_CHAPTER_POSITION,
@@ -158,18 +164,32 @@ export function ReaderScreen({
   const handleSelectChapter = useCallback(
     (position: number) => {
       setLandAtEndPosition(null);
-      goToChapter(position);
       setIsTocOpen(false);
       setHasReachedEnd(false);
+
+      // Escolher o capítulo já aberto rebobina em vez de virar no-op.
+      if (position === currentPosition) {
+        restartChapter();
+        return;
+      }
+
+      goToChapter(position);
     },
-    [goToChapter]
+    [currentPosition, goToChapter, restartChapter]
   );
 
   const handleOpenFirstChapter = useCallback(() => {
     setLandAtEndPosition(null);
-    goToChapter(firstChapterPosition);
     setHasReachedEnd(false);
-  }, [firstChapterPosition, goToChapter]);
+
+    // Livro de um capítulo só: o capítulo já é o primeiro, então recomeça nele.
+    if (currentPosition === firstChapterPosition) {
+      restartChapter();
+      return;
+    }
+
+    goToChapter(firstChapterPosition);
+  }, [currentPosition, firstChapterPosition, goToChapter, restartChapter]);
 
   const readerTitle = ebook?.title ?? "Leitura";
   const backHref = `/ebooks/${bookId}`;
@@ -185,6 +205,9 @@ export function ReaderScreen({
     hasReachedEnd || errorKind !== null || pageError !== null || chapter === null;
   const isChunkErrorVisible =
     pageError !== null && errorKind === null && !hasReachedEnd;
+  // Falha tem o aviso do rodapé; página nula sem falha é carga em andamento.
+  const isPagePending =
+    chapter !== null && page === null && pageError === null;
 
   useReaderKeyboard({
     isTocOpen,
@@ -239,8 +262,6 @@ export function ReaderScreen({
 
     return (
       <ReaderPageInteraction
-        pageKey={`${chapter.position}:${pageIndex}`}
-        direction={direction}
         isBlocked={isReadingBlocked}
         onNext={goToNextPage}
         onPrevious={goToPreviousPage}
@@ -248,10 +269,22 @@ export function ReaderScreen({
       >
         <ReaderPageView
           page={page}
+          pageKey={`${chapter.position}:${pageIndex}`}
+          direction={direction}
           fontSize={fontSize}
           theme={theme}
           onMetricsChange={handleMetricsChange}
         />
+
+        {isPagePending && (
+          <div
+            className={styles.loading}
+            style={PAGE_LOADING_STYLE}
+            aria-live="polite"
+          >
+            <p className={styles.loadingText}>Carregando página…</p>
+          </div>
+        )}
       </ReaderPageInteraction>
     );
   };

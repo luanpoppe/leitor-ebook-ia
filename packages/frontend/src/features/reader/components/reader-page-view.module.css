@@ -12,9 +12,49 @@
   height: 100%;
   max-width: 68ch;
   margin: 0 auto;
-  padding-block: 48px 96px;
+  /* Em telas baixas o padding não pode comer a área útil inteira. */
+  padding-block: min(48px, 6vh) min(96px, 12vh);
   padding-inline: clamp(20px, 5vw, 40px);
   outline: none;
+}
+
+.page {
+  width: 100%;
+}
+
+.page[data-direction="next"] {
+  animation: enterNext 220ms ease-out;
+}
+
+.page[data-direction="previous"] {
+  animation: enterPrevious 220ms ease-out;
+}
+
+@keyframes enterNext {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes enterPrevious {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page[data-direction="next"],
+  .page[data-direction="previous"] {
+    animation: none;
+  }
 }
 
 .content:focus-visible {

@@ -16,6 +16,9 @@ const EMPTY_SIZE = { pageHeight: 0, width: 0 };
 
 export interface ReaderPageViewProps {
   page: TextPage | null;
+  /** Muda a cada página (ex.: `${position}:${pageIndex}`) para animar a entrada. */
+  pageKey: string;
+  direction: "next" | "previous" | null;
   fontSize: number;
   theme: ReaderTheme;
   /** Régua + altura útil; chamado quando a área é medida ou redimensionada. */
@@ -29,6 +32,8 @@ interface ContentSize {
 
 export function ReaderPageView({
   page,
+  pageKey,
+  direction,
   fontSize,
   theme,
   onMetricsChange,
@@ -36,6 +41,7 @@ export function ReaderPageView({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const measureLayerRef = useRef<ReaderMeasureLayerHandle | null>(null);
   const [size, setSize] = useState<ContentSize>(EMPTY_SIZE);
+  const [measureEpoch, setMeasureEpoch] = useState(0);
 
   useEffect(() => {
     const content = contentRef.current;
@@ -56,6 +62,27 @@ export function ReaderPageView({
     return () => observer.disconnect();
   }, []);
 
+  // A fonte pode terminar de carregar depois da primeira medição; sem repaginar
+  // com a fonte real, as linhas quebram em lugar diferente do que foi medido.
+  useEffect(() => {
+    const fontSet = document.fonts;
+    if (fontSet === undefined) return;
+
+    let isMounted = true;
+    const bumpMeasureEpoch = (): void => {
+      if (!isMounted) return;
+      setMeasureEpoch((epoch) => epoch + 1);
+    };
+
+    void fontSet.ready.then(bumpMeasureEpoch);
+    fontSet.addEventListener("loadingdone", bumpMeasureEpoch);
+
+    return () => {
+      isMounted = false;
+      fontSet.removeEventListener("loadingdone", bumpMeasureEpoch);
+    };
+  }, []);
+
   const { pageHeight, width } = size;
 
   const measure = useCallback(
@@ -69,11 +96,11 @@ export function ReaderPageView({
 
       return handle.measure(text);
     },
-    // `fontSize` entra na identidade de propósito: a régua muda com a fonte e o
-    // motor só repagina quando a função muda. A largura da coluna nem sempre
-    // acompanha a fonte (coluna limitada pela tela em vez dos 68ch).
+    // `fontSize` e `measureEpoch` entram na identidade de propósito: a régua
+    // muda com a fonte e o motor só repagina quando a função muda. A largura da
+    // coluna nem sempre acompanha a fonte (coluna limitada pela tela, não 68ch).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fontSize, width]
+    [fontSize, measureEpoch, width]
   );
 
   useEffect(() => {
@@ -97,17 +124,25 @@ export function ReaderPageView({
         aria-label="Texto da página"
         tabIndex={0}
       >
-        {paragraphs.map((paragraph, index) => (
-          <p key={index} className={styles.paragraph}>
-            {paragraph}
-          </p>
-        ))}
+        {/* Só os parágrafos remontam: a régua e a área medida ficam estáveis. */}
+        <div
+          key={pageKey}
+          className={styles.page}
+          data-direction={direction ?? "none"}
+        >
+          {paragraphs.map((paragraph, index) => (
+            <p key={index} className={styles.paragraph}>
+              {paragraph}
+            </p>
+          ))}
+        </div>
       </div>
 
       <ReaderMeasureLayer
         ref={measureLayerRef}
         fontSize={fontSize}
         width={width}
+        cacheEpoch={measureEpoch}
       />
     </div>
   );

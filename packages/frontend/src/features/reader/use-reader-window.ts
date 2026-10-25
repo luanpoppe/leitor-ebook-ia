@@ -53,6 +53,8 @@ export interface UseReaderWindowResult {
   pages: TextPage[];
   pageIndex: number;
   page: TextPage | null;
+  /** Capítulo dono da sessão exibida; null enquanto a carga não chega. */
+  windowPosition: number | null;
   isLoading: boolean;
   error: Error | null;
   isAtChapterStart: boolean;
@@ -61,6 +63,7 @@ export interface UseReaderWindowResult {
   goToNextPage(): void;
   goToPreviousPage(): void;
   retry(): void;
+  restart(): void;
 }
 
 export function useReaderWindow({
@@ -175,21 +178,34 @@ export function useReaderWindow({
     [fetcher, showPage]
   );
 
+  const loadChapter = useCallback(
+    (openOffset: number) => {
+      // Busca uma janela antes do offset salvo para haver texto anterior para
+      // paginar acima; o pouso continua sendo no offset de abertura.
+      const fetchOffset = Math.max(0, openOffset - WINDOW_SIZE);
+      const startPoint = { position, offset: fetchOffset };
+      loadedChapterRef.current = { position, initialOffset: openOffset };
+      pendingAdvanceRef.current = null;
+      trailRef.current.reset(startPoint);
+      // Trocar de capítulo não pode manter o texto do capítulo anterior na tela.
+      sessionRef.current = null;
+      pageIndexRef.current = 0;
+      setSession(null);
+      setPageIndex(0);
+      void loadWindow(startPoint, { kind: "offset", offset: openOffset });
+    },
+    [loadWindow, position]
+  );
+
   const loadChapterStart = useCallback(() => {
-    // Busca uma janela antes do offset salvo para haver texto anterior para
-    // paginar acima; o pouso continua sendo no offset de retomada.
-    const fetchOffset = Math.max(0, initialOffset - WINDOW_SIZE);
-    const startPoint = { position, offset: fetchOffset };
-    loadedChapterRef.current = { position, initialOffset };
-    pendingAdvanceRef.current = null;
-    trailRef.current.reset(startPoint);
-    // Trocar de capítulo não pode manter o texto do capítulo anterior na tela.
-    sessionRef.current = null;
-    pageIndexRef.current = 0;
-    setSession(null);
-    setPageIndex(0);
-    void loadWindow(startPoint, { kind: "offset", offset: initialOffset });
-  }, [initialOffset, loadWindow, position]);
+    loadChapter(initialOffset);
+  }, [initialOffset, loadChapter]);
+
+  const restart = useCallback(() => {
+    // Recomeçar o capítulo atual é abrir no offset 0, sem depender do progresso
+    // salvo (que continuaria apontando para a página antiga).
+    loadChapter(0);
+  }, [loadChapter]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -305,6 +321,7 @@ export function useReaderWindow({
     pages,
     pageIndex,
     page: pages[pageIndex] ?? null,
+    windowPosition: session?.window.position ?? null,
     isLoading,
     error,
     isAtChapterStart: session?.window.offset === 0 && pageIndex === 0,
@@ -314,5 +331,6 @@ export function useReaderWindow({
     goToNextPage,
     goToPreviousPage,
     retry,
+    restart,
   };
 }
