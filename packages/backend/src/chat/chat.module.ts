@@ -3,6 +3,7 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { ChapterReadingRepository } from '../catalog/chapter-reading.repository';
 import { IndexingModule } from '../indexing/indexing.module';
 import { ChatController } from './chat.controller';
+import { ChatQueryPlanner } from './chat-query-planner';
 import { ChatService } from './chat.service';
 import { ChunkSearchRepository } from './chunk-search.repository';
 import { ConversationRepository } from './conversation.repository';
@@ -12,6 +13,7 @@ import { ConversationRepository } from './conversation.repository';
   controllers: [ChatController],
   providers: [
     ChatService,
+    ChatQueryPlanner,
     ConversationRepository,
     ChunkSearchRepository,
     ChapterReadingRepository,

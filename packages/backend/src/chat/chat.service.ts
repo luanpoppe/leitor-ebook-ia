@@ -1,10 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AIMessages, type AIModelNames } from '@luanpoppe/ai';
-import { ChapterReadingRepository } from '../catalog/chapter-reading.repository';
+import {
+  ChapterReadingRepository,
+  type ChapterSummaryRecord,
+} from '../catalog/chapter-reading.repository';
 import { EbookNotFoundError, EbookNotReadyError } from '../catalog/catalog.errors';
 import { EbookRepository } from '../catalog/ebook.repository';
 import { AI_CLIENT, type AiClient } from '../core/ai/ai.provider';
-import { BookStatus, ChatRole } from '../generated/prisma/client';
+import { Book, BookStatus, ChatRole } from '../generated/prisma/client';
 import { EmbeddingService } from '../indexing/embedding.service';
 import {
   ChatPromptBuilder,
@@ -13,6 +16,7 @@ import {
   type ChatCitation,
   type ChatExcerpt,
 } from './chat-prompt.builder';
+import { ChatQueryPlanner } from './chat-query-planner';
 import {
   ChatContextUnavailableError,
   ChatUnavailableError,
@@ -46,6 +50,7 @@ const HISTORY_LIMIT = 10;
 const MAX_TITLE_LENGTH = 80;
 const ANSWER_MAX_TOKENS = 1_200;
 const ANSWER_TEMPERATURE = 0.3;
+const MAX_QUERIES = 3;
 // Sem os offsets do cliente, ainda mandamos um trecho de leitura aproximado:
 // 6 mil caracteres antes do topo e 2 mil depois.
 const FALLBACK_READING_BEFORE = 6_000;
@@ -67,6 +72,7 @@ export class ChatService {
     private readonly chunkSearchRepository: ChunkSearchRepository,
     private readonly readingRepository: ChapterReadingRepository,
     private readonly embeddingService: EmbeddingService,
+    private readonly queryPlanner: ChatQueryPlanner,
     @Inject(AI_CLIENT) private readonly client: AiClient,
   ) {}
 
@@ -136,7 +142,7 @@ export class ChatService {
     }
     if (this.client === null) throw new ChatUnavailableError();
 
-    const excerpts = await this.findExcerpts(book.id, input);
+    const excerpts = await this.findExcerpts(book, input);
     const history = await this.conversationRepository.findRecentMessages(
       conversation.id,
       HISTORY_LIMIT,
@@ -172,7 +178,7 @@ export class ChatService {
   }
 
   private async findExcerpts(
-    bookId: string,
+    book: Book,
     input: {
       question: string;
       scope: ChatScope;
@@ -183,34 +189,46 @@ export class ChatService {
     },
   ): Promise<ChatExcerpt[]> {
     const range = resolveReadingRange(input);
-    const readingExcerpt = await this.findReadingExcerpt(bookId, input.position, range);
-    const vector = await this.embeddingService.embedQuery(input.question);
-    const matches = await this.chunkSearchRepository.search(
-      bookId,
-      vector,
-      CANDIDATE_LIMIT,
+    const readingExcerpt = await this.findReadingExcerpt(
+      book.id,
+      input.position,
+      range,
     );
-    const scopedMatches = matches.filter((match) =>
-      isInsideScope(match, input.scope, input.position, input.offset),
+    const summaries = await this.readingRepository.listChapterSummaries(book.id);
+    const allowedSummaries = summaries.filter(
+      (summary) =>
+        input.scope === 'whole-book' || summary.position <= input.position,
     );
-    const searchMatches = scopedMatches
-      .filter(
-        (match) => !isInsideReadingRange(match, input.position, range),
-      )
-      .slice(0, MAX_SEARCH_EXCERPTS);
-    const excerpts: ChatExcerpt[] = [];
+    const plan = await this.queryPlanner.plan({
+      question: input.question,
+      bookTitle: book.title,
+      chapters: allowedSummaries,
+      scope: input.scope,
+      position: input.position,
+    });
+    const searchMatches = await this.searchMatches(
+      book.id,
+      plan.queries,
+      input,
+      range,
+    );
+    const summaryExcerpts = toSummaryExcerpts(
+      plan.chapters,
+      allowedSummaries,
+    );
+    const excerpts: Array<Omit<ChatExcerpt, 'index'>> = [];
 
     if (readingExcerpt !== null) excerpts.push(readingExcerpt);
-    searchMatches.forEach((match) => {
-      excerpts.push({
-        index: excerpts.length + 1,
-        kind: 'search',
+    excerpts.push(...summaryExcerpts);
+    excerpts.push(
+      ...searchMatches.map((match) => ({
+        kind: 'search' as const,
         chapterPosition: match.chapterPosition,
         chapterTitle: match.chapterTitle,
         offset: match.charOffset,
         text: match.text,
-      });
-    });
+      })),
+    );
 
     if (excerpts.length === 0) {
       throw new ChatContextUnavailableError(
@@ -218,14 +236,45 @@ export class ChatService {
       );
     }
 
-    return excerpts;
+    this.logger.log(
+      `Contexto montado: buscas=${plan.queries.length} [${plan.queries.join(' | ')}], resumos=${summaryExcerpts.length}, trechos=${searchMatches.length}.`,
+    );
+
+    return excerpts.map((excerpt, index) => ({ ...excerpt, index: index + 1 }));
+  }
+
+  /** Uma busca por termo do plano, todas em paralelo, fundidas por trecho. */
+  private async searchMatches(
+    bookId: string,
+    queries: string[],
+    input: { scope: ChatScope; position: number; offset: number },
+    range: ReadingRange,
+  ): Promise<ChunkMatch[]> {
+    const terms = queries.slice(0, MAX_QUERIES);
+    const vectors = await Promise.all(
+      terms.map((term) => this.embeddingService.embedQuery(term)),
+    );
+    const resultSets = await Promise.all(
+      vectors.map((vector) =>
+        this.chunkSearchRepository.search(bookId, vector, CANDIDATE_LIMIT),
+      ),
+    );
+
+    return mergeMatches(resultSets)
+      .filter((match) =>
+        isInsideScope(match, input.scope, input.position, input.offset),
+      )
+      .filter(
+        (match) => !isInsideReadingRange(match, input.position, range),
+      )
+      .slice(0, MAX_SEARCH_EXCERPTS);
   }
 
   private async findReadingExcerpt(
     bookId: string,
     position: number,
     range: ReadingRange,
-  ): Promise<ChatExcerpt | null> {
+  ): Promise<Omit<ChatExcerpt, 'index'> | null> {
     const length = range.end - range.start;
     if (length <= 0) return null;
 
@@ -239,7 +288,6 @@ export class ChatService {
     if (chapter === null || text.length === 0) return null;
 
     return {
-      index: 1,
       kind: 'reading',
       chapterPosition: chapter.position,
       chapterTitle: chapter.title,
@@ -366,6 +414,57 @@ function isInsideReadingRange(
   if (!isSameChapter) return false;
 
   return match.charOffset >= range.start && match.charOffset < range.end;
+}
+
+/**
+ * Junta os resultados das buscas paralelas: o mesmo trecho pode aparecer em
+ * mais de um termo, e aí vale a maior similaridade.
+ */
+function mergeMatches(resultSets: ChunkMatch[][]): ChunkMatch[] {
+  const byKey = new Map<string, ChunkMatch>();
+
+  for (const matches of resultSets) {
+    for (const match of matches) {
+      const key = `${match.chapterPosition}:${match.chunkPosition}`;
+      const current = byKey.get(key);
+      const isBetter =
+        current === undefined || match.similarity > current.similarity;
+      if (!isBetter) continue;
+
+      byKey.set(key, match);
+    }
+  }
+
+  return [...byKey.values()].sort(
+    (left, right) => right.similarity - left.similarity,
+  );
+}
+
+/** Resumos dos capítulos que o planejador escolheu. */
+function toSummaryExcerpts(
+  positions: number[],
+  summaries: ChapterSummaryRecord[],
+): Array<Omit<ChatExcerpt, 'index'>> {
+  const summaryByPosition = new Map(
+    summaries.map((summary) => [summary.position, summary]),
+  );
+  const excerpts: Array<Omit<ChatExcerpt, 'index'>> = [];
+
+  for (const position of positions) {
+    const summary = summaryByPosition.get(position);
+    if (summary === undefined) continue;
+
+    excerpts.push({
+      kind: 'summary',
+      chapterPosition: summary.position,
+      chapterTitle: summary.title,
+      // Resumo é visão geral do capítulo: o salto abre no começo dele.
+      offset: 0,
+      text: summary.summary,
+    });
+  }
+
+  return excerpts;
 }
 
 function buildTitle(question: string): string {

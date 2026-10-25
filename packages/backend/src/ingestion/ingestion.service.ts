@@ -5,6 +5,7 @@ import { EbookNotFoundError } from '../catalog/catalog.errors';
 import { EbookRepository } from '../catalog/ebook.repository';
 import { ContentExtractor } from '../extraction/content-extractor';
 import { Book, BookStatus } from '../generated/prisma/client';
+import { ChapterSummaryService } from '../indexing/chapter-summary.service';
 import { ContentIndexingService } from '../indexing/content-indexing.service';
 import { FileStorageService } from '../storage/file-storage.service';
 
@@ -47,6 +48,7 @@ export class IngestionService {
     private readonly storage: FileStorageService,
     private readonly contentExtractor: ContentExtractor,
     private readonly indexing: ContentIndexingService,
+    private readonly summaries: ChapterSummaryService,
   ) {}
 
   async process(bookId: string): Promise<IngestionOutcome> {
@@ -107,6 +109,7 @@ export class IngestionService {
     const hasRemainingChunks = prepared.remaining > 0;
     if (hasRemainingChunks) throw new IncompleteIndexingError(prepared.remaining);
 
+    await this.generateSummaries(bookId);
     await this.markReady(bookId);
 
     return {
@@ -131,6 +134,7 @@ export class IngestionService {
       throw new IncompleteIndexingError(outcome.remaining);
     }
 
+    await this.generateSummaries(bookId);
     await this.markReady(bookId);
 
     return {
@@ -143,6 +147,21 @@ export class IngestionService {
 
   private async markReady(bookId: string): Promise<void> {
     await this.ebookRepository.updateStatus(bookId, BookStatus.READY);
+  }
+
+  /**
+   * Resumo é melhoria do chat, não pré-requisito da leitura: falha aqui não
+   * impede o livro de ficar pronto.
+   */
+  private async generateSummaries(bookId: string): Promise<void> {
+    try {
+      await this.summaries.summarizeBook(bookId);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Ingestão concluída sem resumos: bookId=${bookId}, motivo=${reason}`,
+      );
+    }
   }
 
   private logFailure(

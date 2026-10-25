@@ -54,6 +54,8 @@ model Chapter {
   position Int
   title    String? @db.VarChar(200)
   text     String
+  /** Resumo gerado na ingestão; null quando ainda não foi resumido. */
+  summary  String?
 
   book   Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chunks Chunk[]

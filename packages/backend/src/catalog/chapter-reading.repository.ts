@@ -21,6 +21,12 @@ export interface AdjacentPositions {
   nextPosition: number | null;
 }
 
+export interface ChapterSummaryRecord {
+  position: number;
+  title: string | null;
+  summary: string;
+}
+
 interface ChapterSummaryRow {
   id: string;
   position: number;
@@ -142,6 +148,23 @@ export class ChapterReadingRepository {
       previousPosition: this.toNullableNumber(row.previous_position),
       nextPosition: this.toNullableNumber(row.next_position),
     };
+  }
+
+  /** Resumos gerados na ingestão, para o planejador do chat escolher capítulos. */
+  async listChapterSummaries(bookId: string): Promise<ChapterSummaryRecord[]> {
+    const rows = await this.prisma.chapter.findMany({
+      where: { bookId, summary: { not: null } },
+      orderBy: { position: 'asc' },
+      select: { position: true, title: true, summary: true },
+    });
+
+    return rows.flatMap((row) => {
+      if (row.summary === null) return [];
+
+      return [
+        { position: row.position, title: row.title, summary: row.summary },
+      ];
+    });
   }
 
   private toChapterSummary(row: ChapterSummaryRow): ChapterSummary {

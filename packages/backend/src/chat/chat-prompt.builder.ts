@@ -3,7 +3,7 @@ export interface ChatBookMetadata {
   author: string | null;
 }
 
-export type ChatExcerptKind = "reading" | "search";
+export type ChatExcerptKind = "reading" | "summary" | "search";
 
 export interface ChatExcerpt {
   /** Número usado pelo modelo para citar (`[1]`, `[2]`...). */
@@ -28,6 +28,8 @@ export const MAX_EXCERPT_CHARS = 1_200;
 // A leitura atual é enviada inteira (página atual + duas anteriores), então
 // tem um teto próprio, bem maior que o de um trecho de busca.
 export const MAX_READING_CONTEXT_CHARS = 8_000;
+// Resumo já nasce curto; o teto só protege contra um resumo fora do padrão.
+export const MAX_SUMMARY_EXCERPT_CHARS = 1_400;
 
 /**
  * Monta o prompt do chat. O modelo recebe metadados do livro e trechos
@@ -44,6 +46,7 @@ export class ChatPromptBuilder {
       `Você é um assistente de leitura que responde perguntas sobre o livro "${book.title}"${authorship}.`,
       'Responda em português do Brasil, de forma direta e útil, sem repetir a pergunta.',
       'Use SOMENTE os trechos fornecidos. Se a resposta não estiver neles, diga que não encontrou essa informação nos trechos disponíveis.',
+      'Os trechos podem ser literais do livro ou resumos de capítulo. Use os resumos para visão geral e os trechos literais para detalhes.',
       'Ao usar um trecho, cite o número entre colchetes — por exemplo [1] ou [2][3]. Nunca invente números de trecho.',
       'Não invente fatos sobre o livro que não estejam nos trechos.',
     ];
@@ -83,16 +86,33 @@ export class ChatPromptBuilder {
     const chapterLabel = excerpt.chapterTitle
       ? `Capítulo ${excerpt.chapterPosition} — ${excerpt.chapterTitle}`
       : `Capítulo ${excerpt.chapterPosition}`;
-    const isReading = excerpt.kind === 'reading';
-    const label = isReading
-      ? `Leitura atual (página atual e duas anteriores) — ${chapterLabel}`
-      : chapterLabel;
-    const maxChars = isReading
-      ? MAX_READING_CONTEXT_CHARS
-      : MAX_EXCERPT_CHARS;
+    const { label, maxChars } = ChatPromptBuilder.describeExcerpt(
+      excerpt,
+      chapterLabel,
+    );
     const text = ChatPromptBuilder.truncate(excerpt.text, maxChars);
 
     return `[${excerpt.index}] ${label}:\n"${text}"`;
+  }
+
+  private static describeExcerpt(
+    excerpt: ChatExcerpt,
+    chapterLabel: string,
+  ): { label: string; maxChars: number } {
+    if (excerpt.kind === 'reading') {
+      return {
+        label: `Leitura atual (página atual e duas anteriores) — ${chapterLabel}`,
+        maxChars: MAX_READING_CONTEXT_CHARS,
+      };
+    }
+    if (excerpt.kind === 'summary') {
+      return {
+        label: `Resumo de ${chapterLabel}`,
+        maxChars: MAX_SUMMARY_EXCERPT_CHARS,
+      };
+    }
+
+    return { label: chapterLabel, maxChars: MAX_EXCERPT_CHARS };
   }
 
   private static truncate(text: string, maxChars: number): string {
