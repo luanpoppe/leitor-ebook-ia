@@ -41,40 +41,6 @@ export async function getChapterPage(
   return response.data;
 }
 
-// A API devolve o capítulo em páginas; a leitura precisa do texto inteiro para
-// que a rolagem e o progresso cubram o capítulo todo.
-export async function getFullChapter(
-  bookId: string,
-  position: number
-): Promise<ChapterPage> {
-  const firstPage = await getChapterPage(bookId, position, 0);
-  const collectedText: string[] = [firstPage.text];
-  let lastPage = firstPage;
-  let nextOffset = firstPage.nextOffset;
-
-  while (nextOffset !== null) {
-    const requestedOffset = nextOffset;
-    const page = await getChapterPage(bookId, position, requestedOffset);
-    collectedText.push(page.text);
-    lastPage = page;
-    nextOffset = page.nextOffset;
-
-    // Se o backend repetir o mesmo offset, parar evita loop infinito.
-    const didOffsetAdvance = nextOffset !== requestedOffset;
-    if (!didOffsetAdvance) break;
-  }
-
-  const text = collectedText.join("");
-  return {
-    ...firstPage,
-    text,
-    offset: 0,
-    limit: text.length,
-    nextOffset: null,
-    totalLength: lastPage.totalLength,
-  };
-}
-
 export async function getReadingProgress(
   bookId: string
 ): Promise<ReadingProgress | null> {

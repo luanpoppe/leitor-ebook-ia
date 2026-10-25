@@ -12,7 +12,7 @@
 }
 
 /*
- * Espelha a tipografia da página de leitura (reader-chapter-view.module.css).
+ * Espelha a tipografia da página de leitura (reader-page-view.module.css).
  * Se a página mudar fonte, entrelinha, largura de coluna ou espaçamento entre
  * parágrafos, estes valores precisam acompanhar — senão a página medida deixa
  * de caber no viewport.
