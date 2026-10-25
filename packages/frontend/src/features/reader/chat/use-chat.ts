@@ -23,10 +23,7 @@ export interface UseChatResult {
   isLoading: boolean;
   isSending: boolean;
   error: string | null;
-  send(input: Omit<AskQuestionInput, "position" | "offset"> & {
-    position: number;
-    offset: number;
-  }): Promise<void>;
+  send(input: AskQuestionInput): Promise<void>;
   openConversation(conversationId: string): Promise<void>;
   startNewConversation(): Promise<void>;
   retry(): Promise<void>;

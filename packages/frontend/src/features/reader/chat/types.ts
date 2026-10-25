@@ -37,6 +37,9 @@ export interface AskQuestionInput {
   scope: ChatScope;
   position: number;
   offset: number;
+  /** Faixa da leitura atual (página atual e duas anteriores). */
+  contextStart: number;
+  contextEnd: number;
 }
 
 export interface AskQuestionResponse {

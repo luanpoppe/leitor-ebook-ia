@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AIMessages, type AIModelNames } from '@luanpoppe/ai';
+import { ChapterReadingRepository } from '../catalog/chapter-reading.repository';
 import { EbookNotFoundError, EbookNotReadyError } from '../catalog/catalog.errors';
 import { EbookRepository } from '../catalog/ebook.repository';
 import { AI_CLIENT, type AiClient } from '../core/ai/ai.provider';
@@ -7,7 +8,7 @@ import { BookStatus, ChatRole } from '../generated/prisma/client';
 import { EmbeddingService } from '../indexing/embedding.service';
 import {
   ChatPromptBuilder,
-  MAX_EXCERPTS,
+  MAX_SEARCH_EXCERPTS,
   type ChatBookMetadata,
   type ChatCitation,
   type ChatExcerpt,
@@ -45,6 +46,11 @@ const HISTORY_LIMIT = 10;
 const MAX_TITLE_LENGTH = 80;
 const ANSWER_MAX_TOKENS = 1_200;
 const ANSWER_TEMPERATURE = 0.3;
+// Sem os offsets do cliente, ainda mandamos um trecho de leitura aproximado:
+// 6 mil caracteres antes do topo e 2 mil depois.
+const FALLBACK_READING_BEFORE = 6_000;
+const FALLBACK_READING_AFTER = 2_000;
+const MAX_READING_RANGE_CHARS = 12_000;
 
 /**
  * Chat do livro: conversas persistidas e respostas com base nos trechos
@@ -59,6 +65,7 @@ export class ChatService {
     private readonly ebookRepository: EbookRepository,
     private readonly conversationRepository: ConversationRepository,
     private readonly chunkSearchRepository: ChunkSearchRepository,
+    private readonly readingRepository: ChapterReadingRepository,
     private readonly embeddingService: EmbeddingService,
     @Inject(AI_CLIENT) private readonly client: AiClient,
   ) {}
@@ -115,6 +122,8 @@ export class ChatService {
       scope: ChatScope;
       position: number;
       offset: number;
+      contextStart?: number;
+      contextEnd?: number;
     },
   ): Promise<AskQuestionResponse> {
     const book = await this.requireReadyBook(bookId);
@@ -164,8 +173,17 @@ export class ChatService {
 
   private async findExcerpts(
     bookId: string,
-    input: { question: string; scope: ChatScope; position: number; offset: number },
+    input: {
+      question: string;
+      scope: ChatScope;
+      position: number;
+      offset: number;
+      contextStart?: number;
+      contextEnd?: number;
+    },
   ): Promise<ChatExcerpt[]> {
+    const range = resolveReadingRange(input);
+    const readingExcerpt = await this.findReadingExcerpt(bookId, input.position, range);
     const vector = await this.embeddingService.embedQuery(input.question);
     const matches = await this.chunkSearchRepository.search(
       bookId,
@@ -175,21 +193,59 @@ export class ChatService {
     const scopedMatches = matches.filter((match) =>
       isInsideScope(match, input.scope, input.position, input.offset),
     );
-    const selectedMatches = scopedMatches.slice(0, MAX_EXCERPTS);
+    const searchMatches = scopedMatches
+      .filter(
+        (match) => !isInsideReadingRange(match, input.position, range),
+      )
+      .slice(0, MAX_SEARCH_EXCERPTS);
+    const excerpts: ChatExcerpt[] = [];
 
-    if (selectedMatches.length === 0) {
+    if (readingExcerpt !== null) excerpts.push(readingExcerpt);
+    searchMatches.forEach((match) => {
+      excerpts.push({
+        index: excerpts.length + 1,
+        kind: 'search',
+        chapterPosition: match.chapterPosition,
+        chapterTitle: match.chapterTitle,
+        offset: match.charOffset,
+        text: match.text,
+      });
+    });
+
+    if (excerpts.length === 0) {
       throw new ChatContextUnavailableError(
         'Nenhum trecho do livro atende ao escopo escolhido. Tente o livro todo.',
       );
     }
 
-    return selectedMatches.map((match, index) => ({
-      index: index + 1,
-      chapterPosition: match.chapterPosition,
-      chapterTitle: match.chapterTitle,
-      offset: match.charOffset,
-      text: match.text,
-    }));
+    return excerpts;
+  }
+
+  private async findReadingExcerpt(
+    bookId: string,
+    position: number,
+    range: ReadingRange,
+  ): Promise<ChatExcerpt | null> {
+    const length = range.end - range.start;
+    if (length <= 0) return null;
+
+    const chapter = await this.readingRepository.findPage(
+      bookId,
+      position,
+      range.start,
+      Math.min(length, MAX_READING_RANGE_CHARS),
+    );
+    const text = chapter?.text.trim() ?? '';
+    if (chapter === null || text.length === 0) return null;
+
+    return {
+      index: 1,
+      kind: 'reading',
+      chapterPosition: chapter.position,
+      chapterTitle: chapter.title,
+      offset: range.start,
+      text: chapter.text,
+    };
   }
 
   private async requestAnswer(
@@ -198,7 +254,10 @@ export class ChatService {
     excerpts: ChatExcerpt[],
     history: StoredMessage[],
   ): Promise<string> {
-    const systemPrompt = ChatPromptBuilder.buildSystemPrompt(book);
+    const systemPrompt = ChatPromptBuilder.buildSystemPrompt(
+      book,
+      excerpts.some((excerpt) => excerpt.kind === 'reading'),
+    );
     const userPrompt = ChatPromptBuilder.buildUserPrompt(question, excerpts);
     const historyMessages = history.map((message) =>
       message.role === ChatRole.USER
@@ -261,6 +320,52 @@ function isInsideScope(
   if (match.chapterPosition > position) return false;
 
   return match.charOffset <= offset;
+}
+
+interface ReadingRange {
+  start: number;
+  end: number;
+}
+
+/** Faixa de texto que o leitor está vendo, enviada pelo cliente. */
+function resolveReadingRange(input: {
+  offset: number;
+  contextStart?: number;
+  contextEnd?: number;
+}): ReadingRange {
+  const hasClientRange =
+    input.contextStart !== undefined &&
+    input.contextEnd !== undefined &&
+    input.contextEnd > input.contextStart;
+
+  if (hasClientRange) {
+    const end = input.contextEnd as number;
+    const requestedStart = input.contextStart as number;
+    const start = Math.max(
+      0,
+      requestedStart,
+      end - MAX_READING_RANGE_CHARS,
+    );
+
+    return { start, end };
+  }
+
+  return {
+    start: Math.max(0, input.offset - FALLBACK_READING_BEFORE),
+    end: input.offset + FALLBACK_READING_AFTER,
+  };
+}
+
+/** Trecho que já está dentro da leitura atual não precisa vir da busca. */
+function isInsideReadingRange(
+  match: ChunkMatch,
+  position: number,
+  range: ReadingRange,
+): boolean {
+  const isSameChapter = match.chapterPosition === position;
+  if (!isSameChapter) return false;
+
+  return match.charOffset >= range.start && match.charOffset < range.end;
 }
 
 function buildTitle(question: string): string {

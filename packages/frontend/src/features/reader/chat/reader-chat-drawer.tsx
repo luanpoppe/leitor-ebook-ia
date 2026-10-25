@@ -12,6 +12,11 @@ interface ReaderChatDrawerProps {
   /** Capítulo e offset do topo visível: base do escopo "até aqui". */
   position: number;
   offset: number;
+  /** Faixa de texto da página atual e das duas anteriores. */
+  contextStart: number;
+  contextEnd: number;
+  /** Um modal está por cima: o Esc é dele, não do chat. */
+  isSuspended?: boolean;
   onClose(): void;
   onCitationSelect(citation: ChatCitation): void;
 }
@@ -37,6 +42,9 @@ export function ReaderChatDrawer({
   bookId,
   position,
   offset,
+  contextStart,
+  contextEnd,
+  isSuspended = false,
   onClose,
   onCitationSelect,
 }: ReaderChatDrawerProps): JSX.Element {
@@ -58,6 +66,8 @@ export function ReaderChatDrawer({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   useEffect(() => {
+    if (isSuspended) return;
+
     const handleEscape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
 
@@ -66,7 +76,7 @@ export function ReaderChatDrawer({
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
+  }, [isSuspended, onClose]);
 
   const submitQuestion = useCallback(
     async (rawQuestion: string) => {
@@ -74,9 +84,16 @@ export function ReaderChatDrawer({
       if (trimmedQuestion.length === 0 || isSending) return;
 
       setQuestion("");
-      await send({ question: trimmedQuestion, scope, position, offset });
+      await send({
+        question: trimmedQuestion,
+        scope,
+        position,
+        offset,
+        contextStart,
+        contextEnd,
+      });
     },
-    [isSending, offset, position, scope, send]
+    [contextEnd, contextStart, isSending, offset, position, scope, send]
   );
 
   const handleSubmit = useCallback(
@@ -216,7 +233,7 @@ export function ReaderChatDrawer({
             return (
               <div key={message.id} className={bubbleClassName}>
                 {isUser ? (
-                  <p className={styles.messageText}>{message.content}</p>
+                  <p className={styles.userText}>{message.content}</p>
                 ) : (
                   <>
                     <ChatMessageText

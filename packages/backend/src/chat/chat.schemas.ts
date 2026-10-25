@@ -14,6 +14,10 @@ export const askQuestionSchema = z.object({
   scope: z.enum(['up-to-current', 'whole-book']).default('up-to-current'),
   position: z.coerce.number().int().min(1).default(1),
   offset: z.coerce.number().int().min(0).default(0),
+  /** Início do texto que o leitor está vendo (página atual e as duas anteriores). */
+  contextStart: z.coerce.number().int().min(0).optional(),
+  /** Fim do texto visível. */
+  contextEnd: z.coerce.number().int().min(0).optional(),
 });
 
 export class AskQuestionDto extends createZodDto(askQuestionSchema) {}

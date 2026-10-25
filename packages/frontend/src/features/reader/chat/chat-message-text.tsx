@@ -1,6 +1,9 @@
 "use client";
 
 import type { JSX } from "react";
+import Markdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
 import type { ChatCitation } from "./types";
 import styles from "./reader-chat-drawer.module.css";
 
@@ -10,51 +13,70 @@ interface ChatMessageTextProps {
   onCitationSelect(citation: ChatCitation): void;
 }
 
-const CITATION_PATTERN = /(\[\d+\])/g;
+const CITATION_LINK_PREFIX = "#cite-";
+// Só `[2]` isolado vira link: `[texto](url)` do markdown fica intacto.
+const CITATION_MARK_PATTERN = /\[(\d+)\](?!\()/g;
 
 /**
- * Texto da resposta com as citações `[n]` viram botões que levam ao trecho no
- * livro. Marcador sem citação correspondente fica como texto normal.
+ * Resposta da IA em markdown, com as citações `[n]` virando botões que abrem o
+ * trecho no livro. Marcador sem citação correspondente continua como texto.
  */
 export function ChatMessageText({
   content,
   citations,
   onCitationSelect,
 }: ChatMessageTextProps): JSX.Element {
-  const parts = content.split(CITATION_PATTERN);
+  const markdown = withCitationLinks(content);
 
   return (
-    <p className={styles.messageText}>
-      {parts.map((part, index) => {
-        const citation = resolveCitation(part, citations);
-        if (citation === null) {
-          return <span key={index}>{part}</span>;
-        }
+    <div className={styles.messageText}>
+      <Markdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={{
+          a: ({ href, children }) => {
+            const citation = resolveCitationLink(href, citations);
+            if (citation === null) {
+              return (
+                <a href={href} target="_blank" rel="noreferrer">
+                  {children}
+                </a>
+              );
+            }
 
-        return (
-          <button
-            key={index}
-            type="button"
-            onClick={() => onCitationSelect(citation)}
-            className={styles.citationMark}
-            aria-label={`Ir para ${describeCitation(citation)}`}
-          >
-            {part}
-          </button>
-        );
-      })}
-    </p>
+            return (
+              <button
+                type="button"
+                onClick={() => onCitationSelect(citation)}
+                className={styles.citationMark}
+                aria-label={`Abrir ${describeCitation(citation)}`}
+              >
+                {children}
+              </button>
+            );
+          },
+        }}
+      >
+        {markdown}
+      </Markdown>
+    </div>
   );
 }
 
-function resolveCitation(
-  part: string,
+function withCitationLinks(content: string): string {
+  return content.replace(
+    CITATION_MARK_PATTERN,
+    (_match, index: string) => `[${index}](${CITATION_LINK_PREFIX}${index})`
+  );
+}
+
+function resolveCitationLink(
+  href: string | undefined,
   citations: ChatCitation[]
 ): ChatCitation | null {
-  const isCitationMark = /^\[\d+\]$/.test(part);
-  if (!isCitationMark) return null;
+  if (href === undefined) return null;
+  if (!href.startsWith(CITATION_LINK_PREFIX)) return null;
 
-  const index = Number(part.slice(1, -1));
+  const index = Number(href.slice(CITATION_LINK_PREFIX.length));
   const citation = citations.find((item) => item.index === index);
   return citation ?? null;
 }

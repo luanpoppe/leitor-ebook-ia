@@ -78,6 +78,8 @@ export class ChatController {
       scope: body.scope,
       position: body.position,
       offset: body.offset,
+      contextStart: body.contextStart,
+      contextEnd: body.contextEnd,
     });
   }
 }

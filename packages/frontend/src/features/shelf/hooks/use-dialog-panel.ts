@@ -46,7 +46,7 @@ export function useDialogPanel(onClose: () => void) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLElement>): void => {
     if (event.key !== "Tab") return;
 
     const dialog = dialogRef.current;

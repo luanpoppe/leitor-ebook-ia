@@ -10,7 +10,7 @@ import {
 } from "./window/window-pager";
 import { WindowTrail } from "./window/window-trail";
 import {
-  WINDOW_SIZE,
+  WINDOW_BACKTRACK,
   isSamePoint,
   type TextWindow,
   type WindowPoint,
@@ -180,9 +180,9 @@ export function useReaderWindow({
 
   const loadChapter = useCallback(
     (openOffset: number) => {
-      // Busca uma janela antes do offset salvo para haver texto anterior para
-      // paginar acima; o pouso continua sendo no offset de abertura.
-      const fetchOffset = Math.max(0, openOffset - WINDOW_SIZE);
+      // Busca um pouco antes do offset salvo para haver texto anterior para
+      // paginar acima, mantendo o offset de abertura dentro da janela.
+      const fetchOffset = Math.max(0, openOffset - WINDOW_BACKTRACK);
       const startPoint = { position, offset: fetchOffset };
       loadedChapterRef.current = { position, initialOffset: openOffset };
       pendingAdvanceRef.current = null;

@@ -7,7 +7,11 @@ import {
   ScrollSegments,
   type ScrollSegment,
 } from "./window/scroll-segments";
-import { WINDOW_SIZE, type WindowPoint } from "./window/window-types";
+import {
+  WINDOW_BACKTRACK,
+  WINDOW_SIZE,
+  type WindowPoint,
+} from "./window/window-types";
 
 export type { ScrollParagraph, ScrollSegment } from "./window/scroll-segments";
 
@@ -203,8 +207,9 @@ export function useReaderScroll({
       setHasReachedEnd(false);
       setError(null);
 
-      // Busca uma janela antes do offset para haver texto acima do ponto.
-      const fetchOffset = Math.max(0, openOffset - WINDOW_SIZE);
+      // Busca um pouco antes do offset para haver texto acima do ponto, sem
+      // empurrar o ponto para fora da janela.
+      const fetchOffset = Math.max(0, openOffset - WINDOW_BACKTRACK);
       const startPoint = { position: chapterPosition, offset: fetchOffset };
       void runLoad("reset", () => loadSegment(startPoint));
     },

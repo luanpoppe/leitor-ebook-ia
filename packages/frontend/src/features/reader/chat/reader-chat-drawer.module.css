@@ -199,10 +199,90 @@
   color: var(--text);
 }
 
-.messageText {
+.userText {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
+}
+
+/* Markdown da resposta: blocos compactos, no tamanho da bolha. */
+.messageText {
+  overflow-wrap: break-word;
+}
+
+.messageText > :first-child {
+  margin-top: 0;
+}
+
+.messageText > :last-child {
+  margin-bottom: 0;
+}
+
+.messageText p {
+  margin: 0 0 8px;
+}
+
+.messageText ul,
+.messageText ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.messageText li {
+  margin-bottom: 3px;
+}
+
+.messageText li > p {
+  margin: 0;
+}
+
+.messageText strong {
+  font-weight: 600;
+}
+
+.messageText em {
+  font-style: italic;
+}
+
+.messageText code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.06);
+  font-size: 12px;
+}
+
+.messageText pre {
+  overflow-x: auto;
+  margin: 0 0 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.06);
+}
+
+.messageText pre code {
+  padding: 0;
+  background: none;
+}
+
+.messageText blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent-track);
+  color: var(--muted);
+}
+
+.messageText h1,
+.messageText h2,
+.messageText h3,
+.messageText h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.messageText a {
+  color: var(--accent-ink);
+  text-decoration: underline;
 }
 
 .citationMark {
