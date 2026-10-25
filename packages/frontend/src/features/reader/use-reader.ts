@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getApiErrorInfo } from "@/features/ebooks/api";
 import {
-  getFullChapter,
+  getChapterPage,
   getReadingProgress,
   listChapters,
 } from "./api";
@@ -176,11 +176,14 @@ async function fetchReadingProgress(
   return progress;
 }
 
+// A tela paginada busca o texto em trechos (`useReaderWindow`); do capítulo
+// inteiro ela só precisa dos metadados. Um caractere basta para a API devolver
+// `totalLength`, `previousPosition` e `nextPosition` sem carregar o texto todo.
 async function fetchChapter(
   bookId: string,
   position: number
 ): Promise<ChapterPage> {
-  const chapter = await getFullChapter(bookId, position);
+  const chapter = await getChapterPage(bookId, position, 0, 1);
   return chapter;
 }
 

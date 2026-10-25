@@ -1,26 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { JSX } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, JSX } from "react";
 import Link from "next/link";
 import { useEbookDetail } from "@/features/ebooks/use-ebook-detail";
 import { useReader } from "../use-reader";
 import { useReaderKeyboard } from "../use-reader-keyboard";
+import { useReaderMode } from "../use-reader-mode";
+import { useReaderPage, type ReaderPageMetrics } from "../use-reader-page";
 import { useReaderPreferences } from "../use-reader-preferences";
+import { useReaderScroll } from "../use-reader-scroll";
 import { useReadingProgressWriter } from "../use-reading-progress-writer";
-import { ReaderChapterView } from "./reader-chapter-view";
 import { ReaderErrorMessage } from "./reader-error-message";
+import { ReaderFooterNotice } from "./reader-footer-notice";
 import { ReaderMessage } from "./reader-message";
+import { ReaderPageInteraction } from "./reader-page-interaction";
+import { ReaderPageView } from "./reader-page-view";
+import {
+  ReaderScrollView,
+  type ReaderScrollViewHandle,
+} from "./reader-scroll-view";
 import { ReaderTocDrawer } from "./reader-toc-drawer";
 import { ReaderToolbar } from "./reader-toolbar";
 import styles from "./reader-screen.module.css";
 import messageStyles from "./reader-message.module.css";
 
 const FIRST_CHAPTER_POSITION = 1;
+const CHUNK_ERROR_MESSAGE = "Falha ao carregar o trecho do capítulo.";
+// O carregamento cobre a área sem desmontar a view que a mede.
+const PAGE_LOADING_STYLE: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+};
 
 interface ReaderScreenProps {
   bookId: string;
   initialChapterPosition: number | null;
+}
+
+// Ponto de leitura: capítulo + offset do primeiro parágrafo visível.
+interface ReaderPoint {
+  position: number;
+  offset: number;
 }
 
 export function ReaderScreen({
@@ -50,43 +71,199 @@ export function ReaderScreen({
     decreaseFont,
     toggleTheme,
   } = useReaderPreferences();
+  const { mode, toggleMode } = useReaderMode();
   const { scheduleSave } = useReadingProgressWriter(bookId, savedProgress);
   const { ebook } = useEbookDetail(bookId);
 
   const [isTocOpen, setIsTocOpen] = useState(false);
-  const [lastOffset, setLastOffset] = useState(0);
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
+  const [metrics, setMetrics] = useState<ReaderPageMetrics | null>(null);
+  // Capítulo que abre na última página: voltar do começo do capítulo seguinte.
+  const [landAtEndPosition, setLandAtEndPosition] = useState<number | null>(
+    null
+  );
+  // Topo da leitura, comum aos dois modos: é o ponto que a troca de modo leva
+  // de um para o outro e o que a barra mostra no modo rolagem.
+  const [visiblePoint, setVisiblePoint] = useState<ReaderPoint>({
+    position: currentPosition ?? FIRST_CHAPTER_POSITION,
+    offset: resumeOffset,
+  });
+  // Offset de abertura do modo página. null = ainda seguindo o progresso salvo,
+  // que só chega depois da montagem; navegar ou trocar de modo fixa o valor.
+  const [pageOffset, setPageOffset] = useState<number | null>(null);
+  // Espelho para a rolagem: fixado ao alternar de modo ou voltar de capítulo,
+  // para o motor abrir na janela certa em vez do começo do capítulo.
+  const [scrollOffset, setScrollOffset] = useState<number | null>(null);
+  const [scrollAnchor, setScrollAnchor] = useState<ReaderPoint | null>(null);
 
-  const firstChapterPosition =
-    chapters[0]?.position ?? FIRST_CHAPTER_POSITION;
+  const scrollRef = useRef<ReaderScrollViewHandle>(null);
+  const isScrollMode = mode === "scroll";
 
-  // Cada capítulo novo começa do ponto de retomada que o leitor informou.
-  useEffect(() => {
-    setLastOffset(resumeOffset);
-  }, [chapter?.id, resumeOffset]);
+  // A view mede a área e publica a régua; uma identidade nova a cada render
+  // dispararia repaginação em loop.
+  const handleMetricsChange = useCallback((nextMetrics: ReaderPageMetrics) => {
+    setMetrics(nextMetrics);
+  }, []);
 
-  const handlePositionChange = useCallback(
+  const handlePageChange = useCallback(
     (position: number, offset: number) => {
-      setLastOffset(offset);
+      setVisiblePoint({ position, offset });
       scheduleSave(position, offset);
     },
     [scheduleSave]
   );
 
-  const handleNext = useCallback(() => {
-    if (hasNext) {
-      goNext();
-      setHasReachedEnd(false);
+  const isLandingAtChapterEnd =
+    chapter !== null && landAtEndPosition === chapter.position;
+  const openingPageOffset = pageOffset ?? resumeOffset;
+  const initialOffset = isLandingAtChapterEnd
+    ? chapter.totalLength
+    : openingPageOffset;
+
+  const handleTurnPastEnd = useCallback(() => {
+    if (!hasNext) {
+      setHasReachedEnd(true);
       return;
     }
 
-    setHasReachedEnd(true);
+    setPageOffset(0);
+    setLandAtEndPosition(null);
+    goNext();
+    setHasReachedEnd(false);
   }, [goNext, hasNext]);
 
-  const handlePrevious = useCallback(() => {
-    setHasReachedEnd(false);
+  const handleTurnPastStart = useCallback(() => {
+    const previousPosition = chapter?.previousPosition ?? null;
+    if (!hasPrevious || previousPosition === null) return;
+
+    setPageOffset(0);
+    setLandAtEndPosition(previousPosition);
     goPrevious();
-  }, [goPrevious]);
+    setHasReachedEnd(false);
+  }, [chapter, goPrevious, hasPrevious]);
+
+  const {
+    page,
+    pageIndex,
+    totalPages,
+    direction,
+    error: pageError,
+    goToNextPage,
+    goToPreviousPage,
+    retry: retryPage,
+    restart: restartChapter,
+  } = useReaderPage({
+    bookId,
+    position: currentPosition ?? FIRST_CHAPTER_POSITION,
+    initialOffset,
+    metrics,
+    enabled:
+      !isScrollMode &&
+      chapter !== null &&
+      errorKind === null &&
+      !hasReachedEnd,
+    onTurnPastEnd: handleTurnPastEnd,
+    onTurnPastStart: handleTurnPastStart,
+    onPageChange: handlePageChange,
+  });
+
+  // Lista estável: uma array nova a cada render recriaria as cargas da rolagem.
+  const chapterPositions = useMemo(
+    () => chapters.map((chapterSummary) => chapterSummary.position),
+    [chapters]
+  );
+
+  const handleScrollPositionChange = useCallback(
+    (position: number, offset: number) => {
+      setVisiblePoint({ position, offset });
+      scheduleSave(position, offset);
+    },
+    [scheduleSave]
+  );
+
+  // O topo visível cruzou a fronteira: a URL e o capítulo da tela acompanham,
+  // para a barra, o sumário e os botões de capítulo apontarem para ele.
+  const handleScrollChapterChange = useCallback(
+    (position: number) => {
+      if (position === currentPosition) return;
+
+      setLandAtEndPosition(null);
+      goToChapter(position);
+    },
+    [currentPosition, goToChapter]
+  );
+
+  const {
+    segments,
+    isLoading: isScrollLoading,
+    error: scrollError,
+    errorDirection: scrollErrorDirection,
+    hasReachedEnd: hasScrollReachedEnd,
+    loadMore,
+    loadPrevious,
+    retry: retryScroll,
+    reportVisible,
+  } = useReaderScroll({
+    bookId,
+    position: currentPosition ?? FIRST_CHAPTER_POSITION,
+    initialOffset: scrollOffset ?? resumeOffset,
+    chapterPositions,
+    // Sem capítulo resolvido ainda não se sabe onde abrir: buscar o primeiro
+    // capítulo aqui faria a troca de modo piscar o texto errado. A rolagem
+    // atravessa capítulos sem desligar.
+    enabled: isScrollMode && currentPosition !== null,
+    onChapterChange: handleScrollChapterChange,
+    onPositionChange: handleScrollPositionChange,
+  });
+
+  const handleScrollVisible = useCallback(
+    (position: number, offset: number) => {
+      reportVisible(position, offset);
+    },
+    [reportVisible]
+  );
+
+  const firstChapterPosition =
+    chapters[0]?.position ?? FIRST_CHAPTER_POSITION;
+
+  // Pular capítulo pela barra é navegação explícita: não herda o "abrir no fim"
+  // que só existe para a virada de página voltando do primeiro capítulo.
+  const handleNextChapter = useCallback(() => {
+    setPageOffset(0);
+    setScrollOffset(0);
+    setLandAtEndPosition(null);
+
+    if (!hasNext) {
+      setHasReachedEnd(true);
+      return;
+    }
+
+    // Na rolagem o capítulo seguinte pode já estar anexado: quem leva a view
+    // até ele é a âncora.
+    const nextPosition = chapter?.nextPosition ?? null;
+    const isScrollAnchorNeeded = isScrollMode && nextPosition !== null;
+    if (isScrollAnchorNeeded) {
+      setScrollAnchor({ position: nextPosition, offset: 0 });
+    }
+
+    goNext();
+    setHasReachedEnd(false);
+  }, [chapter, goNext, hasNext, isScrollMode]);
+
+  const handlePreviousChapter = useCallback(() => {
+    setPageOffset(0);
+    setScrollOffset(0);
+    setLandAtEndPosition(null);
+    setHasReachedEnd(false);
+
+    const previousPosition = chapter?.previousPosition ?? null;
+    const isScrollAnchorNeeded = isScrollMode && previousPosition !== null;
+    if (isScrollAnchorNeeded) {
+      setScrollAnchor({ position: previousPosition, offset: 0 });
+    }
+
+    goPrevious();
+  }, [chapter, goPrevious, isScrollMode]);
 
   const handleToggleToc = useCallback(() => {
     setIsTocOpen((isOpen) => !isOpen);
@@ -98,32 +275,152 @@ export function ReaderScreen({
 
   const handleSelectChapter = useCallback(
     (position: number) => {
-      goToChapter(position);
+      setPageOffset(0);
+      setScrollOffset(0);
+      setLandAtEndPosition(null);
       setIsTocOpen(false);
       setHasReachedEnd(false);
+
+      if (isScrollMode) {
+        // O capítulo pode já estar anexado: a âncora leva a view ao começo.
+        setScrollAnchor({ position, offset: 0 });
+      }
+
+      // Escolher o capítulo já aberto rebobina em vez de virar no-op.
+      if (position === currentPosition) {
+        if (isScrollMode) return;
+        restartChapter();
+        return;
+      }
+
+      goToChapter(position);
     },
-    [goToChapter]
+    [currentPosition, goToChapter, isScrollMode, restartChapter]
   );
 
   const handleOpenFirstChapter = useCallback(() => {
-    goToChapter(firstChapterPosition);
+    setPageOffset(0);
+    setScrollOffset(0);
+    setLandAtEndPosition(null);
     setHasReachedEnd(false);
-  }, [firstChapterPosition, goToChapter]);
+
+    if (isScrollMode) {
+      setScrollAnchor({ position: firstChapterPosition, offset: 0 });
+    }
+
+    // Livro de um capítulo só: o capítulo já é o primeiro, então recomeça nele.
+    if (currentPosition === firstChapterPosition) {
+      if (isScrollMode) return;
+      restartChapter();
+      return;
+    }
+
+    goToChapter(firstChapterPosition);
+  }, [
+    currentPosition,
+    firstChapterPosition,
+    goToChapter,
+    isScrollMode,
+    restartChapter,
+  ]);
+
+  const handleToggleMode = useCallback(() => {
+    const isEnteringPageMode = isScrollMode;
+    toggleMode();
+    // "Abrir no fim" pertence à virada de página: trocar de modo não herda.
+    setLandAtEndPosition(null);
+
+    if (isEnteringPageMode) {
+      const isVisibleChapterDifferent =
+        visiblePoint.position !== currentPosition;
+      if (isVisibleChapterDifferent) {
+        goToChapter(visiblePoint.position);
+      }
+
+      // O offset do topo vale para o capítulo que vai abrir.
+      setPageOffset(visiblePoint.offset);
+      return;
+    }
+
+    // Entrar na rolagem não herda o fim do livro do modo página: quem sinaliza
+    // o fim no fluxo contínuo é a própria view, no pé do texto.
+    setHasReachedEnd(false);
+    setScrollOffset(visiblePoint.offset);
+    setScrollAnchor(visiblePoint);
+  }, [currentPosition, goToChapter, isScrollMode, toggleMode, visiblePoint]);
+
+  // Abrir direto em rolagem (preferência salva) não passa pelo botão de modo:
+  // sem âncora a view mostraria o começo da janela e regravaria progresso menor.
+  useEffect(() => {
+    if (mode !== "scroll") return;
+    if (scrollAnchor !== null) return;
+    if (chapter === null) return;
+    if (currentPosition === null) return;
+
+    setScrollAnchor({ position: currentPosition, offset: resumeOffset });
+  }, [chapter, currentPosition, mode, resumeOffset, scrollAnchor]);
+
+  const handleScrollPage = useCallback(
+    (direction: -1 | 1, fraction?: number) => {
+      scrollRef.current?.scrollByPage(direction, fraction);
+    },
+    []
+  );
 
   const readerTitle = ebook?.title ?? "Leitura";
   const backHref = `/ebooks/${bookId}`;
   const chaptersCount = chapters.length;
-  const chapterProgress =
-    chapter === null
-      ? 0
-      : resolveChapterProgress(lastOffset, chapter.totalLength);
+  const toolbarPosition = isScrollMode
+    ? visiblePoint.position
+    : currentPosition;
+  const pageLabel =
+    isScrollMode || page === null
+      ? null
+      : `Página ${pageIndex + 1} de ${totalPages}`;
+
+  // Na rolagem o trecho visível conhece o total do capítulo; o capítulo da tela
+  // é só o fallback enquanto a view ainda não reportou.
+  const visibleScrollSegment = segments.find(
+    (segment) => segment.position === visiblePoint.position
+  );
+  const scrollTotalLength =
+    visibleScrollSegment?.totalLength ?? chapter?.totalLength ?? 0;
+  const progressOffset = isScrollMode
+    ? visiblePoint.offset
+    : page?.startOffset ?? 0;
+  const progressTotalLength = isScrollMode
+    ? scrollTotalLength
+    : chapter?.totalLength ?? 0;
+  const chapterProgress = resolveChapterProgress(
+    progressOffset,
+    progressTotalLength
+  );
+
+  const isPageReadingBlocked =
+    hasReachedEnd ||
+    errorKind !== null ||
+    pageError !== null ||
+    chapter === null;
+  // Falha de trecho na rolagem não trava o texto já carregado; só a ausência de
+  // capítulo e o erro global impedem a leitura.
+  const isScrollReadingBlocked = errorKind !== null || chapter === null;
+  const isReadingBlocked = isScrollMode
+    ? isScrollReadingBlocked
+    : isPageReadingBlocked;
+  const isChunkErrorVisible =
+    !isScrollMode && pageError !== null && errorKind === null && !hasReachedEnd;
+  // Falha tem o aviso do rodapé; página nula sem falha é carga em andamento.
+  const isPagePending =
+    !isScrollMode && chapter !== null && page === null && pageError === null;
 
   useReaderKeyboard({
+    mode,
     isTocOpen,
-    isReadingBlocked: hasReachedEnd || errorKind !== null,
+    isReadingBlocked,
     onCloseToc: handleCloseToc,
-    onNext: handleNext,
-    onPrevious: handlePrevious,
+    onNext: goToNextPage,
+    onPrevious: goToPreviousPage,
+    onScrollPage: handleScrollPage,
   });
 
   const renderBody = () => {
@@ -135,6 +432,48 @@ export function ReaderScreen({
           onRetry={retry}
           onOpenFirstChapter={handleOpenFirstChapter}
         />
+      );
+    }
+
+    // A view desenha o próprio carregando, a falha com retry e o fim do livro.
+    // Ao atravessar capítulos o metadado fica nulo por um instante: com trechos
+    // em memória a view continua montada para a leitura não pular.
+    if (isScrollMode) {
+      const isScrollEmpty = segments.length === 0;
+      if (chapter === null && isScrollEmpty) {
+        return (
+          <div className={styles.loading} aria-live="polite">
+            <p className={styles.loadingText}>Carregando livro…</p>
+          </div>
+        );
+      }
+
+      return (
+        <ReaderScrollView
+          ref={scrollRef}
+          segments={segments}
+          isLoading={isScrollLoading}
+          error={scrollError}
+          errorDirection={scrollErrorDirection}
+          hasReachedEnd={hasScrollReachedEnd}
+          fontSize={fontSize}
+          theme={theme}
+          anchor={scrollAnchor}
+          onLoadMore={loadMore}
+          onLoadPrevious={loadPrevious}
+          onRetry={retryScroll}
+          onVisibleChange={handleScrollVisible}
+        />
+      );
+    }
+
+    // Sem capítulo e sem erro, ainda estamos abrindo o livro — inclusive se a
+    // query ainda nem começou.
+    if (chapter === null) {
+      return (
+        <div className={styles.loading} aria-live="polite">
+          <p className={styles.loadingText}>Carregando livro…</p>
+        </div>
       );
     }
 
@@ -159,27 +498,32 @@ export function ReaderScreen({
       );
     }
 
-    // Erro e fim do livro já saíram acima; sem capítulo e sem erro, ainda
-    // estamos abrindo o livro — inclusive se a query ainda nem começou.
-    const isOpeningBook = chapter === null;
-    if (isOpeningBook) {
-      return (
-        <div className={styles.loading} aria-live="polite">
-          <p className={styles.loadingText}>Carregando livro…</p>
-        </div>
-      );
-    }
-
-    if (chapter === null) return null;
-
     return (
-      <ReaderChapterView
-        chapter={chapter}
-        fontSize={fontSize}
-        theme={theme}
-        resumeOffset={resumeOffset}
-        onPositionChange={handlePositionChange}
-      />
+      <ReaderPageInteraction
+        isBlocked={isReadingBlocked}
+        onNext={goToNextPage}
+        onPrevious={goToPreviousPage}
+        onOpenToc={handleToggleToc}
+      >
+        <ReaderPageView
+          page={page}
+          pageKey={`${chapter.position}:${pageIndex}`}
+          direction={direction}
+          fontSize={fontSize}
+          theme={theme}
+          onMetricsChange={handleMetricsChange}
+        />
+
+        {isPagePending && (
+          <div
+            className={styles.loading}
+            style={PAGE_LOADING_STYLE}
+            aria-live="polite"
+          >
+            <p className={styles.loadingText}>Carregando página…</p>
+          </div>
+        )}
+      </ReaderPageInteraction>
     );
   };
 
@@ -188,15 +532,16 @@ export function ReaderScreen({
       <ReaderToolbar
         bookTitle={readerTitle}
         backHref={backHref}
-        currentPosition={currentPosition}
+        currentPosition={toolbarPosition}
         chaptersCount={chaptersCount}
+        pageLabel={pageLabel}
         chapterProgress={chapterProgress}
         isTocOpen={isTocOpen}
         onToggleToc={handleToggleToc}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
-        onPrevious={handlePrevious}
-        onNext={handleNext}
+        onPrevious={handlePreviousChapter}
+        onNext={handleNextChapter}
         fontSize={fontSize}
         canDecreaseFont={canDecrease}
         canIncreaseFont={canIncrease}
@@ -204,14 +549,25 @@ export function ReaderScreen({
         onIncreaseFont={increaseFont}
         theme={theme}
         onToggleTheme={toggleTheme}
+        mode={mode}
+        onToggleMode={handleToggleMode}
       />
 
-      <main className={styles.main}>{renderBody()}</main>
+      <main className={styles.main}>
+        {renderBody()}
+
+        {isChunkErrorVisible && (
+          <ReaderFooterNotice
+            message={CHUNK_ERROR_MESSAGE}
+            onRetry={retryPage}
+          />
+        )}
+      </main>
 
       {isTocOpen && (
         <ReaderTocDrawer
           chapters={chapters}
-          currentPosition={currentPosition}
+          currentPosition={toolbarPosition}
           onSelect={handleSelectChapter}
           onClose={handleCloseToc}
         />

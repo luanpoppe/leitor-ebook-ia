@@ -1,0 +1,8 @@
+.stage {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  /* pan-y deixa a rolagem vertical nativa; a horizontal é nossa, por ponteiro. */
+  touch-action: pan-y;
+  user-select: text;
+}
