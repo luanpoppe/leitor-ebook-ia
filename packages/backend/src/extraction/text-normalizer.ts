@@ -96,6 +96,25 @@ export class TextNormalizer {
    * leitor poder destacá-lo.
    */
   static splitByHeadings(chapter: ExtractedChapter): ExtractedChapter[] {
+    return TextNormalizer.splitChapter(chapter, (text) =>
+      TextNormalizer.isHeadingParagraph(text),
+    );
+  }
+
+  /** Mesma divisão, com o padrão de título aprendido do próprio livro. */
+  static splitByRegex(
+    chapters: ExtractedChapter[],
+    regex: RegExp,
+  ): ExtractedChapter[] {
+    return chapters.flatMap((chapter) =>
+      TextNormalizer.splitChapter(chapter, (text) => regex.test(text)),
+    );
+  }
+
+  private static splitChapter(
+    chapter: ExtractedChapter,
+    isHeading: (text: string) => boolean,
+  ): ExtractedChapter[] {
     const paragraphs = chapter.text.split('\n\n');
     const segments: ExtractedChapter[] = [];
     let currentTitle = chapter.title;
@@ -116,7 +135,7 @@ export class TextNormalizer {
 
     for (const [index, paragraph] of paragraphs.entries()) {
       const headingText = paragraph.trim();
-      if (!TextNormalizer.isHeadingParagraph(headingText)) {
+      if (!isHeading(headingText)) {
         currentParagraphs.push(paragraph);
         continue;
       }
