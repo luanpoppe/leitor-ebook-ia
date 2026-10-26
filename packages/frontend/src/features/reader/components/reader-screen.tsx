@@ -503,6 +503,45 @@ export function ReaderScreen({
           resolveChapterProgress(page.startOffset, chapter.totalLength) * 100
         )}% do capítulo`;
 
+  // Progresso do livro: capítulos anteriores inteiros + a fração lida do atual.
+  const bookProgress = useMemo(() => {
+    if (chapters.length === 0) return null;
+
+    const totalWords = chapters.reduce(
+      (sum, item) => sum + item.wordCount,
+      0
+    );
+    if (totalWords <= 0) return null;
+
+    const position = isScrollMode ? visiblePoint.position : toolbarPosition;
+    if (position === null) return null;
+
+    const wordsBefore = chapters
+      .filter((item) => item.position < position)
+      .reduce((sum, item) => sum + item.wordCount, 0);
+    const currentChapter = chapters.find((item) => item.position === position);
+    const currentWords = currentChapter?.wordCount ?? 0;
+    const offset = isScrollMode ? visiblePoint.offset : page?.startOffset ?? 0;
+    const isChapterLoaded =
+      chapter !== null &&
+      chapter.position === position &&
+      chapter.totalLength > 0;
+    const chapterFraction = isChapterLoaded
+      ? Math.min(Math.max(offset / chapter.totalLength, 0), 1)
+      : 0;
+    const progress = (wordsBefore + currentWords * chapterFraction) / totalWords;
+
+    return Math.min(Math.max(progress, 0), 1);
+  }, [
+    chapter,
+    chapters,
+    isScrollMode,
+    page,
+    toolbarPosition,
+    visiblePoint.offset,
+    visiblePoint.position,
+  ]);
+
   // Na rolagem o trecho visível conhece o total do capítulo; o capítulo da tela
   // é só o fallback enquanto a view ainda não reportou.
   const visibleScrollSegment = segments.find(
@@ -700,6 +739,7 @@ export function ReaderScreen({
         currentPosition={toolbarPosition}
         chaptersCount={chaptersCount}
         pageLabel={pageLabel}
+        bookProgress={bookProgress}
         chapterProgress={chapterProgress}
         isTocOpen={isTocOpen}
         onToggleToc={handleToggleToc}

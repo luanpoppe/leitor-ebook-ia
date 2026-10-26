@@ -85,6 +85,25 @@
   text-overflow: ellipsis;
 }
 
+.progressLabels {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.bookLabel {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.labelSeparator {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .progressZone {
   flex: 1 1 140px;
   min-width: 120px;

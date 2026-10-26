@@ -11,6 +11,8 @@ interface ReaderToolbarProps {
   currentPosition: number | null;
   chaptersCount: number;
   pageLabel?: string | null;
+  /** 0 a 1: posição no livro inteiro (capítulos anteriores + fração do atual). */
+  bookProgress: number | null;
   chapterProgress: number;
   isTocOpen: boolean;
   onToggleToc: () => void;
@@ -98,6 +100,7 @@ export function ReaderToolbar({
   currentPosition,
   chaptersCount,
   pageLabel,
+  bookProgress,
   chapterProgress,
   isTocOpen,
   onToggleToc,
@@ -120,6 +123,8 @@ export function ReaderToolbar({
   onToggleChat,
 }: ReaderToolbarProps): JSX.Element {
   const progressPercent = resolveProgress(chapterProgress);
+  const bookPercent =
+    bookProgress === null ? null : Math.round(bookProgress * 100);
   const chapterLabel = resolveChapterLabel(currentPosition, chaptersCount);
   const themeActionLabel = resolveThemeActionLabel(theme);
   const alignmentActionLabel =
@@ -153,15 +158,34 @@ export function ReaderToolbar({
           >
             {chapterLabel}
           </span>
-          {pageLabel ? (
-            <span
-              className={styles.pageLabel}
-              title={pageLabel}
-              role="status"
-              aria-live="polite"
-            >
-              {pageLabel}
-            </span>
+          {pageLabel || bookPercent !== null ? (
+            <div className={styles.progressLabels}>
+              {pageLabel ? (
+                <span
+                  className={styles.pageLabel}
+                  title={pageLabel}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {pageLabel}
+                </span>
+              ) : null}
+              {pageLabel && bookPercent !== null ? (
+                <span className={styles.labelSeparator} aria-hidden="true">
+                  ·
+                </span>
+              ) : null}
+              {bookPercent !== null ? (
+                <span
+                  className={styles.bookLabel}
+                  title={`${bookPercent}% do livro`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {bookPercent}% do livro
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
