@@ -131,9 +131,10 @@ export function useReaderWindow({
 
   /**
    * A janela de 20 mil caracteres pode terminar no meio de uma página, deixando
-   * um vão grande embaixo. Quando a última página está pouco preenchida, busca
-   * o trecho seguinte e repagina o conjunto: a página fica cheia e a virada
-   * continua no texto, sem a sensação de recomeço.
+   * um vão grande embaixo (e às vezes cortando uma palavra). Quando a última
+   * página está pouco preenchida, busca o trecho seguinte, repagina o conjunto
+   * e corta a sessão no fim da página que atravessa a fronteira. Assim a última
+   * página fica cheia e o próximo trecho começa exatamente onde ela terminou.
    */
   const fillLastPage = useCallback(
     async (
@@ -142,8 +143,9 @@ export function useReaderWindow({
       metrics: PageMetrics,
     ): Promise<{ window: TextWindow; pages: TextPage[] }> => {
       const lastPage = pages[pages.length - 1];
+      const boundaryOffset = window.nextOffset;
       if (lastPage === undefined) return { window, pages };
-      if (window.nextOffset === null) return { window, pages };
+      if (boundaryOffset === null) return { window, pages };
       if (metrics.pageHeight <= 0) return { window, pages };
 
       const lastPageHeight = metrics.measure(lastPage.text);
@@ -153,7 +155,7 @@ export function useReaderWindow({
 
       const lookahead = await fetcher.get({
         position: window.position,
-        offset: window.nextOffset,
+        offset: boundaryOffset,
       });
       if (lookahead.text.length === 0) return { window, pages };
 
@@ -163,11 +165,22 @@ export function useReaderWindow({
         nextOffset: lookahead.nextOffset,
         totalLength: lookahead.totalLength,
       };
+      const mergedPages = WindowPager.paginate(mergedWindow, metrics);
+      // Página que atravessa a fronteira original: é ela que fica inteira, com
+      // o texto do trecho seguinte. O resto do lookahead é descartado.
+      const boundaryPageIndex = mergedPages.findIndex(
+        (page) => page.endOffset > boundaryOffset,
+      );
+      if (boundaryPageIndex < 0) return { window, pages };
 
-      return {
-        window: mergedWindow,
-        pages: WindowPager.paginate(mergedWindow, metrics),
+      const boundaryPage = mergedPages[boundaryPageIndex];
+      const trimmedPages = mergedPages.slice(0, boundaryPageIndex + 1);
+      const trimmedWindow: TextWindow = {
+        ...mergedWindow,
+        nextOffset: boundaryPage.endOffset,
       };
+
+      return { window: trimmedWindow, pages: trimmedPages };
     },
     [fetcher],
   );
@@ -274,6 +287,39 @@ export function useReaderWindow({
     loadChapterStart();
   }, [enabled, initialOffset, loadChapterStart, position]);
 
+  /**
+   * Repagina a sessão atual preservando a página; passa pelo mesmo
+   * preenchimento da última página para o resize não recriar o vão no fim.
+   */
+  const repaginateWithFill = useCallback(
+    async (sessionToRepaginate: ReaderSession, settings: PageMetrics) => {
+      const pages = WindowPager.paginate(sessionToRepaginate.window, settings);
+      if (pages.length === 0) return;
+
+      const filled = await fillLastPage(
+        sessionToRepaginate.window,
+        pages,
+        settings,
+      );
+      // Uma carga nova pode ter substituído a sessão enquanto buscava o trecho.
+      if (sessionRef.current !== sessionToRepaginate) return;
+
+      const currentPage = sessionToRepaginate.pages[pageIndexRef.current];
+      const anchorOffset =
+        currentPage?.startOffset ?? sessionToRepaginate.window.offset;
+      const nextIndex = WindowPager.resolveAnchorIndex(
+        filled.pages,
+        anchorOffset,
+      );
+      showPage(
+        { window: filled.window, pages: filled.pages },
+        nextIndex,
+        false,
+      );
+    },
+    [fillLastPage, showPage],
+  );
+
   useEffect(() => {
     const currentSession = sessionRef.current;
     if (pageHeight <= 0 || currentSession === null) return;
@@ -284,26 +330,11 @@ export function useReaderWindow({
       const sessionToRepaginate = sessionRef.current;
       if (sessionToRepaginate === null) return;
 
-      const settings = { pageHeight, measure };
-      const pages = WindowPager.paginate(
-        sessionToRepaginate.window,
-        settings
-      );
-      if (pages.length === 0) return;
-
-      const currentPage = sessionToRepaginate.pages[pageIndexRef.current];
-      const anchorOffset =
-        currentPage?.startOffset ?? sessionToRepaginate.window.offset;
-      const nextIndex = WindowPager.resolveAnchorIndex(pages, anchorOffset);
-      showPage(
-        { window: sessionToRepaginate.window, pages },
-        nextIndex,
-        false
-      );
+      void repaginateWithFill(sessionToRepaginate, { pageHeight, measure });
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [measure, pageHeight, showPage]);
+  }, [measure, pageHeight, repaginateWithFill]);
 
   const goToPage = useCallback(
     (index: number) => {
