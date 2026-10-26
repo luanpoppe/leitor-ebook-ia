@@ -59,6 +59,7 @@ model Chapter {
 
   book   Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chunks Chunk[]
+  sections ChapterSection[]
 
   @@unique([bookId, position])
   @@map("chapters")
@@ -118,10 +119,28 @@ model ChatMessage {
   conversationId String       @map("conversation_id") @db.Uuid
   role           ChatRole
   content        String
+  /** Trecho do livro que a pergunta usou como foco (mensagens do usuário). */
+  selection      String?
   citations      Json?
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt], map: "chat_messages_conversation_created_idx")
   @@map("chat_messages")
+}
+
+
+model ChapterSection {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  chapterId   String  @map("chapter_id") @db.Uuid
+  position    Int
+  startOffset Int     @map("start_offset")
+  endOffset   Int     @map("end_offset")
+  summary     String
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, position])
+  @@index([chapterId, startOffset])
+  @@map("chapter_sections")
 }

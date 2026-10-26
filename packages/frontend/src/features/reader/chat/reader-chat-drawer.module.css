@@ -250,6 +250,36 @@
   overflow-wrap: break-word;
 }
 
+/* Trecho selecionado que originou a pergunta, dentro do balão do usuário. */
+.messageSelection {
+  margin: 0 0 7px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--accent-track);
+  border-radius: 0 6px 6px 0;
+  background: rgb(255 255 255 / 0.55);
+}
+
+.messageSelectionLabel {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--accent-ink);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.messageSelectionText {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
 /* Markdown da resposta: blocos compactos, no tamanho da bolha. */
 .messageText {
   overflow-wrap: break-word;

@@ -23,7 +23,7 @@ import {
 import { ReaderTocDrawer } from "./reader-toc-drawer";
 import { ReaderChatDrawer } from "../chat/reader-chat-drawer";
 import { ReaderCitationPreview } from "../chat/reader-citation-preview";
-import type { ChatCitation } from "../chat/types";
+import type { ChatCitation, ChatSelection } from "../chat/types";
 import { useTextSelection } from "../use-text-selection";
 import { ReaderSelectionAction } from "./reader-selection-action";
 import { ReaderToolbar } from "./reader-toolbar";
@@ -113,7 +113,7 @@ export function ReaderScreen({
   // Onde a leitura estava quando a citação foi aberta, para o "voltar".
   const [returnPoint, setReturnPoint] = useState<ReaderPoint | null>(null);
   // Trecho selecionado que o chat vai usar como foco da pergunta.
-  const [chatSelection, setChatSelection] = useState<string | null>(null);
+  const [chatSelection, setChatSelection] = useState<ChatSelection | null>(null);
 
   const scrollRef = useRef<ReaderScrollViewHandle>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -355,7 +355,10 @@ export function ReaderScreen({
   const handleAskSelection = useCallback(() => {
     if (textSelection === null) return;
 
-    setChatSelection(textSelection.text);
+    setChatSelection({
+      text: textSelection.text,
+      before: textSelection.before,
+    });
     setIsTocOpen(false);
     setIsChatOpen(true);
     window.getSelection()?.removeAllRanges();

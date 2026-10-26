@@ -20,6 +20,8 @@ export const askQuestionSchema = z.object({
   contextEnd: z.coerce.number().int().min(0).optional(),
   /** Trecho selecionado pelo leitor; a pergunta é sobre ele. */
   selection: z.string().trim().min(1).max(4_000).optional(),
+  /** Texto imediatamente anterior à seleção. */
+  selectionBefore: z.string().trim().max(2_000).optional(),
 });
 
 export class AskQuestionDto extends createZodDto(askQuestionSchema) {}
@@ -38,6 +40,8 @@ export interface ChatMessageResponse {
   id: string;
   role: 'USER' | 'ASSISTANT';
   content: string;
+  /** Trecho do livro que a pergunta usou como foco (só em mensagens USER). */
+  selection: string | null;
   citations: ChatCitationResponse[];
   createdAt: string;
 }

@@ -81,6 +81,7 @@ export class ChatController {
       contextStart: body.contextStart,
       contextEnd: body.contextEnd,
       selection: body.selection,
+      selectionBefore: body.selectionBefore,
     });
   }
 }

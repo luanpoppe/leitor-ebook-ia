@@ -12,12 +12,15 @@ export interface ReaderSelectionRect {
 
 export interface ReaderTextSelection {
   text: string;
+  /** Texto imediatamente anterior à seleção, para dar contexto à IA. */
+  before: string;
   rect: ReaderSelectionRect | null;
 }
 
 const MIN_SELECTION_LENGTH = 2;
 // Teto do trecho que vai para o prompt; o backend também limita.
 const MAX_SELECTION_LENGTH = 4_000;
+const MAX_BEFORE_LENGTH = 800;
 
 /**
  * Seleção de texto dentro da área de leitura. A ação aparece no pointerup (e
@@ -60,8 +63,10 @@ export function useTextSelection(
     }
 
     const rect = range.getBoundingClientRect();
+    const before = readTextBefore(container, range);
     setSelection({
       text: text.slice(0, MAX_SELECTION_LENGTH),
+      before,
       rect: {
         top: rect.top,
         left: rect.left,
@@ -87,4 +92,17 @@ export function useTextSelection(
   }, [enabled, readSelection]);
 
   return selection;
+}
+
+/** Texto entre o começo da área de leitura e o início da seleção. */
+function readTextBefore(container: HTMLElement, range: Range): string {
+  try {
+    const beforeRange = range.cloneRange();
+    beforeRange.setStart(container, 0);
+    beforeRange.setEnd(range.startContainer, range.startOffset);
+
+    return beforeRange.toString().slice(-MAX_BEFORE_LENGTH).trim();
+  } catch {
+    return "";
+  }
 }

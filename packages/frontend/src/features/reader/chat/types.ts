@@ -15,8 +15,16 @@ export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
+  /** Trecho selecionado que a pergunta usou como foco (mensagens USER). */
+  selection: string | null;
   citations: ChatCitation[];
   createdAt: string;
+}
+
+/** Seleção ativa no painel: o foco da próxima pergunta. */
+export interface ChatSelection {
+  text: string;
+  before: string;
 }
 
 export interface ConversationSummary {
@@ -42,6 +50,8 @@ export interface AskQuestionInput {
   contextEnd: number;
   /** Trecho selecionado pelo leitor: foco da pergunta. */
   selection?: string;
+  /** Texto imediatamente anterior à seleção. */
+  selectionBefore?: string;
 }
 
 export interface AskQuestionResponse {

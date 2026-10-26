@@ -52,6 +52,7 @@ const MAX_TITLE_LENGTH = 80;
 const ANSWER_MAX_TOKENS = 1_200;
 const ANSWER_TEMPERATURE = 0.3;
 const MAX_QUERIES = 3;
+const MAX_READ_SECTIONS = 3;
 // Sem os offsets do cliente, ainda mandamos um trecho de leitura aproximado:
 // 6 mil caracteres antes do topo e 2 mil depois.
 const FALLBACK_READING_BEFORE = 6_000;
@@ -132,6 +133,7 @@ export class ChatService {
       contextStart?: number;
       contextEnd?: number;
       selection?: string;
+      selectionBefore?: string;
     },
   ): Promise<AskQuestionResponse> {
     const book = await this.requireReadyBook(bookId);
@@ -164,6 +166,7 @@ export class ChatService {
       question: input.question,
       answer,
       citations,
+      selection: input.selection ?? null,
     });
 
     this.logger.log(
@@ -189,6 +192,7 @@ export class ChatService {
       contextStart?: number;
       contextEnd?: number;
       selection?: string;
+      selectionBefore?: string;
     },
   ): Promise<ChatExcerpt[]> {
     const range = resolveReadingRange(input);
@@ -196,6 +200,12 @@ export class ChatService {
       book.id,
       input.position,
       range,
+    );
+    const readSections = await this.readingRepository.listReadSections(
+      book.id,
+      input.position,
+      input.offset,
+      MAX_READ_SECTIONS,
     );
     const summaries = await this.readingRepository.listChapterSummaries(book.id);
     // No escopo "até aqui" o capítulo atual fica de fora: o resumo cobre o
@@ -225,15 +235,28 @@ export class ChatService {
     const excerpts: Array<Omit<ChatExcerpt, 'index'>> = [];
 
     if (input.selection !== undefined) {
+      const selectionText =
+        input.selectionBefore !== undefined
+          ? `${input.selectionBefore}\n\n⟦início do trecho selecionado⟧\n\n${input.selection}`
+          : input.selection;
       excerpts.push({
         kind: 'selection',
         chapterPosition: input.position,
         chapterTitle: readingExcerpt?.chapterTitle ?? null,
         offset: input.offset,
-        text: input.selection,
+        text: selectionText,
       });
     }
     if (readingExcerpt !== null) excerpts.push(readingExcerpt);
+    excerpts.push(
+      ...readSections.map((section) => ({
+        kind: 'section' as const,
+        chapterPosition: input.position,
+        chapterTitle: readingExcerpt?.chapterTitle ?? null,
+        offset: section.startOffset,
+        text: section.summary,
+      })),
+    );
     excerpts.push(...summaryExcerpts);
     excerpts.push(
       ...searchMatches.map((match) => ({
@@ -252,7 +275,7 @@ export class ChatService {
     }
 
     this.logger.log(
-      `Contexto montado: buscas=${plan.queries.length} [${plan.queries.join(' | ')}], resumos=${summaryExcerpts.length} [${plan.chapters.join(', ')}], trechos=${searchMatches.length}, selecao=${input.selection === undefined ? 'nao' : 'sim'}.`,
+      `Contexto montado: buscas=${plan.queries.length} [${plan.queries.join(' | ')}], resumos=${summaryExcerpts.length} [${plan.chapters.join(', ')}], secoes=${readSections.length}, trechos=${searchMatches.length}, selecao=${input.selection === undefined ? 'nao' : 'sim'}.`,
     );
 
     return excerpts.map((excerpt, index) => ({ ...excerpt, index: index + 1 }));
@@ -531,6 +554,7 @@ function toMessage(message: StoredMessage): ChatMessageResponse {
     id: message.id,
     role: message.role,
     content: message.content,
+    selection: message.selection,
     citations: toCitations(message.citations),
     createdAt: message.createdAt.toISOString(),
   };

@@ -13,6 +13,7 @@ export interface StoredMessage {
   id: string;
   role: ChatRole;
   content: string;
+  selection: string | null;
   citations: unknown;
   createdAt: Date;
 }
@@ -30,6 +31,8 @@ export interface SaveExchangeInput {
   question: string;
   answer: string;
   citations: unknown[];
+  /** Trecho selecionado que a pergunta usou como foco. */
+  selection?: string | null;
 }
 
 export interface SavedExchange {
@@ -91,6 +94,7 @@ export class ConversationRepository {
             id: true,
             role: true,
             content: true,
+            selection: true,
             citations: true,
             createdAt: true,
           },
@@ -122,6 +126,7 @@ export class ConversationRepository {
         id: true,
         role: true,
         content: true,
+        selection: true,
         citations: true,
         createdAt: true,
       },
@@ -139,8 +144,16 @@ export class ConversationRepository {
           conversationId: input.conversationId,
           role: ChatRole.USER,
           content: input.question,
+          selection: input.selection ?? null,
         },
-        select: { id: true, role: true, content: true, citations: true, createdAt: true },
+        select: {
+          id: true,
+          role: true,
+          content: true,
+          selection: true,
+          citations: true,
+          createdAt: true,
+        },
       });
       const assistantMessage = await transaction.chatMessage.create({
         data: {
@@ -149,7 +162,14 @@ export class ConversationRepository {
           content: input.answer,
           citations,
         },
-        select: { id: true, role: true, content: true, citations: true, createdAt: true },
+        select: {
+          id: true,
+          role: true,
+          content: true,
+          selection: true,
+          citations: true,
+          createdAt: true,
+        },
       });
 
       await transaction.conversation.update({

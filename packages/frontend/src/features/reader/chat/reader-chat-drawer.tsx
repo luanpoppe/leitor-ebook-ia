@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ChatMessageText, describeCitation } from "./chat-message-text";
-import type { ChatCitation, ChatScope } from "./types";
+import type { ChatCitation, ChatScope, ChatSelection } from "./types";
 import { useChat } from "./use-chat";
 import styles from "./reader-chat-drawer.module.css";
 
@@ -16,7 +16,7 @@ interface ReaderChatDrawerProps {
   contextStart: number;
   contextEnd: number;
   /** Trecho selecionado no texto: foco da próxima pergunta. */
-  selection: string | null;
+  selection: ChatSelection | null;
   onClearSelection(): void;
   /** Um modal está por cima: o Esc é dele, não do chat. */
   isSuspended?: boolean;
@@ -106,7 +106,8 @@ export function ReaderChatDrawer({
         offset,
         contextStart,
         contextEnd,
-        selection: selection ?? undefined,
+        selection: selection?.text,
+        selectionBefore: selection?.before,
       });
     },
     [
@@ -226,7 +227,7 @@ export function ReaderChatDrawer({
                 ×
               </button>
             </div>
-            <p className={styles.selectionText}>{selection}</p>
+            <p className={styles.selectionText}>{selection.text}</p>
           </div>
         )}
 
@@ -275,7 +276,20 @@ export function ReaderChatDrawer({
             return (
               <div key={message.id} className={bubbleClassName}>
                 {isUser ? (
-                  <p className={styles.userText}>{message.content}</p>
+                  <>
+                    {typeof message.selection === "string" &&
+                      message.selection.length > 0 && (
+                        <blockquote className={styles.messageSelection}>
+                          <span className={styles.messageSelectionLabel}>
+                            Trecho selecionado
+                          </span>
+                          <p className={styles.messageSelectionText}>
+                            {message.selection}
+                          </p>
+                        </blockquote>
+                      )}
+                    <p className={styles.userText}>{message.content}</p>
+                  </>
                 ) : (
                   <>
                     <ChatMessageText

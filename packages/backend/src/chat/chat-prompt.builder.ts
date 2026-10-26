@@ -3,7 +3,12 @@ export interface ChatBookMetadata {
   author: string | null;
 }
 
-export type ChatExcerptKind = "reading" | "summary" | "search" | "selection";
+export type ChatExcerptKind =
+  | "reading"
+  | "summary"
+  | "section"
+  | "search"
+  | "selection";
 
 export interface ChatExcerpt {
   /** Número usado pelo modelo para citar (`[1]`, `[2]`...). */
@@ -31,8 +36,10 @@ export const MAX_READING_CONTEXT_CHARS = 8_000;
 // Resumo já nasce curto; o teto só protege contra um resumo fora do padrão.
 export const MAX_SUMMARY_EXCERPT_CHARS = 1_400;
 // Seleção do leitor: é o foco da pergunta, então vai inteira (até o teto que o
-// schema aceita).
-export const MAX_SELECTION_EXCERPT_CHARS = 4_000;
+// schema aceita), com o texto imediatamente anterior.
+export const MAX_SELECTION_EXCERPT_CHARS = 5_000;
+// Resumo de uma parte já lida do capítulo atual.
+export const MAX_SECTION_EXCERPT_CHARS = 700;
 
 /**
  * Monta o prompt do chat. O modelo recebe metadados do livro e trechos
@@ -64,6 +71,9 @@ export class ChatPromptBuilder {
         'O trecho identificado como "Trecho selecionado pelo leitor" é o foco da pergunta: responda especificamente sobre ele e use o restante só como apoio.',
       );
     }
+    lines.push(
+      'Os resumos marcados como "Resumo do que já foi lido" cobrem apenas partes que o leitor já passou; use-os para situar a dúvida, sem revelar o que vem depois.',
+    );
 
     return lines.join('\n');
   }
@@ -124,6 +134,12 @@ export class ChatPromptBuilder {
       return {
         label: `Trecho selecionado pelo leitor — ${chapterLabel}`,
         maxChars: MAX_SELECTION_EXCERPT_CHARS,
+      };
+    }
+    if (excerpt.kind === 'section') {
+      return {
+        label: `Resumo do que já foi lido — ${chapterLabel}`,
+        maxChars: MAX_SECTION_EXCERPT_CHARS,
       };
     }
 
