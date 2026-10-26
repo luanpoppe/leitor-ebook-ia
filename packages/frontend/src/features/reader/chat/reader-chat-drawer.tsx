@@ -1,8 +1,14 @@
 "use client";
 
+/* As imagens vêm do backend dinâmico (MinIO); o otimizador do next/image não
+   se aplica a elas. */
+/* eslint-disable @next/next/no-img-element */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
+import { env } from "@/env";
 import { ChatMessageText, describeCitation } from "./chat-message-text";
+import { listBookImages, type BookImage } from "./images-api";
 import type { ChatCitation, ChatScope, ChatSelection } from "./types";
 import { useChat } from "./use-chat";
 import styles from "./reader-chat-drawer.module.css";
@@ -69,6 +75,11 @@ export function ReaderChatDrawer({
   const [scope, setScope] = useState<ChatScope>("up-to-current");
   const [question, setQuestion] = useState("");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<BookImage[]>([]);
+  const [isGalleryLoading, setIsGalleryLoading] = useState(false);
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<BookImage | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Abriu a partir de uma seleção: o teclado já pode ir para a pergunta.
@@ -155,6 +166,22 @@ export function ReaderChatDrawer({
     void startNewConversation();
   }, [startNewConversation]);
 
+  const openGallery = useCallback(async () => {
+    setIsGalleryOpen(true);
+    setIsGalleryLoading(true);
+    setGalleryError(null);
+
+    try {
+      setGalleryImages(await listBookImages(bookId));
+    } catch (cause) {
+      setGalleryError(
+        cause instanceof Error ? cause.message : "Falha ao carregar as imagens."
+      );
+    } finally {
+      setIsGalleryLoading(false);
+    }
+  }, [bookId]);
+
   const activeScope = SCOPE_OPTIONS.find((option) => option.value === scope);
 
   return (
@@ -183,6 +210,13 @@ export function ReaderChatDrawer({
             <button
               type="button"
               className={styles.smallButton}
+              onClick={() => void openGallery()}
+            >
+              Galeria
+            </button>
+            <button
+              type="button"
+              className={styles.smallButton}
               aria-expanded={isHistoryOpen}
               onClick={() => setIsHistoryOpen((isOpen) => !isOpen)}
             >
@@ -205,6 +239,57 @@ export function ReaderChatDrawer({
             </button>
           </div>
         </header>
+
+        {isGalleryOpen && (
+          <section
+            className={styles.galleryPanel}
+            aria-label="Galeria de imagens"
+          >
+            <div className={styles.galleryHeader}>
+              <h3 className={styles.galleryTitle}>Imagens geradas</h3>
+              <button
+                type="button"
+                className={styles.smallButton}
+                onClick={() => setIsGalleryOpen(false)}
+              >
+                Voltar
+              </button>
+            </div>
+
+            {isGalleryLoading && (
+              <p className={styles.status}>Carregando imagens…</p>
+            )}
+            {galleryError !== null && (
+              <p className={styles.galleryError}>{galleryError}</p>
+            )}
+            {!isGalleryLoading &&
+              galleryError === null &&
+              galleryImages.length === 0 && (
+                <p className={styles.status}>
+                  Nenhuma imagem gerada ainda. Peça uma no chat.
+                </p>
+              )}
+
+            <div className={styles.galleryGrid}>
+              {galleryImages.map((image) => (
+                <button
+                  key={image.id}
+                  type="button"
+                  className={styles.galleryItem}
+                  onClick={() => setSelectedImage(image)}
+                >
+                  <img
+                    src={`${env.NEXT_PUBLIC_API_URL}${image.url}`}
+                    alt={image.prompt.slice(0, 90)}
+                    className={styles.galleryImage}
+                    loading="lazy"
+                  />
+                  <span className={styles.galleryPrompt}>{image.prompt}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {isHistoryOpen && (
           <ConversationList
@@ -303,6 +388,14 @@ export function ReaderChatDrawer({
                         {resolveSourceLabels(message.citations).join(" · ")}
                       </p>
                     )}
+                    {message.imageUrl !== null && (
+                      <img
+                        src={`${env.NEXT_PUBLIC_API_URL}${message.imageUrl}`}
+                        alt="Imagem gerada a partir do livro"
+                        className={styles.messageImage}
+                        loading="lazy"
+                      />
+                    )}
                   </>
                 )}
               </div>
@@ -356,6 +449,23 @@ export function ReaderChatDrawer({
           </button>
         </form>
       </aside>
+
+      {selectedImage !== null && (
+        <div
+          className={styles.lightbox}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Imagem gerada"
+          onClick={() => setSelectedImage(null)}
+        >
+          <img
+            src={`${env.NEXT_PUBLIC_API_URL}${selectedImage.url}`}
+            alt={selectedImage.prompt.slice(0, 120)}
+            className={styles.lightboxImage}
+          />
+          <p className={styles.lightboxPrompt}>{selectedImage.prompt}</p>
+        </div>
+      )}
     </div>
   );
 }

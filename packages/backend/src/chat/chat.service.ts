@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { AIMessages, type AIModelNames } from '@luanpoppe/ai';
+import { AIMessages, AITools, type AIModelNames } from '@luanpoppe/ai';
+import { z } from 'zod';
 import {
   ChapterReadingRepository,
   type ChapterSummaryRecord,
@@ -8,8 +9,10 @@ import { EbookNotFoundError, EbookNotReadyError } from '../catalog/catalog.error
 import { EbookRepository } from '../catalog/ebook.repository';
 import { AI_CLIENT, type AiClient } from '../core/ai/ai.provider';
 import { Book, BookStatus, ChatRole } from '../generated/prisma/client';
+import { ImageService } from '../images/image.service';
 import { EmbeddingService } from '../indexing/embedding.service';
 import { EmbeddingUnavailableError } from '../indexing/indexing.errors';
+import { SearchService } from '../search/search.service';
 import {
   ChatPromptBuilder,
   MAX_SEARCH_EXCERPTS,
@@ -18,6 +21,7 @@ import {
   type ChatExcerpt,
 } from './chat-prompt.builder';
 import { ChatQueryPlanner } from './chat-query-planner';
+import type { ChatPlan } from './chat-query-planner';
 import {
   ChatContextUnavailableError,
   ChatUnavailableError,
@@ -53,6 +57,23 @@ const ANSWER_MAX_TOKENS = 1_200;
 const ANSWER_TEMPERATURE = 0.3;
 const MAX_QUERIES = 3;
 const MAX_READ_SECTIONS = 3;
+const MAX_IMAGE_CONTEXT_CHUNKS = 6;
+const MAX_IMAGE_SEARCH_RESULTS = 3;
+const IMAGE_PROMPT_MAX_TOKENS = 800;
+
+type AiCallParams = Parameters<NonNullable<AiClient>['call']>[0];
+type ChatTools = NonNullable<NonNullable<AiCallParams['agent']>['tools']>;
+
+interface AskInput {
+  question: string;
+  scope: ChatScope;
+  position: number;
+  offset: number;
+  contextStart?: number;
+  contextEnd?: number;
+  selection?: string;
+  selectionBefore?: string;
+}
 // Sem os offsets do cliente, ainda mandamos um trecho de leitura aproximado:
 // 6 mil caracteres antes do topo e 2 mil depois.
 const FALLBACK_READING_BEFORE = 6_000;
@@ -75,6 +96,8 @@ export class ChatService {
     private readonly readingRepository: ChapterReadingRepository,
     private readonly embeddingService: EmbeddingService,
     private readonly queryPlanner: ChatQueryPlanner,
+    private readonly searchService: SearchService,
+    private readonly imageService: ImageService,
     @Inject(AI_CLIENT) private readonly client: AiClient,
   ) {}
 
@@ -89,7 +112,7 @@ export class ChatService {
     const book = await this.requireReadyBook(bookId);
     const conversation = await this.conversationRepository.create(book.id);
 
-    return toConversation(conversation);
+    return toConversation(conversation, book.id);
   }
 
   async getConversation(
@@ -105,7 +128,7 @@ export class ChatService {
       throw new ConversationNotFoundError(book.id, conversationId);
     }
 
-    return toConversation(conversation);
+    return toConversation(conversation, book.id);
   }
 
   async deleteConversation(
@@ -146,7 +169,30 @@ export class ChatService {
     }
     if (this.client === null) throw new ChatUnavailableError();
 
-    const excerpts = await this.findExcerpts(book, input);
+    const summaries = await this.readingRepository.listChapterSummaries(book.id);
+    const allowedSummaries = summaries.filter(
+      (summary) =>
+        input.scope === 'whole-book' || summary.position < input.position,
+    );
+    const plan = await this.queryPlanner.plan({
+      question: input.question,
+      bookTitle: book.title,
+      chapters: allowedSummaries,
+      scope: input.scope,
+      position: input.position,
+      selection: input.selection,
+    });
+
+    if (plan.wantsImage) {
+      return this.askWithImage(book, conversation, input, plan);
+    }
+
+    const excerpts = await this.findExcerpts(
+      book,
+      input,
+      plan,
+      allowedSummaries,
+    );
     const history = await this.conversationRepository.findRecentMessages(
       conversation.id,
       HISTORY_LIMIT,
@@ -156,6 +202,7 @@ export class ChatService {
       input.question,
       excerpts,
       history,
+      this.buildSearchTools(book.id),
     );
 
     const citations = ChatPromptBuilder.toCitations(excerpts);
@@ -176,8 +223,8 @@ export class ChatService {
     return {
       conversationId: conversation.id,
       messages: [
-        toMessage(exchange.userMessage),
-        toMessage(exchange.assistantMessage),
+        toMessage(exchange.userMessage, book.id),
+        toMessage(exchange.assistantMessage, book.id),
       ],
     };
   }
@@ -194,6 +241,8 @@ export class ChatService {
       selection?: string;
       selectionBefore?: string;
     },
+    plan: ChatPlan,
+    allowedSummaries: ChapterSummaryRecord[],
   ): Promise<ChatExcerpt[]> {
     const range = resolveReadingRange(input);
     const readingExcerpt = await this.findReadingExcerpt(
@@ -207,21 +256,6 @@ export class ChatService {
       input.offset,
       MAX_READ_SECTIONS,
     );
-    const summaries = await this.readingRepository.listChapterSummaries(book.id);
-    // No escopo "até aqui" o capítulo atual fica de fora: o resumo cobre o
-    // capítulo inteiro e entregaria cenas que o leitor ainda não alcançou.
-    const allowedSummaries = summaries.filter(
-      (summary) =>
-        input.scope === 'whole-book' || summary.position < input.position,
-    );
-    const plan = await this.queryPlanner.plan({
-      question: input.question,
-      bookTitle: book.title,
-      chapters: allowedSummaries,
-      scope: input.scope,
-      position: input.position,
-      selection: input.selection,
-    });
     const searchMatches = await this.searchMatches(
       book.id,
       plan.queries,
@@ -322,8 +356,7 @@ export class ChatService {
     }
   }
 
-  private async findReadingExcerpt(
-    bookId: string,
+  private async findReadingExcerpt(    bookId: string,
     position: number,
     range: ReadingRange,
   ): Promise<Omit<ChatExcerpt, 'index'> | null> {
@@ -348,11 +381,171 @@ export class ChatService {
     };
   }
 
-  private async requestAnswer(
-    book: ChatBookMetadata,
+  /** Ferramenta de busca exata que o modelo decide quando usar. */
+  private buildSearchTools(bookId: string): ChatTools {
+    const tools = new AITools();
+    const searchTool = tools.createTool({
+      name: 'buscar_no_livro',
+      description:
+        'Busca um termo ou frase exata no livro (sem diferenciar maiúsculas). Use para conferir nomes, lugares e passagens específicas. Devolve os trechos com capítulo e posição.',
+      schema: z.object({
+        termo: z.string().trim().min(2).max(120),
+      }),
+      toolFunction: async ({ termo }) => {
+        const result = await this.searchService.search(bookId, termo, 5);
+        if (result.items.length === 0) {
+          return `Nenhuma ocorrência de "${termo}" no livro.`;
+        }
+
+        return result.items
+          .map((item) => {
+            const chapter = item.chapterTitle
+              ? `Capítulo ${item.chapterPosition} — ${item.chapterTitle}`
+              : `Capítulo ${item.chapterPosition}`;
+            return `${chapter}: "${item.snippet}"`;
+          })
+          .join('\n\n');
+      },
+    });
+
+    return [searchTool];
+  }
+
+  private async askWithImage(
+    book: Book,
+    conversation: ConversationWithMessages,
+    input: AskInput,
+    plan: ChatPlan,
+  ): Promise<AskQuestionResponse> {
+    const subject = plan.imageSubject.trim() || input.question;
+    const context = await this.findImageContext(
+      book.id,
+      subject,
+      plan.queries,
+    );
+    const imagePrompt = await this.buildImagePrompt(book, subject, context);
+    this.logger.log(
+      `Prompt de imagem (${subject}): ${imagePrompt.slice(0, 400)}`,
+    );
+    const image = await this.imageService.generate({
+      bookId: book.id,
+      conversationId: conversation.id,
+      prompt: imagePrompt,
+    });
+
+    const answer = `Aqui está a imagem de ${subject}, criada com base em ${context.length} trecho(s) do livro.`;
+    const title = conversation.title ?? buildTitle(input.question);
+    const exchange = await this.conversationRepository.saveExchange({
+      conversationId: conversation.id,
+      title: conversation.title === null ? title : null,
+      question: input.question,
+      answer,
+      citations: [],
+      selection: input.selection ?? null,
+      imageId: image.id,
+    });
+
+    this.logger.log(
+      `Imagem gerada (livro ${book.id}, conversa ${conversation.id}, modelo ${image.model}).`,
+    );
+
+    return {
+      conversationId: conversation.id,
+      messages: [
+        toMessage(exchange.userMessage, book.id),
+        toMessage(exchange.assistantMessage, book.id),
+      ],
+    };
+  }
+
+  /** Descrições do livro usadas para montar o prompt visual. */
+  private async findImageContext(
+    bookId: string,
+    subject: string,
+    queries: string[],
+  ): Promise<string[]> {
+    const terms = [subject, ...queries].slice(0, MAX_QUERIES);
+    const vectors = await Promise.all(
+      terms.map((term) => this.embeddingService.embedQuery(term)),
+    );
+    const resultSets = await Promise.all(
+      vectors.map((vector) =>
+        this.chunkSearchRepository.search(bookId, vector, CANDIDATE_LIMIT),
+      ),
+    );
+    const semantic = mergeMatches(resultSets).slice(
+      0,
+      MAX_IMAGE_CONTEXT_CHUNKS,
+    );
+    const lexical = await this.searchService.search(
+      bookId,
+      subject,
+      MAX_IMAGE_SEARCH_RESULTS,
+    );
+    const blocks: string[] = [];
+
+    for (const match of semantic) {
+      blocks.push(
+        `${describeChapter(match.chapterPosition, match.chapterTitle)}: ${match.text}`,
+      );
+    }
+    for (const item of lexical.items) {
+      blocks.push(
+        `${describeChapter(item.chapterPosition, item.chapterTitle)}: ${item.snippet}`,
+      );
+    }
+
+    return blocks;
+  }
+
+  private async buildImagePrompt(
+    book: Book,
+    subject: string,
+    context: string[],
+  ): Promise<string> {
+    if (this.client === null) throw new ChatUnavailableError();
+
+    const excerpts = context.length > 0 ? context.join('\n\n') : '(sem trechos)';
+    const { response } = await this.client.callStructuredOutput({
+      aiModel: CHAT_MODEL,
+      outputSchema: z.object({
+        prompt: z.string().trim().min(10).max(2_000),
+      }),
+      systemPrompt: [
+        'Você escreve prompts para um modelo de geração de imagem.',
+        'A partir das descrições do livro e do pedido do leitor, descreva a cena ou personagem em inglês.',
+        'Inclua aparência, roupas, ambiente, luz e clima, usando SOMENTE o que os trechos informam.',
+        'Quando faltar detalhe, complete de forma coerente com o texto, sem contradizê-lo.',
+        'Estilo: ilustração de fantasia, pintura digital, sem texto, sem marca d\'água, sem molduras.',
+        'Devolva apenas o prompt final.',
+      ].join('\n'),
+      messages: [
+        AIMessages.human(
+          [
+            `Livro: ${book.title}${book.author ? `, de ${book.author}` : ''}`,
+            `Pedido do leitor: ${subject}`,
+            '',
+            'Trechos do livro:',
+            excerpts,
+          ].join('\n'),
+        ),
+      ],
+      modelConfig: {
+        reasoningEffort: 'low',
+        maxTokens: IMAGE_PROMPT_MAX_TOKENS,
+        temperature: 0.5,
+      },
+      aiModelsFallback: [CHAT_FALLBACK_MODEL],
+    });
+
+    return response.prompt;
+  }
+
+  private async requestAnswer(    book: ChatBookMetadata,
     question: string,
     excerpts: ChatExcerpt[],
     history: StoredMessage[],
+    tools: ChatTools,
   ): Promise<string> {
     const systemPrompt = ChatPromptBuilder.buildSystemPrompt(
       book,
@@ -376,6 +569,7 @@ export class ChatService {
           maxTokens: ANSWER_MAX_TOKENS,
           temperature: ANSWER_TEMPERATURE,
         },
+        agent: tools.length > 0 ? { tools } : undefined,
         aiModelsFallback: [CHAT_FALLBACK_MODEL],
       });
 
@@ -541,23 +735,42 @@ function toConversationSummary(
 
 function toConversation(
   conversation: ConversationWithMessages,
+  bookId: string,
 ): ConversationResponse {
   return {
     id: conversation.id,
     title: conversation.title,
-    messages: conversation.messages.map(toMessage),
+    messages: conversation.messages.map((message) =>
+      toMessage(message, bookId),
+    ),
   };
 }
 
-function toMessage(message: StoredMessage): ChatMessageResponse {
+function toMessage(
+  message: StoredMessage,
+  bookId: string,
+): ChatMessageResponse {
   return {
     id: message.id,
     role: message.role,
     content: message.content,
     selection: message.selection,
+    imageUrl:
+      message.imageId === null
+        ? null
+        : `/ebooks/${bookId}/images/${message.imageId}`,
     citations: toCitations(message.citations),
     createdAt: message.createdAt.toISOString(),
   };
+}
+
+function describeChapter(
+  position: number,
+  title: string | null,
+): string {
+  if (title === null || title.length === 0) return `Capítulo ${position}`;
+
+  return `Capítulo ${position} — ${title}`;
 }
 
 function toCitations(value: unknown): ChatCitation[] {

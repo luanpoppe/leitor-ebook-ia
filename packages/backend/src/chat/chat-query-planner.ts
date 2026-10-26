@@ -27,6 +27,8 @@ const chatPlanSchema = z.object({
     .array(z.number().int().min(1).max(100_000))
     .max(MAX_PLANNED_CHAPTERS)
     .default([]),
+  wantsImage: z.boolean().default(false),
+  imageSubject: z.string().trim().max(300).default(''),
 });
 
 export type ChatPlan = z.infer<typeof chatPlanSchema>;
@@ -62,6 +64,8 @@ export class ChatQueryPlanner {
     const fallback: ChatPlan = {
       queries: [input.question],
       chapters: [],
+      wantsImage: false,
+      imageSubject: '',
     };
     if (this.client === null) return fallback;
 
@@ -98,6 +102,8 @@ export class ChatQueryPlanner {
       'Escolha pelo menos 1 capítulo quando a pergunta for sobre o conteúdo do livro; deixe vazio só quando a pergunta for apenas sobre a página atual.',
       'Para perguntas sobre o livro inteiro (enredo, final, temas, personagens), escolha os capítulos que melhor cobrem o arco — inclusive o último capítulo narrativo quando a pergunta for sobre o desfecho.',
       'Não se preocupe com spoilers: o leitor escolheu consultar o livro todo.',
+      'wantsImage: true somente se o leitor estiver pedindo para gerar, desenhar ou criar uma imagem.',
+      'imageSubject: quando wantsImage for true, o que a imagem deve retratar (personagem, lugar ou cena) em poucas palavras; senão devolva string vazia.',
     ];
     if (input.selection !== undefined) {
       lines.push(
@@ -186,6 +192,8 @@ export class ChatQueryPlanner {
     return {
       queries: queries.slice(0, MAX_QUERIES),
       chapters: chapters.slice(0, MAX_PLANNED_CHAPTERS),
+      wantsImage: plan.wantsImage,
+      imageSubject: plan.wantsImage ? plan.imageSubject.trim() : '',
     };
   }
 }

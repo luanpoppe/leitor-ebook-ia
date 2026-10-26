@@ -12,6 +12,7 @@ import {
   InvalidReadingProgressError,
 } from '../../catalog/catalog.errors';
 import { QueueUnavailableError } from '../../ingestion/ingestion.errors';
+import { ImageGenerationError } from '../../images/image-generation.service';
 import {
   ChatContextUnavailableError,
   ChatUnavailableError,
@@ -148,6 +149,9 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
       return HttpStatus.UNPROCESSABLE_ENTITY;
     }
     if (exception instanceof ChatUnavailableError) {
+      return HttpStatus.SERVICE_UNAVAILABLE;
+    }
+    if (exception instanceof ImageGenerationError) {
       return HttpStatus.SERVICE_UNAVAILABLE;
     }
     return null;

@@ -82,9 +82,7 @@ function resolveCitationLink(
 }
 
 export function describeCitation(citation: ChatCitation): string {
-  if (citation.chapterTitle !== null) {
-    return `capítulo ${citation.chapterPosition} — ${citation.chapterTitle}`;
-  }
+  if (citation.chapterTitle !== null) return citation.chapterTitle;
 
   return `capítulo ${citation.chapterPosition}`;
 }

@@ -59,6 +59,7 @@ export class ChatPromptBuilder {
       'Use SOMENTE os trechos fornecidos. Se a resposta não estiver neles, diga que não encontrou essa informação nos trechos disponíveis.',
       'Os trechos podem ser literais do livro ou resumos de capítulo. Use os resumos para visão geral e os trechos literais para detalhes.',
       'Ao usar um trecho, cite o número entre colchetes — por exemplo [1] ou [2][3]. Nunca invente números de trecho.',
+      'Você tem a ferramenta buscar_no_livro para localizar termos ou frases exatas (nomes, lugares, passagens). Use-a quando a pergunta citar um termo específico que a busca semântica pode perder.',
       'Não invente fatos sobre o livro que não estejam nos trechos.',
     ];
     if (hasReadingContext) {

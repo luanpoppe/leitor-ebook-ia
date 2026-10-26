@@ -42,6 +42,8 @@ export interface ChatMessageResponse {
   content: string;
   /** Trecho do livro que a pergunta usou como foco (só em mensagens USER). */
   selection: string | null;
+  /** URL relativa da imagem gerada (só em mensagens ASSISTANT). */
+  imageUrl: string | null;
   citations: ChatCitationResponse[];
   createdAt: string;
 }

@@ -16,6 +16,7 @@ interface ReaderToolbarProps {
   chapterProgress: number;
   isTocOpen: boolean;
   onToggleToc: () => void;
+  onOpenSearch: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
   onPrevious: () => void;
@@ -39,6 +40,7 @@ const BACK_LABEL = "Voltar para a ficha do livro";
 const PREVIOUS_LABEL = "Capítulo anterior";
 const NEXT_LABEL = "Próximo capítulo";
 const TOC_LABEL = "Sumário";
+const SEARCH_LABEL = "Buscar";
 const CHAT_LABEL = "Chat";
 const DECREASE_FONT_LABEL = "Diminuir fonte";
 const INCREASE_FONT_LABEL = "Aumentar fonte";
@@ -104,6 +106,7 @@ export function ReaderToolbar({
   chapterProgress,
   isTocOpen,
   onToggleToc,
+  onOpenSearch,
   hasPrevious,
   hasNext,
   onPrevious,
@@ -235,6 +238,15 @@ export function ReaderToolbar({
           className={resolveIsTocButtonActive(isTocOpen)}
         >
           {TOC_LABEL}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          aria-label={SEARCH_LABEL}
+          className={styles.button}
+        >
+          {SEARCH_LABEL}
         </button>
 
         <button

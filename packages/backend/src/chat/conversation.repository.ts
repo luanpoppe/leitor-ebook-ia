@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { ChatRole, type Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../core/prisma.service';
 
@@ -14,6 +14,7 @@ export interface StoredMessage {
   role: ChatRole;
   content: string;
   selection: string | null;
+  imageId: string | null;
   citations: unknown;
   createdAt: Date;
 }
@@ -33,6 +34,8 @@ export interface SaveExchangeInput {
   citations: unknown[];
   /** Trecho selecionado que a pergunta usou como foco. */
   selection?: string | null;
+  /** Imagem gerada anexada à resposta. */
+  imageId?: string | null;
 }
 
 export interface SavedExchange {
@@ -95,6 +98,7 @@ export class ConversationRepository {
             role: true,
             content: true,
             selection: true,
+            imageId: true,
             citations: true,
             createdAt: true,
           },
@@ -127,6 +131,7 @@ export class ConversationRepository {
         role: true,
         content: true,
         selection: true,
+        imageId: true,
         citations: true,
         createdAt: true,
       },
@@ -151,6 +156,7 @@ export class ConversationRepository {
           role: true,
           content: true,
           selection: true,
+          imageId: true,
           citations: true,
           createdAt: true,
         },
@@ -161,12 +167,14 @@ export class ConversationRepository {
           role: ChatRole.ASSISTANT,
           content: input.answer,
           citations,
+          imageId: input.imageId ?? null,
         },
         select: {
           id: true,
           role: true,
           content: true,
           selection: true,
+          imageId: true,
           citations: true,
           createdAt: true,
         },

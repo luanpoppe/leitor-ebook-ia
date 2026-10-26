@@ -17,6 +17,8 @@ export interface ChatMessage {
   content: string;
   /** Trecho selecionado que a pergunta usou como foco (mensagens USER). */
   selection: string | null;
+  /** URL relativa da imagem gerada (mensagens ASSISTANT). */
+  imageUrl: string | null;
   citations: ChatCitation[];
   createdAt: string;
 }

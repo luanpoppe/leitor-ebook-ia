@@ -10,6 +10,8 @@ import { IndexingModule } from './indexing/indexing.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { EbooksModule } from './api/ebooks/ebooks.module';
 import { ChatModule } from './chat/chat.module';
+import { ImagesModule } from './images/images.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { ChatModule } from './chat/chat.module';
     IngestionModule,
     EbooksModule,
     ChatModule,
+    SearchModule,
+    ImagesModule,
   ],
   controllers: [AppController],
 })

@@ -24,6 +24,7 @@ import { ReaderTocDrawer } from "./reader-toc-drawer";
 import { ReaderChatDrawer } from "../chat/reader-chat-drawer";
 import { ReaderCitationPreview } from "../chat/reader-citation-preview";
 import type { ChatCitation, ChatSelection } from "../chat/types";
+import { ReaderSearchDrawer } from "../search/reader-search-drawer";
 import { useTextSelection } from "../use-text-selection";
 import { ReaderSelectionAction } from "./reader-selection-action";
 import { ReaderToolbar } from "./reader-toolbar";
@@ -90,6 +91,7 @@ export function ReaderScreen({
 
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
   const [metrics, setMetrics] = useState<ReaderPageMetrics | null>(null);
   // Capítulo que abre na última página: voltar do começo do capítulo seguinte.
@@ -125,7 +127,7 @@ export function ReaderScreen({
   // Só observa seleção com a leitura limpa (sem sumário, chat ou prévia por cima).
   const textSelection = useTextSelection(
     mainRef,
-    !isChatOpen && citationPreview === null && !isTocOpen
+    !isChatOpen && citationPreview === null && !isTocOpen && !isSearchOpen
   );
 
   // A view mede a área e publica a régua; uma identidade nova a cada render
@@ -296,6 +298,8 @@ export function ReaderScreen({
 
   const handleToggleToc = useCallback(() => {
     setIsChatOpen(false);
+    setIsSearchOpen(false);
+    setChatSelection(null);
     setIsTocOpen((isOpen) => !isOpen);
   }, []);
 
@@ -303,8 +307,20 @@ export function ReaderScreen({
     setIsTocOpen(false);
   }, []);
 
+  const handleOpenSearch = useCallback(() => {
+    setIsTocOpen(false);
+    setIsChatOpen(false);
+    setChatSelection(null);
+    setIsSearchOpen(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setIsSearchOpen(false);
+  }, []);
+
   const handleToggleChat = useCallback(() => {
     setIsTocOpen(false);
+    setIsSearchOpen(false);
     setChatSelection(null);
     setIsChatOpen((isOpen) => !isOpen);
   }, []);
@@ -334,6 +350,14 @@ export function ReaderScreen({
       goToChapter(point.position);
     },
     [currentPosition, goToChapter, isScrollMode]
+  );
+
+  const handleSearchSelect = useCallback(
+    (position: number, offset: number) => {
+      setIsSearchOpen(false);
+      navigateToPoint({ position, offset });
+    },
+    [navigateToPoint]
   );
 
   // Citação do chat: abre a prévia sem mover a leitura principal.
@@ -608,7 +632,10 @@ export function ReaderScreen({
     ? isScrollReadingBlocked
     : isPageReadingBlocked;
   const isReadingLocked =
-    isReadingBlocked || isChatOpen || citationPreview !== null;
+    isReadingBlocked ||
+    isChatOpen ||
+    isSearchOpen ||
+    citationPreview !== null;
   const isChunkErrorVisible =
     !isScrollMode && pageError !== null && errorKind === null && !hasReachedEnd;
   // Falha tem o aviso do rodapé; página nula sem falha é carga em andamento.
@@ -743,6 +770,7 @@ export function ReaderScreen({
         chapterProgress={chapterProgress}
         isTocOpen={isTocOpen}
         onToggleToc={handleToggleToc}
+        onOpenSearch={handleOpenSearch}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
         onPrevious={handlePreviousChapter}
@@ -798,6 +826,14 @@ export function ReaderScreen({
           isSuspended={citationPreview !== null}
           onClose={handleCloseChat}
           onCitationSelect={handleCitationSelect}
+        />
+      )}
+
+      {isSearchOpen && (
+        <ReaderSearchDrawer
+          bookId={bookId}
+          onClose={handleCloseSearch}
+          onSelect={handleSearchSelect}
         />
       )}
 
