@@ -5,6 +5,7 @@ import type { JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useDialogPanel } from "@/features/shelf/hooks/use-dialog-panel";
 import { ReaderPageView } from "../components/reader-page-view";
 import type { ReaderTheme } from "../reader-preferences";
+import type { ReaderAlignment } from "../reader-preferences";
 import { useReaderPage, type ReaderPageMetrics } from "../use-reader-page";
 import { describeCitation } from "./chat-message-text";
 import type { ChatCitation } from "./types";
@@ -17,6 +18,7 @@ interface ReaderCitationPreviewProps {
   citation: ChatCitation;
   fontSize: number;
   theme: ReaderTheme;
+  alignment: ReaderAlignment;
   onClose(): void;
   /** Leva a leitura principal para a página que está aberta no modal. */
   onGoToReading(citation: ChatCitation): void;
@@ -32,6 +34,7 @@ export function ReaderCitationPreview({
   citation,
   fontSize,
   theme,
+  alignment,
   onClose,
   onGoToReading,
 }: ReaderCitationPreviewProps): JSX.Element {
@@ -133,6 +136,7 @@ export function ReaderCitationPreview({
             direction={direction}
             fontSize={fontSize}
             theme={theme}
+            alignment={alignment}
             onMetricsChange={handleMetricsChange}
           />
 

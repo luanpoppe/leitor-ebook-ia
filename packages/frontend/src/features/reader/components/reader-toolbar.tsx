@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, JSX } from "react";
-import type { ReaderMode, ReaderTheme } from "../reader-preferences";
+import type { ReaderAlignment, ReaderMode, ReaderTheme } from "../reader-preferences";
 import styles from "./reader-toolbar.module.css";
 
 interface ReaderToolbarProps {
@@ -25,6 +25,8 @@ interface ReaderToolbarProps {
   onIncreaseFont: () => void;
   theme: ReaderTheme;
   onToggleTheme: () => void;
+  alignment: ReaderAlignment;
+  onToggleAlignment: () => void;
   mode: ReaderMode;
   onToggleMode: () => void;
   isChatOpen: boolean;
@@ -40,6 +42,8 @@ const DECREASE_FONT_LABEL = "Diminuir fonte";
 const INCREASE_FONT_LABEL = "Aumentar fonte";
 const LIGHT_THEME_ACTION_LABEL = "Usar tema sépia";
 const SEPIA_THEME_ACTION_LABEL = "Usar tema claro";
+const JUSTIFY_ACTION_LABEL = "Justificar texto";
+const LEFT_ALIGN_ACTION_LABEL = "Alinhar à esquerda";
 
 function resolveProgress(chapterProgress: number): number {
   if (!Number.isFinite(chapterProgress)) return 0;
@@ -108,6 +112,8 @@ export function ReaderToolbar({
   onIncreaseFont,
   theme,
   onToggleTheme,
+  alignment,
+  onToggleAlignment,
   mode,
   onToggleMode,
   isChatOpen,
@@ -116,6 +122,8 @@ export function ReaderToolbar({
   const progressPercent = resolveProgress(chapterProgress);
   const chapterLabel = resolveChapterLabel(currentPosition, chaptersCount);
   const themeActionLabel = resolveThemeActionLabel(theme);
+  const alignmentActionLabel =
+    alignment === "justify" ? LEFT_ALIGN_ACTION_LABEL : JUSTIFY_ACTION_LABEL;
   const modeTargetLabel = resolveModeTargetLabel(mode);
   const modeActionLabel = resolveModeActionLabel(mode);
   const progressFillStyle = {
@@ -249,6 +257,17 @@ export function ReaderToolbar({
           className={styles.themeButton}
         >
           {themeActionLabel}
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleAlignment}
+          aria-label={alignmentActionLabel}
+          aria-pressed={alignment === "justify"}
+          title={alignmentActionLabel}
+          className={styles.themeButton}
+        >
+          {(alignment === "justify" ? "Esquerda" : "Justificar")}
         </button>
 
         <button

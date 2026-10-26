@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { CSSProperties, JSX } from "react";
-import type { ReaderTheme } from "../reader-preferences";
+import type { ReaderAlignment, ReaderTheme } from "../reader-preferences";
 import type { ScrollErrorDirection, ScrollSegment } from "../use-reader-scroll";
 import styles from "./reader-scroll-view.module.css";
 
@@ -52,6 +52,7 @@ export interface ReaderScrollViewProps {
   hasReachedEnd: boolean;
   fontSize: number;
   theme: ReaderTheme;
+  alignment: ReaderAlignment;
   /** Quando muda (troca de modo ou de capítulo pelo sumário), a view rola até ali. */
   anchor: { position: number; offset: number } | null;
   onLoadMore(): void;
@@ -67,7 +68,7 @@ export const ReaderScrollView = forwardRef<
 >(function ReaderScrollView(props, ref): JSX.Element {
   const {
     segments, isLoading, error, errorDirection, hasReachedEnd, fontSize, theme,
-    anchor, onLoadMore, onLoadPrevious, onRetry, onVisibleChange,
+    alignment, anchor, onLoadMore, onLoadPrevious, onRetry, onVisibleChange,
   } = props;
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -399,7 +400,12 @@ export const ReaderScrollView = forwardRef<
   const isPrependError = errorDirection === "prepend";
 
   return (
-    <div className={styles.frame} data-theme={theme} style={containerStyle}>
+    <div
+      className={styles.frame}
+      data-theme={theme}
+      data-alignment={alignment}
+      style={containerStyle}
+    >
       <div
         ref={viewportRef} className={styles.viewport} role="region"
         aria-label="Texto do capítulo" tabIndex={0} onScroll={scheduleEvaluation}

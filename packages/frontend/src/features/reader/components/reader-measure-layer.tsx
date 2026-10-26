@@ -2,6 +2,7 @@
 
 import { useCallback, useImperativeHandle, useRef } from "react";
 import type { CSSProperties, JSX, Ref } from "react";
+import type { ReaderAlignment } from "../reader-preferences";
 import styles from "./reader-measure-layer.module.css";
 
 const PARAGRAPH_SEPARATOR = "\n\n";
@@ -18,6 +19,8 @@ interface ReaderMeasureLayerProps {
   fontSize: number;
   /** Largura útil do texto em px — a mesma da página de leitura. */
   width: number;
+  /** Alinhamento do texto; entra na chave do cache de alturas. */
+  alignment: ReaderAlignment;
   /**
    * Muda quando a tipografia real muda sem fonte/largura novas (ex.: a fonte
    * terminou de carregar); invalida o cache de alturas.
@@ -35,6 +38,7 @@ interface ReaderMeasureLayerProps {
 export function ReaderMeasureLayer({
   fontSize,
   width,
+  alignment,
   cacheEpoch = 0,
   ref,
 }: ReaderMeasureLayerProps): JSX.Element {
@@ -49,7 +53,7 @@ export function ReaderMeasureLayer({
       // Antes do primeiro layout não há largura útil para medir.
       if (width <= 0) return 0;
 
-      const cacheKey = `${fontSize}:${width}:${cacheEpoch}`;
+      const cacheKey = `${fontSize}:${width}:${alignment}:${cacheEpoch}`;
       const isCacheStale = cacheKeyRef.current !== cacheKey;
       if (isCacheStale) {
         cacheKeyRef.current = cacheKey;
@@ -75,7 +79,7 @@ export function ReaderMeasureLayer({
 
       return height;
     },
-    [cacheEpoch, fontSize, width]
+    [alignment, cacheEpoch, fontSize, width]
   );
 
   useImperativeHandle(ref, () => ({ measure }), [measure]);
@@ -87,7 +91,12 @@ export function ReaderMeasureLayer({
 
   return (
     <div className={styles.layer} aria-hidden="true">
-      <div ref={blockRef} className={styles.block} style={blockStyle} />
+      <div
+        ref={blockRef}
+        className={styles.block}
+        style={blockStyle}
+        data-alignment={alignment}
+      />
     </div>
   );
 }

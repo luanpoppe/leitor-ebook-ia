@@ -128,3 +128,8 @@
   text-align: center;
   opacity: 0.7;
 }
+
+/* Justificado quando o leitor escolhe; o padrao continua a esquerda. */
+.frame[data-alignment="justify"] .paragraph {
+  text-align: justify;
+}

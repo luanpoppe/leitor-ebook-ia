@@ -79,3 +79,8 @@
   background: #fdfcf9;
   color: #2a2724;
 }
+
+/* Justificado quando o leitor escolhe; o padrao continua a esquerda. */
+.frame[data-alignment="justify"] .paragraph {
+  text-align: justify;
+}

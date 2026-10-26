@@ -20,6 +20,9 @@ import {
 // disparar a pré-busca do trecho seguinte.
 const PREFETCH_PAGE_THRESHOLD = 2;
 const LOAD_ERROR_MESSAGE = "Falha ao carregar o trecho do capítulo.";
+// Abaixo disso a última página da janela está visivelmente vazia: vale buscar
+// o trecho seguinte para preencher, em vez de cortar a frase no meio da tela.
+const LAST_PAGE_FILL_RATIO = 0.75;
 
 interface ReaderSession {
   window: TextWindow;
@@ -126,6 +129,49 @@ export function useReaderWindow({
     [fetcher]
   );
 
+  /**
+   * A janela de 20 mil caracteres pode terminar no meio de uma página, deixando
+   * um vão grande embaixo. Quando a última página está pouco preenchida, busca
+   * o trecho seguinte e repagina o conjunto: a página fica cheia e a virada
+   * continua no texto, sem a sensação de recomeço.
+   */
+  const fillLastPage = useCallback(
+    async (
+      window: TextWindow,
+      pages: TextPage[],
+      metrics: PageMetrics,
+    ): Promise<{ window: TextWindow; pages: TextPage[] }> => {
+      const lastPage = pages[pages.length - 1];
+      if (lastPage === undefined) return { window, pages };
+      if (window.nextOffset === null) return { window, pages };
+      if (metrics.pageHeight <= 0) return { window, pages };
+
+      const lastPageHeight = metrics.measure(lastPage.text);
+      const isUnderfilled =
+        lastPageHeight < metrics.pageHeight * LAST_PAGE_FILL_RATIO;
+      if (!isUnderfilled) return { window, pages };
+
+      const lookahead = await fetcher.get({
+        position: window.position,
+        offset: window.nextOffset,
+      });
+      if (lookahead.text.length === 0) return { window, pages };
+
+      const mergedWindow: TextWindow = {
+        ...window,
+        text: window.text + lookahead.text,
+        nextOffset: lookahead.nextOffset,
+        totalLength: lookahead.totalLength,
+      };
+
+      return {
+        window: mergedWindow,
+        pages: WindowPager.paginate(mergedWindow, metrics),
+      };
+    },
+    [fetcher],
+  );
+
   const loadWindow = useCallback(
     async (point: WindowPoint, landing: PageLanding) => {
       const requestId = (requestIdRef.current += 1);
@@ -156,7 +202,14 @@ export function useReaderWindow({
         }
         pendingAdvanceRef.current = null;
 
-        const pages = WindowPager.paginate(window, paginationRef.current);
+        let pages = WindowPager.paginate(window, paginationRef.current);
+        const filled = await fillLastPage(
+          window,
+          pages,
+          paginationRef.current,
+        );
+        window = filled.window;
+        pages = filled.pages;
         const landingIndex = WindowPager.resolveLandingIndex(pages, landing);
         failedLoadRef.current = null;
         showPage({ window, pages }, landingIndex, true);
@@ -175,7 +228,7 @@ export function useReaderWindow({
         if (requestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [fetcher, showPage]
+    [fetcher, fillLastPage, showPage]
   );
 
   const loadChapter = useCallback(

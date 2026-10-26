@@ -76,11 +76,13 @@ export function ReaderScreen({
   const {
     fontSize,
     theme,
+    alignment,
     canIncrease,
     canDecrease,
     increaseFont,
     decreaseFont,
     toggleTheme,
+    toggleAlignment,
   } = useReaderPreferences();
   const { mode, toggleMode } = useReaderMode();
   const { scheduleSave } = useReadingProgressWriter(bookId, savedProgress);
@@ -173,7 +175,6 @@ export function ReaderScreen({
     pages,
     page,
     pageIndex,
-    totalPages,
     direction,
     error: pageError,
     goToNextPage,
@@ -496,9 +497,11 @@ export function ReaderScreen({
     ? visiblePoint.position
     : currentPosition;
   const pageLabel =
-    isScrollMode || page === null
+    isScrollMode || page === null || chapter === null
       ? null
-      : `Página ${pageIndex + 1} de ${totalPages}`;
+      : `${Math.round(
+          resolveChapterProgress(page.startOffset, chapter.totalLength) * 100
+        )}% do capítulo`;
 
   // Na rolagem o trecho visível conhece o total do capítulo; o capítulo da tela
   // é só o fallback enquanto a view ainda não reportou.
@@ -618,6 +621,7 @@ export function ReaderScreen({
           hasReachedEnd={hasScrollReachedEnd}
           fontSize={fontSize}
           theme={theme}
+          alignment={alignment}
           anchor={scrollAnchor}
           onLoadMore={loadMore}
           onLoadPrevious={loadPrevious}
@@ -671,6 +675,7 @@ export function ReaderScreen({
           direction={direction}
           fontSize={fontSize}
           theme={theme}
+          alignment={alignment}
           onMetricsChange={handleMetricsChange}
         />
 
@@ -709,6 +714,8 @@ export function ReaderScreen({
         onIncreaseFont={increaseFont}
         theme={theme}
         onToggleTheme={toggleTheme}
+        alignment={alignment}
+        onToggleAlignment={toggleAlignment}
         mode={mode}
         onToggleMode={handleToggleMode}
         isChatOpen={isChatOpen}
@@ -760,6 +767,7 @@ export function ReaderScreen({
           citation={citationPreview}
           fontSize={fontSize}
           theme={theme}
+          alignment={alignment}
           onClose={handleCloseCitationPreview}
           onGoToReading={handleGoToReadingFromPreview}
         />
