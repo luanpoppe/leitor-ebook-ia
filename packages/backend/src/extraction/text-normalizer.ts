@@ -22,8 +22,40 @@ export class TextNormalizer {
     const withCollapsedSpaces = withoutHyphenation.replace(/[ \t]+/g, ' ');
     const withTrimmedLines = withCollapsedSpaces.replace(/[ \t]*\n[ \t]*/g, '\n');
     const withCollapsedBreaks = withTrimmedLines.replace(/\n{3,}/g, '\n\n');
+    const withoutPageNumbers =
+      TextNormalizer.stripPageNumberArtifacts(withCollapsedBreaks);
 
-    return withCollapsedBreaks.trim();
+    return withoutPageNumbers.trim();
+  }
+
+  /**
+   * Remove números de página que o EPUB/PDF deixa no meio do texto, como
+   * "6 9 6" (dígitos separados por espaço). Só pega sequências de 3+ grupos de
+   * 1–2 dígitos, então "1 000" e "1 234" (números reais) ficam intactos.
+   * Número no fim de um parágrafo também rejunta a frase partida ao parágrafo
+   * seguinte, que era o efeito da quebra de página no meio da frase.
+   */
+  static stripPageNumberArtifacts(text: string): string {
+    // (?<![\d.,]) evita cortar um pedaço de número maior.
+    const token = String.raw`(?<![\d.,])\d{1,2}(?: \d{1,2}){2,}(?![\d.,])`;
+    let result = text;
+
+    // Parágrafo que é só o número de página.
+    result = result.replace(new RegExp(`\\n\\n *${token} *\\n\\n`, 'g'), '\n\n');
+    result = result.replace(new RegExp(`^ *${token} *\\n\\n`, 'g'), '');
+    result = result.replace(new RegExp(`\\n\\n *${token} *$`, 'g'), '');
+
+    // Número no começo do parágrafo, antes do texto.
+    result = result.replace(new RegExp(`\\n\\n *${token} +`, 'g'), '\n\n');
+    result = result.replace(new RegExp(`^ *${token} +`, 'g'), '');
+
+    // Número no fim do parágrafo: a frase continua no parágrafo seguinte.
+    result = result.replace(new RegExp(` *${token} *\\n\\n`, 'g'), ' ');
+
+    // Sobrou no meio de um parágrafo: só remove o número.
+    result = result.replace(new RegExp(` *${token} *`, 'g'), ' ');
+
+    return result.replace(/ {2,}/g, ' ').replace(/ *\n/g, '\n');
   }
 
   /**
