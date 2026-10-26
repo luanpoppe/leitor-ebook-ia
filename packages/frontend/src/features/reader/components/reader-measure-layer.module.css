@@ -19,7 +19,7 @@
  */
 .block {
   /* flow-root impede que a margem do último parágrafo escape do bloco: sem
-     isso a altura medida ficaria 1,25em menor que a da página de verdade. */
+     isso a altura medida ficaria 0,7em menor que a da página de verdade. */
   display: flow-root;
   font-size: var(--reader-font-size, 18px);
   line-height: 1.75;
@@ -28,7 +28,7 @@
 }
 
 .paragraph {
-  margin: 0 0 1.25em;
+  margin: 0 0 0.7em;
   font-size: inherit;
   line-height: inherit;
 }
