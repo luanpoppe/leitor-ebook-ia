@@ -195,9 +195,11 @@ export class ChatService {
       range,
     );
     const summaries = await this.readingRepository.listChapterSummaries(book.id);
+    // No escopo "até aqui" o capítulo atual fica de fora: o resumo cobre o
+    // capítulo inteiro e entregaria cenas que o leitor ainda não alcançou.
     const allowedSummaries = summaries.filter(
       (summary) =>
-        input.scope === 'whole-book' || summary.position <= input.position,
+        input.scope === 'whole-book' || summary.position < input.position,
     );
     const plan = await this.queryPlanner.plan({
       question: input.question,
@@ -237,7 +239,7 @@ export class ChatService {
     }
 
     this.logger.log(
-      `Contexto montado: buscas=${plan.queries.length} [${plan.queries.join(' | ')}], resumos=${summaryExcerpts.length}, trechos=${searchMatches.length}.`,
+      `Contexto montado: buscas=${plan.queries.length} [${plan.queries.join(' | ')}], resumos=${summaryExcerpts.length} [${plan.chapters.join(', ')}], trechos=${searchMatches.length}.`,
     );
 
     return excerpts.map((excerpt, index) => ({ ...excerpt, index: index + 1 }));

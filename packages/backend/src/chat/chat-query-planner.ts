@@ -98,7 +98,8 @@ export class ChatQueryPlanner {
     ];
     if (input.scope === 'up-to-current') {
       lines.push(
-        `O leitor está no capítulo ${input.position}: não escolha capítulos depois dele.`,
+        `O leitor está no capítulo ${input.position}: escolha apenas capítulos anteriores a ele.`,
+        'O resumo do capítulo atual não é enviado porque o leitor pode não ter chegado ao fim dele.',
       );
     }
 
