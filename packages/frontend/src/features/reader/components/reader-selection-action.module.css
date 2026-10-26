@@ -1,0 +1,30 @@
+.action {
+  position: fixed;
+  z-index: 68;
+  padding: 7px 12px;
+  border: 1px solid rgb(0 0 0 / 0.08);
+  border-radius: 999px;
+  background: var(--accent-ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgb(17 24 39 / 0.28);
+}
+
+.action:hover {
+  background: var(--accent);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .action {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}

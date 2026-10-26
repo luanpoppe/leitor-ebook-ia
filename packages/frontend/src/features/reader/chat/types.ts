@@ -40,6 +40,8 @@ export interface AskQuestionInput {
   /** Faixa da leitura atual (página atual e duas anteriores). */
   contextStart: number;
   contextEnd: number;
+  /** Trecho selecionado pelo leitor: foco da pergunta. */
+  selection?: string;
 }
 
 export interface AskQuestionResponse {

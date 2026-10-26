@@ -80,6 +80,7 @@ export class ChatController {
       offset: body.offset,
       contextStart: body.contextStart,
       contextEnd: body.contextEnd,
+      selection: body.selection,
     });
   }
 }

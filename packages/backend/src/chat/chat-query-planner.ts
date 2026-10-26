@@ -16,6 +16,7 @@ const PLANNER_TEMPERATURE = 0.2;
 const MAX_QUERIES = 3;
 const MAX_PLANNED_CHAPTERS = 2;
 const CHAPTER_SUMMARY_PREVIEW_CHARS = 280;
+const SELECTION_PREVIEW_CHARS = 600;
 
 const chatPlanSchema = z.object({
   queries: z
@@ -43,6 +44,8 @@ export interface PlannerInput {
   scope: 'up-to-current' | 'whole-book';
   /** Capítulo em que o leitor está (limite do escopo "até aqui"). */
   position: number;
+  /** Trecho selecionado: a pergunta é sobre ele. */
+  selection?: string;
 }
 
 /**
@@ -96,6 +99,11 @@ export class ChatQueryPlanner {
       'Para perguntas sobre o livro inteiro (enredo, final, temas, personagens), escolha os capítulos que melhor cobrem o arco — inclusive o último capítulo narrativo quando a pergunta for sobre o desfecho.',
       'Não se preocupe com spoilers: o leitor escolheu consultar o livro todo.',
     ];
+    if (input.selection !== undefined) {
+      lines.push(
+        'A pergunta é sobre o trecho selecionado pelo leitor: use os nomes e termos dele nas buscas.',
+      );
+    }
     if (input.scope === 'up-to-current') {
       lines.push(
         `O leitor está no capítulo ${input.position}: escolha apenas capítulos anteriores a ele.`,
@@ -118,21 +126,28 @@ export class ChatQueryPlanner {
     const chaptersBlock = hasChapters
       ? chapterLines.join('\n')
       : '(não há resumos disponíveis; devolva chapters vazio)';
-
-    return [
+    const lines = [
       'Capítulos disponíveis:',
       chaptersBlock,
       '',
-      `Pergunta do leitor: ${input.question}`,
-    ].join('\n');
+    ];
+    if (input.selection !== undefined) {
+      lines.push(
+        `Trecho selecionado pelo leitor: "${this.preview(input.selection, SELECTION_PREVIEW_CHARS)}"`,
+        '',
+      );
+    }
+    lines.push(`Pergunta do leitor: ${input.question}`);
+
+    return lines.join('\n');
   }
 
-  private preview(summary: string): string {
+  private preview(summary: string, maxChars = CHAPTER_SUMMARY_PREVIEW_CHARS): string {
     const singleLine = summary.replace(/\s+/g, ' ').trim();
-    const isLong = singleLine.length > CHAPTER_SUMMARY_PREVIEW_CHARS;
+    const isLong = singleLine.length > maxChars;
     if (!isLong) return singleLine;
 
-    return `${singleLine.slice(0, CHAPTER_SUMMARY_PREVIEW_CHARS).trimEnd()}…`;
+    return `${singleLine.slice(0, maxChars).trimEnd()}…`;
   }
 
   private sanitizePlan(plan: ChatPlan, input: PlannerInput): ChatPlan {

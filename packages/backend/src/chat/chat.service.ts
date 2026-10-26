@@ -9,6 +9,7 @@ import { EbookRepository } from '../catalog/ebook.repository';
 import { AI_CLIENT, type AiClient } from '../core/ai/ai.provider';
 import { Book, BookStatus, ChatRole } from '../generated/prisma/client';
 import { EmbeddingService } from '../indexing/embedding.service';
+import { EmbeddingUnavailableError } from '../indexing/indexing.errors';
 import {
   ChatPromptBuilder,
   MAX_SEARCH_EXCERPTS,
@@ -130,6 +131,7 @@ export class ChatService {
       offset: number;
       contextStart?: number;
       contextEnd?: number;
+      selection?: string;
     },
   ): Promise<AskQuestionResponse> {
     const book = await this.requireReadyBook(bookId);
@@ -186,6 +188,7 @@ export class ChatService {
       offset: number;
       contextStart?: number;
       contextEnd?: number;
+      selection?: string;
     },
   ): Promise<ChatExcerpt[]> {
     const range = resolveReadingRange(input);
@@ -207,6 +210,7 @@ export class ChatService {
       chapters: allowedSummaries,
       scope: input.scope,
       position: input.position,
+      selection: input.selection,
     });
     const searchMatches = await this.searchMatches(
       book.id,
@@ -220,6 +224,15 @@ export class ChatService {
     );
     const excerpts: Array<Omit<ChatExcerpt, 'index'>> = [];
 
+    if (input.selection !== undefined) {
+      excerpts.push({
+        kind: 'selection',
+        chapterPosition: input.position,
+        chapterTitle: readingExcerpt?.chapterTitle ?? null,
+        offset: input.offset,
+        text: input.selection,
+      });
+    }
     if (readingExcerpt !== null) excerpts.push(readingExcerpt);
     excerpts.push(...summaryExcerpts);
     excerpts.push(
@@ -239,7 +252,7 @@ export class ChatService {
     }
 
     this.logger.log(
-      `Contexto montado: buscas=${plan.queries.length} [${plan.queries.join(' | ')}], resumos=${summaryExcerpts.length} [${plan.chapters.join(', ')}], trechos=${searchMatches.length}.`,
+      `Contexto montado: buscas=${plan.queries.length} [${plan.queries.join(' | ')}], resumos=${summaryExcerpts.length} [${plan.chapters.join(', ')}], trechos=${searchMatches.length}, selecao=${input.selection === undefined ? 'nao' : 'sim'}.`,
     );
 
     return excerpts.map((excerpt, index) => ({ ...excerpt, index: index + 1 }));
@@ -253,23 +266,37 @@ export class ChatService {
     range: ReadingRange,
   ): Promise<ChunkMatch[]> {
     const terms = queries.slice(0, MAX_QUERIES);
-    const vectors = await Promise.all(
-      terms.map((term) => this.embeddingService.embedQuery(term)),
-    );
-    const resultSets = await Promise.all(
-      vectors.map((vector) =>
-        this.chunkSearchRepository.search(bookId, vector, CANDIDATE_LIMIT),
-      ),
-    );
 
-    return mergeMatches(resultSets)
-      .filter((match) =>
-        isInsideScope(match, input.scope, input.position, input.offset),
-      )
-      .filter(
-        (match) => !isInsideReadingRange(match, input.position, range),
-      )
-      .slice(0, MAX_SEARCH_EXCERPTS);
+    try {
+      const vectors = await Promise.all(
+        terms.map((term) => this.embeddingService.embedQuery(term)),
+      );
+      const resultSets = await Promise.all(
+        vectors.map((vector) =>
+          this.chunkSearchRepository.search(bookId, vector, CANDIDATE_LIMIT),
+        ),
+      );
+
+      return mergeMatches(resultSets)
+        .filter((match) =>
+          isInsideScope(match, input.scope, input.position, input.offset),
+        )
+        .filter(
+          (match) => !isInsideReadingRange(match, input.position, range),
+        )
+        .slice(0, MAX_SEARCH_EXCERPTS);
+    } catch (error) {
+      const isEmbeddingFailure = error instanceof EmbeddingUnavailableError;
+      if (!isEmbeddingFailure) throw error;
+
+      this.logger.error(
+        `Busca indisponível (embedding): ${error.message}`,
+        error.stack,
+      );
+      throw new ChatUnavailableError(
+        'Não foi possível consultar o provedor de IA agora. Tente de novo.',
+      );
+    }
   }
 
   private async findReadingExcerpt(
@@ -307,6 +334,7 @@ export class ChatService {
     const systemPrompt = ChatPromptBuilder.buildSystemPrompt(
       book,
       excerpts.some((excerpt) => excerpt.kind === 'reading'),
+      excerpts.some((excerpt) => excerpt.kind === 'selection'),
     );
     const userPrompt = ChatPromptBuilder.buildUserPrompt(question, excerpts);
     const historyMessages = history.map((message) =>

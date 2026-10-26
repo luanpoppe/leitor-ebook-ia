@@ -3,7 +3,7 @@ export interface ChatBookMetadata {
   author: string | null;
 }
 
-export type ChatExcerptKind = "reading" | "summary" | "search";
+export type ChatExcerptKind = "reading" | "summary" | "search" | "selection";
 
 export interface ChatExcerpt {
   /** Número usado pelo modelo para citar (`[1]`, `[2]`...). */
@@ -30,6 +30,9 @@ export const MAX_EXCERPT_CHARS = 1_200;
 export const MAX_READING_CONTEXT_CHARS = 8_000;
 // Resumo já nasce curto; o teto só protege contra um resumo fora do padrão.
 export const MAX_SUMMARY_EXCERPT_CHARS = 1_400;
+// Seleção do leitor: é o foco da pergunta, então vai inteira (até o teto que o
+// schema aceita).
+export const MAX_SELECTION_EXCERPT_CHARS = 4_000;
 
 /**
  * Monta o prompt do chat. O modelo recebe metadados do livro e trechos
@@ -40,6 +43,7 @@ export class ChatPromptBuilder {
   static buildSystemPrompt(
     book: ChatBookMetadata,
     hasReadingContext: boolean,
+    hasSelection = false,
   ): string {
     const authorship = book.author ? `, de ${book.author}` : '';
     const lines = [
@@ -52,7 +56,12 @@ export class ChatPromptBuilder {
     ];
     if (hasReadingContext) {
       lines.push(
-        'O trecho [1] é a leitura atual do leitor (a página atual e as duas anteriores). Quando a pergunta for sobre o que está na tela, responda com base nele e cite [1].',
+        'O trecho identificado como "Leitura atual" é a página atual e as duas anteriores do leitor. Quando a pergunta for sobre o que está na tela, responda com base nele e cite o número correspondente.',
+      );
+    }
+    if (hasSelection) {
+      lines.push(
+        'O trecho identificado como "Trecho selecionado pelo leitor" é o foco da pergunta: responda especificamente sobre ele e use o restante só como apoio.',
       );
     }
 
@@ -109,6 +118,12 @@ export class ChatPromptBuilder {
       return {
         label: `Resumo de ${chapterLabel}`,
         maxChars: MAX_SUMMARY_EXCERPT_CHARS,
+      };
+    }
+    if (excerpt.kind === 'selection') {
+      return {
+        label: `Trecho selecionado pelo leitor — ${chapterLabel}`,
+        maxChars: MAX_SELECTION_EXCERPT_CHARS,
       };
     }
 

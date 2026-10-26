@@ -24,6 +24,8 @@ import { ReaderTocDrawer } from "./reader-toc-drawer";
 import { ReaderChatDrawer } from "../chat/reader-chat-drawer";
 import { ReaderCitationPreview } from "../chat/reader-citation-preview";
 import type { ChatCitation } from "../chat/types";
+import { useTextSelection } from "../use-text-selection";
+import { ReaderSelectionAction } from "./reader-selection-action";
 import { ReaderToolbar } from "./reader-toolbar";
 import styles from "./reader-screen.module.css";
 import messageStyles from "./reader-message.module.css";
@@ -110,10 +112,19 @@ export function ReaderScreen({
   );
   // Onde a leitura estava quando a citação foi aberta, para o "voltar".
   const [returnPoint, setReturnPoint] = useState<ReaderPoint | null>(null);
+  // Trecho selecionado que o chat vai usar como foco da pergunta.
+  const [chatSelection, setChatSelection] = useState<string | null>(null);
 
   const scrollRef = useRef<ReaderScrollViewHandle>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
   const previewOriginRef = useRef<ReaderPoint | null>(null);
   const isScrollMode = mode === "scroll";
+
+  // Só observa seleção com a leitura limpa (sem sumário, chat ou prévia por cima).
+  const textSelection = useTextSelection(
+    mainRef,
+    !isChatOpen && citationPreview === null && !isTocOpen
+  );
 
   // A view mede a área e publica a régua; uma identidade nova a cada render
   // dispararia repaginação em loop.
@@ -293,10 +304,12 @@ export function ReaderScreen({
 
   const handleToggleChat = useCallback(() => {
     setIsTocOpen(false);
+    setChatSelection(null);
     setIsChatOpen((isOpen) => !isOpen);
   }, []);
 
   const handleCloseChat = useCallback(() => {
+    setChatSelection(null);
     setIsChatOpen(false);
   }, []);
 
@@ -338,6 +351,20 @@ export function ReaderScreen({
     setCitationPreview(null);
   }, []);
 
+  // Seleção virou pergunta: abre o chat com o trecho fixado.
+  const handleAskSelection = useCallback(() => {
+    if (textSelection === null) return;
+
+    setChatSelection(textSelection.text);
+    setIsTocOpen(false);
+    setIsChatOpen(true);
+    window.getSelection()?.removeAllRanges();
+  }, [textSelection]);
+
+  const handleClearChatSelection = useCallback(() => {
+    setChatSelection(null);
+  }, []);
+
   const handleGoToReadingFromPreview = useCallback(
     (citation: ChatCitation) => {
       const origin = previewOriginRef.current;
@@ -349,6 +376,7 @@ export function ReaderScreen({
       });
       setCitationPreview(null);
       setIsChatOpen(false);
+      setChatSelection(null);
     },
     [navigateToPoint]
   );
@@ -684,7 +712,7 @@ export function ReaderScreen({
         onToggleChat={handleToggleChat}
       />
 
-      <main className={styles.main}>
+      <main ref={mainRef} className={styles.main}>
         {renderBody()}
 
         {isChunkErrorVisible && (
@@ -715,6 +743,8 @@ export function ReaderScreen({
           offset={isScrollMode ? visiblePoint.offset : page?.startOffset ?? 0}
           contextStart={chatContext.start}
           contextEnd={chatContext.end}
+          selection={chatSelection}
+          onClearSelection={handleClearChatSelection}
           isSuspended={citationPreview !== null}
           onClose={handleCloseChat}
           onCitationSelect={handleCitationSelect}
@@ -729,6 +759,13 @@ export function ReaderScreen({
           theme={theme}
           onClose={handleCloseCitationPreview}
           onGoToReading={handleGoToReadingFromPreview}
+        />
+      )}
+
+      {textSelection !== null && !isChatOpen && (
+        <ReaderSelectionAction
+          selection={textSelection}
+          onAsk={handleAskSelection}
         />
       )}
 

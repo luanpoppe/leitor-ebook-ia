@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ChatMessageText, describeCitation } from "./chat-message-text";
 import type { ChatCitation, ChatScope } from "./types";
@@ -15,6 +15,9 @@ interface ReaderChatDrawerProps {
   /** Faixa de texto da página atual e das duas anteriores. */
   contextStart: number;
   contextEnd: number;
+  /** Trecho selecionado no texto: foco da próxima pergunta. */
+  selection: string | null;
+  onClearSelection(): void;
   /** Um modal está por cima: o Esc é dele, não do chat. */
   isSuspended?: boolean;
   onClose(): void;
@@ -44,6 +47,8 @@ export function ReaderChatDrawer({
   offset,
   contextStart,
   contextEnd,
+  selection,
+  onClearSelection,
   isSuspended = false,
   onClose,
   onCitationSelect,
@@ -64,6 +69,16 @@ export function ReaderChatDrawer({
   const [scope, setScope] = useState<ChatScope>("up-to-current");
   const [question, setQuestion] = useState("");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Abriu a partir de uma seleção: o teclado já pode ir para a pergunta.
+  useEffect(() => {
+    if (selection === null) return;
+
+    inputRef.current?.focus();
+    // Só na montagem: reabrir conversa não deve puxar o teclado de novo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isSuspended) return;
@@ -91,9 +106,19 @@ export function ReaderChatDrawer({
         offset,
         contextStart,
         contextEnd,
+        selection: selection ?? undefined,
       });
     },
-    [contextEnd, contextStart, isSending, offset, position, scope, send]
+    [
+      contextEnd,
+      contextStart,
+      isSending,
+      offset,
+      position,
+      scope,
+      selection,
+      send,
+    ]
   );
 
   const handleSubmit = useCallback(
@@ -188,6 +213,23 @@ export function ReaderChatDrawer({
           />
         )}
 
+        {selection !== null && (
+          <div className={styles.selectionBar}>
+            <div className={styles.selectionHeader}>
+              <span className={styles.selectionLabel}>Trecho selecionado</span>
+              <button
+                type="button"
+                className={styles.selectionClear}
+                onClick={onClearSelection}
+                aria-label="Remover trecho selecionado"
+              >
+                ×
+              </button>
+            </div>
+            <p className={styles.selectionText}>{selection}</p>
+          </div>
+        )}
+
         <div className={styles.scopeBar} role="group" aria-label="Escopo da resposta">
           {SCOPE_OPTIONS.map((option) => {
             const isActive = option.value === scope;
@@ -277,10 +319,15 @@ export function ReaderChatDrawer({
 
         <form className={styles.composer} onSubmit={handleSubmit}>
           <textarea
+            ref={inputRef}
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             onKeyDown={handleComposerKeyDown}
-            placeholder="Pergunte sobre o livro…"
+            placeholder={
+              selection !== null
+                ? "Pergunte sobre o trecho…"
+                : "Pergunte sobre o livro…"
+            }
             className={styles.input}
             rows={2}
             disabled={isSending}

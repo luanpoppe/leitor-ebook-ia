@@ -137,6 +137,51 @@
   padding: 10px 16px 0;
 }
 
+.selectionBar {
+  margin: 10px 16px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--accent-track);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.selectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.selectionLabel {
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.selectionClear {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.selectionText {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
 .scopeButton {
   flex: 1;
   padding: 6px 8px;

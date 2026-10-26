@@ -18,6 +18,8 @@ export const askQuestionSchema = z.object({
   contextStart: z.coerce.number().int().min(0).optional(),
   /** Fim do texto visível. */
   contextEnd: z.coerce.number().int().min(0).optional(),
+  /** Trecho selecionado pelo leitor; a pergunta é sobre ele. */
+  selection: z.string().trim().min(1).max(4_000).optional(),
 });
 
 export class AskQuestionDto extends createZodDto(askQuestionSchema) {}
