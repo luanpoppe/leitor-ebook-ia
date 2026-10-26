@@ -64,6 +64,15 @@
   hyphens: auto;
 }
 
+.heading {
+  margin: 0 0 0.7em;
+  font-size: var(--reader-font-size, 18px);
+  font-weight: 700;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
 /* Trecho cortado no meio de um parágrafo: some a margem da fronteira para o
    texto não abrir um vão que o autor não escreveu. */
 .paragraphFlushTop {

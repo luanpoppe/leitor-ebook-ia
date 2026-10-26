@@ -3,6 +3,11 @@ import type { ExtractedChapter } from './content.types';
 
 const SHORT_LINE_MAX_LENGTH = 80;
 const DEFAULT_MIN_OCCURRENCES = 3;
+const CHAPTER_HEADING_PATTERN =
+  /^(CAPÍTULO|CAPITULO|CHAPTER|PARTE|PART)\s+(\d+|[IVXLCDM]+)\s*$/i;
+const NAMED_HEADING_PATTERN =
+  /^(PRÓLOGO|PROLOGO|EPÍLOGO|EPILOGO|AGRADECIMENTOS|NOTAS DA TRADUTORA|APÊNDICE|APENDICE)\s*$/i;
+const MAX_TITLE_LENGTH = 70;
 
 export class TextNormalizer {
   /**
@@ -60,22 +65,86 @@ export class TextNormalizer {
 
   /**
    * Normaliza os capítulos e descarta os que ficaram vazios, renumerando os
-   * restantes para manter a ordem sem buracos.
+   * restantes para manter a ordem sem buracos. Depois divide cada capítulo nos
+   * títulos "CAPÍTULO N" que ficaram como texto (EPUBs sem tag de heading).
    */
   static normalizeChapters(chapters: ExtractedChapter[]): ExtractedChapter[] {
-    const normalizedChapters = chapters
-      .map((chapter) => ({
+    const normalizedChapters = chapters.flatMap((chapter) => {
+      const normalizedText = TextNormalizer.normalizeText(chapter.text);
+      if (normalizedText.length === 0) return [];
+
+      return TextNormalizer.splitByHeadings({
         position: chapter.position,
         title: ChapterTitle.normalize(chapter.title),
-        text: TextNormalizer.normalizeText(chapter.text),
-      }))
-      .filter((chapter) => chapter.text.length > 0);
+        text: normalizedText,
+      });
+    });
 
-    return normalizedChapters.map((chapter, index) => ({
-      position: index + 1,
-      title: chapter.title,
-      text: chapter.text,
-    }));
+    return normalizedChapters
+      .filter((chapter) => chapter.text.trim().length > 0)
+      .map((chapter, index) => ({
+        position: index + 1,
+        title: ChapterTitle.normalize(chapter.title),
+        text: chapter.text,
+      }));
+  }
+
+  /**
+   * Um arquivo do EPUB pode conter vários capítulos. O título vem como um
+   * parágrafo "CAPÍTULO 63" (às vezes seguido do nome do capítulo), então o
+   * texto é cortado nesses parágrafos. O heading continua no texto para o
+   * leitor poder destacá-lo.
+   */
+  static splitByHeadings(chapter: ExtractedChapter): ExtractedChapter[] {
+    const paragraphs = chapter.text.split('\n\n');
+    const segments: ExtractedChapter[] = [];
+    let currentTitle = chapter.title;
+    let currentParagraphs: string[] = [];
+
+    const flush = (): void => {
+      const hasContent = currentParagraphs.some(
+        (paragraph) => paragraph.trim().length > 0,
+      );
+      if (!hasContent) return;
+
+      segments.push({
+        position: segments.length + 1,
+        title: currentTitle,
+        text: currentParagraphs.join('\n\n'),
+      });
+    };
+
+    for (const [index, paragraph] of paragraphs.entries()) {
+      const headingText = paragraph.trim();
+      if (!TextNormalizer.isHeadingParagraph(headingText)) {
+        currentParagraphs.push(paragraph);
+        continue;
+      }
+
+      flush();
+
+      const nextParagraph = paragraphs[index + 1]?.trim() ?? '';
+      const isSubtitle =
+        nextParagraph.length > 0 &&
+        nextParagraph.length <= MAX_TITLE_LENGTH &&
+        !/[.!?]$/.test(nextParagraph) &&
+        !TextNormalizer.isHeadingParagraph(nextParagraph);
+      currentTitle = isSubtitle
+        ? `${headingText} — ${nextParagraph}`
+        : headingText;
+      currentParagraphs = [paragraph];
+    }
+
+    flush();
+
+    return segments;
+  }
+
+  /** Título de capítulo que ficou como parágrafo no texto do EPUB. */
+  static isHeadingParagraph(text: string): boolean {
+    return (
+      CHAPTER_HEADING_PATTERN.test(text) || NAMED_HEADING_PATTERN.test(text)
+    );
   }
 
   /**

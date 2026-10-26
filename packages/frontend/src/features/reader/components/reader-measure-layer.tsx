@@ -2,6 +2,7 @@
 
 import { useCallback, useImperativeHandle, useRef } from "react";
 import type { CSSProperties, JSX, Ref } from "react";
+import { ReaderHeading } from "../heading";
 import type { ReaderAlignment } from "../reader-preferences";
 import styles from "./reader-measure-layer.module.css";
 
@@ -112,7 +113,9 @@ function renderParagraphs(block: HTMLElement, text: string): void {
     if (isEmpty) continue;
 
     const element = document.createElement("p");
-    element.className = styles.paragraph;
+    element.className = ReaderHeading.isHeading(paragraph)
+      ? styles.heading
+      : styles.paragraph;
     element.textContent = paragraph;
     block.append(element);
   }

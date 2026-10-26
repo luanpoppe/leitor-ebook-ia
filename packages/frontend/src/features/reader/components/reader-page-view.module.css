@@ -70,6 +70,16 @@
   hyphens: auto;
 }
 
+/* Título de capítulo que veio como parágrafo do EPUB. */
+.heading {
+  margin: 0 0 0.7em;
+  font-size: var(--reader-font-size, 18px);
+  font-weight: 700;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
 .frame[data-theme="sepia"] {
   background: #f4ecd8;
   color: #3f3428;

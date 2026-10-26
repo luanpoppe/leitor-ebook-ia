@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import type { CSSProperties, JSX } from "react";
+import { ReaderHeading } from "../heading";
 import type { ReaderAlignment, ReaderTheme } from "../reader-preferences";
 import type { ScrollErrorDirection, ScrollSegment } from "../use-reader-scroll";
 import styles from "./reader-scroll-view.module.css";
@@ -377,6 +378,7 @@ export const ReaderScrollView = forwardRef<
           <p
             key={paragraph.offset}
             className={resolveParagraphClassName(
+              paragraph.text,
               paragraphIndex,
               segment.paragraphs.length,
               startsInsideParagraph,
@@ -532,11 +534,14 @@ function findSegmentByKey(
 }
 
 function resolveParagraphClassName(
+  text: string,
   index: number,
   paragraphCount: number,
   startsInsideParagraph: boolean,
   endsInsideParagraph: boolean
 ): string {
+  if (ReaderHeading.isHeading(text)) return styles.heading;
+
   const classNames = [styles.paragraph];
   if (index === 0 && startsInsideParagraph) {
     classNames.push(styles.paragraphFlushTop);

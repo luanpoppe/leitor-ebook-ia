@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, JSX } from "react";
 import type { ReaderTheme } from "../reader-preferences";
 import type { ReaderAlignment } from "../reader-preferences";
+import { ReaderHeading } from "../heading";
 import type { ReaderPageMetrics } from "../use-reader-page";
 import type { TextPage } from "../window/page-paginator";
 import {
@@ -139,7 +140,14 @@ export function ReaderPageView({
           data-direction={direction ?? "none"}
         >
           {paragraphs.map((paragraph, index) => (
-            <p key={index} className={styles.paragraph}>
+            <p
+              key={index}
+              className={
+                ReaderHeading.isHeading(paragraph)
+                  ? styles.heading
+                  : styles.paragraph
+              }
+            >
               {paragraph}
             </p>
           ))}

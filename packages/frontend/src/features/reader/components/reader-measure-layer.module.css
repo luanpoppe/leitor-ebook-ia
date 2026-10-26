@@ -33,6 +33,14 @@
   line-height: inherit;
 }
 
+/* Precisa casar com o .heading da página (mesma fonte e margem). */
+.heading {
+  margin: 0 0 0.7em;
+  font-size: inherit;
+  font-weight: 700;
+  line-height: inherit;
+}
+
 /* Espelha o alinhamento da pagina para a regua medir o mesmo texto. */
 .block[data-alignment="justify"] .paragraph {
   text-align: justify;
