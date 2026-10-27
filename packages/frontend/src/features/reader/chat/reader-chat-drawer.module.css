@@ -469,6 +469,61 @@
   border-radius: 8px;
 }
 
+/* Trechos do livro que entraram no prompt da imagem. */
+.imageSources {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.imageSourcesLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.imageSourcesList {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.imageSourcesList li {
+  font-size: 11px;
+}
+
+.imageSourceButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.imageSourceButton:hover {
+  text-decoration: underline;
+}
+
+.imageSourceSnippet {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 /* Galeria por cima do chat. */
 .galleryPanel {
   position: absolute;

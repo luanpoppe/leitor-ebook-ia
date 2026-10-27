@@ -418,12 +418,12 @@ export class ChatService {
     plan: ChatPlan,
   ): Promise<AskQuestionResponse> {
     const subject = plan.imageSubject.trim() || input.question;
-    const context = await this.findImageContext(
+    const { blocks, citations } = await this.findImageContext(
       book.id,
       subject,
       plan.queries,
     );
-    const imagePrompt = await this.buildImagePrompt(book, subject, context);
+    const imagePrompt = await this.buildImagePrompt(book, subject, blocks);
     this.logger.log(
       `Prompt de imagem (${subject}): ${imagePrompt.slice(0, 400)}`,
     );
@@ -433,14 +433,14 @@ export class ChatService {
       prompt: imagePrompt,
     });
 
-    const answer = `Aqui está a imagem de ${subject}, criada com base em ${context.length} trecho(s) do livro.`;
+    const answer = `Aqui está a imagem de ${subject}, criada com base em ${blocks.length} trecho(s) do livro.`;
     const title = conversation.title ?? buildTitle(input.question);
     const exchange = await this.conversationRepository.saveExchange({
       conversationId: conversation.id,
       title: conversation.title === null ? title : null,
       question: input.question,
       answer,
-      citations: [],
+      citations,
       selection: input.selection ?? null,
       imageId: image.id,
     });
@@ -463,7 +463,7 @@ export class ChatService {
     bookId: string,
     subject: string,
     queries: string[],
-  ): Promise<string[]> {
+  ): Promise<{ blocks: string[]; citations: ChatCitation[] }> {
     const terms = [subject, ...queries].slice(0, MAX_QUERIES);
     const vectors = await Promise.all(
       terms.map((term) => this.embeddingService.embedQuery(term)),
@@ -483,19 +483,34 @@ export class ChatService {
       MAX_IMAGE_SEARCH_RESULTS,
     );
     const blocks: string[] = [];
+    const citations: ChatCitation[] = [];
 
     for (const match of semantic) {
       blocks.push(
         `${describeChapter(match.chapterPosition, match.chapterTitle)}: ${match.text}`,
       );
+      citations.push({
+        index: citations.length + 1,
+        chapterPosition: match.chapterPosition,
+        chapterTitle: match.chapterTitle,
+        offset: match.charOffset,
+        snippet: truncateSnippet(match.text),
+      });
     }
     for (const item of lexical.items) {
       blocks.push(
         `${describeChapter(item.chapterPosition, item.chapterTitle)}: ${item.snippet}`,
       );
+      citations.push({
+        index: citations.length + 1,
+        chapterPosition: item.chapterPosition,
+        chapterTitle: item.chapterTitle,
+        offset: item.offset,
+        snippet: truncateSnippet(item.snippet),
+      });
     }
 
-    return blocks;
+    return { blocks, citations };
   }
 
   private async buildImagePrompt(
@@ -771,6 +786,13 @@ function describeChapter(
   if (title === null || title.length === 0) return `Capítulo ${position}`;
 
   return `Capítulo ${position} — ${title}`;
+}
+
+function truncateSnippet(text: string): string {
+  const normalText = text.replace(/\s+/g, ' ').trim();
+  if (normalText.length <= 280) return normalText;
+
+  return `${normalText.slice(0, 280).trimEnd()}…`;
 }
 
 function toCitations(value: unknown): ChatCitation[] {

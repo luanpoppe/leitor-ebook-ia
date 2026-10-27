@@ -26,6 +26,8 @@ export interface ChatCitation {
   chapterPosition: number;
   chapterTitle: string | null;
   offset: number;
+  /** Trecho usado como base (preenchido nas imagens geradas). */
+  snippet?: string;
 }
 
 export const MAX_SEARCH_EXCERPTS = 6;

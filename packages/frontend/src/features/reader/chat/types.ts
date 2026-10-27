@@ -9,6 +9,8 @@ export interface ChatCitation {
   chapterTitle: string | null;
   /** Offset do trecho dentro do capítulo, para o leitor pular até ele. */
   offset: number;
+  /** Trecho usado como base (nas imagens geradas). */
+  snippet?: string;
 }
 
 export interface ChatMessage {

@@ -382,12 +382,13 @@ export function ReaderChatDrawer({
                       citations={message.citations}
                       onCitationSelect={onCitationSelect}
                     />
-                    {message.citations.length > 0 && (
-                      <p className={styles.sources}>
-                        Fontes:{" "}
-                        {resolveSourceLabels(message.citations).join(" · ")}
-                      </p>
-                    )}
+                    {message.citations.length > 0 &&
+                      message.imageUrl === null && (
+                        <p className={styles.sources}>
+                          Fontes:{" "}
+                          {resolveSourceLabels(message.citations).join(" · ")}
+                        </p>
+                      )}
                     {message.imageUrl !== null && (
                       <img
                         src={`${env.NEXT_PUBLIC_API_URL}${message.imageUrl}`}
@@ -396,6 +397,32 @@ export function ReaderChatDrawer({
                         loading="lazy"
                       />
                     )}
+                    {message.imageUrl !== null &&
+                      message.citations.length > 0 && (
+                        <div className={styles.imageSources}>
+                          <span className={styles.imageSourcesLabel}>
+                            Trechos usados na imagem
+                          </span>
+                          <ol className={styles.imageSourcesList}>
+                            {message.citations.map((citation) => (
+                              <li key={citation.index}>
+                                <button
+                                  type="button"
+                                  className={styles.imageSourceButton}
+                                  onClick={() => onCitationSelect(citation)}
+                                >
+                                  {describeCitation(citation)}
+                                </button>
+                                {citation.snippet !== undefined && (
+                                  <p className={styles.imageSourceSnippet}>
+                                    {citation.snippet}
+                                  </p>
+                                )}
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
                   </>
                 )}
               </div>
