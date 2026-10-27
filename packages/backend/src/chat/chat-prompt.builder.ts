@@ -101,6 +101,9 @@ export class ChatPromptBuilder {
       chapterPosition: excerpt.chapterPosition,
       chapterTitle: excerpt.chapterTitle,
       offset: excerpt.offset,
+      // O modelo pode usar qualquer frase do trecho; mostrar o trecho inteiro
+      // na prévia evita a impressão de que a citação abriu no lugar errado.
+      snippet: ChatPromptBuilder.truncate(excerpt.text, 1_200),
     }));
   }
 

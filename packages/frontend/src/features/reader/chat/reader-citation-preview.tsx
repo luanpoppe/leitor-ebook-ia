@@ -129,6 +129,13 @@ export function ReaderCitationPreview({
           </button>
         </header>
 
+        {citation.snippet !== undefined && (
+          <div className={styles.snippet}>
+            <span className={styles.snippetLabel}>Trecho enviado à IA</span>
+            <p className={styles.snippetText}>{citation.snippet}</p>
+          </div>
+        )}
+
         <div className={styles.pageArea}>
           <ReaderPageView
             page={page}

@@ -20,9 +20,10 @@ interface ChunkMatchRow {
   similarity: number | string;
 }
 
-// Prefixo do chunk usado para localizar o trecho dentro do capítulo. O chunker
-// repete ~150 caracteres do trecho anterior, então o offset achado aponta para
-// o começo da passagem, não para o primeiro caractere novo.
+// Localização do trecho dentro do capítulo. O chunker repete ~150 caracteres
+// do trecho anterior, então a sonda começa depois do overlap: o offset assim
+// aponta para o começo do conteúdo novo, não para a repetição.
+const OFFSET_PROBE_INDEX = 160;
 const OFFSET_PROBE_LENGTH = 120;
 
 /**
@@ -46,7 +47,19 @@ export class ChunkSearchRepository {
         ch."position" AS "chapter_position",
         ch."title" AS "chapter_title",
         c."position" AS "chunk_position",
-        strpos(ch."text", left(c."text", ${OFFSET_PROBE_LENGTH})) AS "char_offset",
+        CASE
+          WHEN strpos(ch."text", substr(c."text", ${OFFSET_PROBE_INDEX + 1}, ${OFFSET_PROBE_LENGTH})) > 0
+            THEN GREATEST(
+              0,
+              strpos(
+                ch."text",
+                substr(c."text", ${OFFSET_PROBE_INDEX + 1}, ${OFFSET_PROBE_LENGTH})
+              ) - 1 - ${OFFSET_PROBE_INDEX}
+            )
+          WHEN strpos(ch."text", left(c."text", ${OFFSET_PROBE_LENGTH})) > 0
+            THEN strpos(ch."text", left(c."text", ${OFFSET_PROBE_LENGTH})) - 1
+          ELSE 0
+        END AS "char_offset",
         (1 - (c."embedding" <=> ${vectorLiteral}::vector)) AS "similarity"
       FROM "chunks" c
       INNER JOIN "chapters" ch ON ch."id" = c."chapter_id"
@@ -61,7 +74,9 @@ export class ChunkSearchRepository {
       chapterPosition: row.chapter_position,
       chapterTitle: row.chapter_title,
       chunkPosition: row.chunk_position,
-      charOffset: row.char_offset > 0 ? row.char_offset - 1 : 0,
+      // A sonda em 161 aponta para o conteúdo novo do chunk (depois do overlap),
+      // então o offset já é o começo do trecho no capítulo, em base 0.
+      charOffset: Math.max(0, row.char_offset),
       similarity: Number(row.similarity),
     }));
   }
