@@ -21,6 +21,7 @@ const MIN_SELECTION_LENGTH = 2;
 // Teto do trecho que vai para o prompt; o backend também limita.
 const MAX_SELECTION_LENGTH = 4_000;
 const MAX_BEFORE_LENGTH = 800;
+const SELECTION_ACTION_SELECTOR = "[data-reader-selection-action]";
 
 /**
  * Seleção de texto dentro da área de leitura. A ação aparece no pointerup (e
@@ -76,20 +77,38 @@ export function useTextSelection(
     });
   }, [containerRef]);
 
+  /**
+   * Tocar no próprio botão de ação não pode ser lido como "sumiu a seleção":
+   * o navegador pode colapsar a seleção no toque e o botão desapareceria antes
+   * do clique virar pergunta.
+   */
+  const handlePointerUp = useCallback(
+    (event: PointerEvent) => {
+      const target = event.target;
+      const isActionTap =
+        target instanceof Element &&
+        target.closest(SELECTION_ACTION_SELECTOR) !== null;
+      if (isActionTap) return;
+
+      readSelection();
+    },
+    [readSelection]
+  );
+
   useEffect(() => {
     if (!enabled) {
       setSelection(null);
       return;
     }
 
-    document.addEventListener("pointerup", readSelection);
+    document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("keyup", readSelection);
 
     return () => {
-      document.removeEventListener("pointerup", readSelection);
+      document.removeEventListener("pointerup", handlePointerUp);
       document.removeEventListener("keyup", readSelection);
     };
-  }, [enabled, readSelection]);
+  }, [enabled, handlePointerUp, readSelection]);
 
   return selection;
 }
