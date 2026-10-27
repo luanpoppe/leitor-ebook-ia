@@ -112,6 +112,20 @@ export function useChat(bookId: string, enabled: boolean): UseChatResult {
       setError(null);
       lastInputRef.current = input;
 
+      // Mostra a pergunta na hora: a resposta pode demorar e o campo já foi
+      // limpo, então sem isso o chat parece vazio enquanto "Pensando…".
+      const optimisticId = `optimistic-${Date.now()}`;
+      const optimisticMessage: ChatMessage = {
+        id: optimisticId,
+        role: "USER",
+        content: input.question,
+        selection: input.selection ?? null,
+        imageUrl: null,
+        citations: [],
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((current) => [...current, optimisticMessage]);
+
       try {
         if (conversationId === null) {
           const created = await createConversation(bookId);
@@ -120,7 +134,10 @@ export function useChat(bookId: string, enabled: boolean): UseChatResult {
         }
 
         const response = await askQuestion(bookId, conversationId, input);
-        setMessages((current) => [...current, ...response.messages]);
+        setMessages((current) => [
+          ...current.filter((message) => message.id !== optimisticId),
+          ...response.messages,
+        ]);
         await refreshConversations();
       } catch (cause) {
         setError(resolveErrorMessage(cause));
@@ -172,6 +189,11 @@ export function useChat(bookId: string, enabled: boolean): UseChatResult {
       return;
     }
 
+    // A pergunta anterior ficou na tela com o erro; some antes de reenviar para
+    // não duplicar o balão otimista.
+    setMessages((current) =>
+      current.filter((message) => !message.id.startsWith("optimistic-"))
+    );
     await send(lastInput);
   }, [initialize, send]);
 
