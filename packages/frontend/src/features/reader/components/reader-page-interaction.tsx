@@ -42,6 +42,8 @@ export function ReaderPageInteraction({
     (event: ReactPointerEvent<HTMLDivElement>) => {
       // Só o botão principal inicia gesto; o direito abre menu do navegador.
       if (event.button !== 0) return;
+      // Com texto selecionado, arrastar é ajuste da seleção, não virada.
+      if (hasSelectedText()) return;
 
       pointerStartRef.current = {
         x: event.clientX,
@@ -96,6 +98,12 @@ export function ReaderPageInteraction({
 
       const swipeDirection = PageGesture.resolveSwipe(dx, dy);
       if (swipeDirection !== null) {
+        // No toque, arrastar é seleção de texto (o navegador desenha os
+        // seletores); a virada no celular fica nas zonas de toque. No mouse, o
+        // arrasto continua virando página.
+        const isTouch = event.pointerType === "touch";
+        if (isTouch) return;
+
         runIntent(swipeDirection);
         return;
       }
