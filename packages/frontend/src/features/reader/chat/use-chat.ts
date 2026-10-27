@@ -93,10 +93,7 @@ export function useChat(bookId: string, enabled: boolean): UseChatResult {
   }, [bookId, loadConversation]);
 
   useEffect(() => {
-    if (!enabled) {
-      isInitializedRef.current = false;
-      return;
-    }
+    if (!enabled) return;
     if (isInitializedRef.current) return;
 
     isInitializedRef.current = true;

@@ -810,10 +810,10 @@ export function ReaderScreen({
         />
       )}
 
-      {isChatOpen && (
-        <ReaderChatDrawer
-          bookId={bookId}
-          position={
+      <ReaderChatDrawer
+        bookId={bookId}
+        isOpen={isChatOpen}
+        position={
             isScrollMode
               ? visiblePoint.position
               : toolbarPosition ?? FIRST_CHAPTER_POSITION
@@ -827,7 +827,6 @@ export function ReaderScreen({
           onClose={handleCloseChat}
           onCitationSelect={handleCitationSelect}
         />
-      )}
 
       {isSearchOpen && (
         <ReaderSearchDrawer

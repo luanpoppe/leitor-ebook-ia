@@ -15,6 +15,7 @@ import styles from "./reader-chat-drawer.module.css";
 
 interface ReaderChatDrawerProps {
   bookId: string;
+  isOpen: boolean;
   /** Capítulo e offset do topo visível: base do escopo "até aqui". */
   position: number;
   offset: number;
@@ -49,6 +50,7 @@ const SCOPE_OPTIONS: Array<{
 
 export function ReaderChatDrawer({
   bookId,
+  isOpen,
   position,
   offset,
   contextStart,
@@ -58,7 +60,7 @@ export function ReaderChatDrawer({
   isSuspended = false,
   onClose,
   onCitationSelect,
-}: ReaderChatDrawerProps): JSX.Element {
+}: ReaderChatDrawerProps): JSX.Element | null {
   const {
     conversations,
     messages,
@@ -70,7 +72,7 @@ export function ReaderChatDrawer({
     openConversation,
     startNewConversation,
     retry,
-  } = useChat(bookId, true);
+  } = useChat(bookId, isOpen);
 
   const [scope, setScope] = useState<ChatScope>("up-to-current");
   const [question, setQuestion] = useState("");
@@ -84,18 +86,31 @@ export function ReaderChatDrawer({
     prompt: string;
   } | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   // Abriu a partir de uma seleção: o teclado já pode ir para a pergunta.
   useEffect(() => {
-    if (selection === null) return;
+    if (!isOpen || selection === null) return;
 
     inputRef.current?.focus();
-    // Só na montagem: reabrir conversa não deve puxar o teclado de novo.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isOpen, selection]);
+
+  // Ao abrir e a cada mensagem nova, acompanha a conversa no fim.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const frame = requestAnimationFrame(() => {
+      const container = messagesRef.current;
+      if (container === null) return;
+
+      container.scrollTop = container.scrollHeight;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, isSending, messages]);
 
   useEffect(() => {
-    if (isSuspended) return;
+    if (!isOpen || isSuspended) return;
 
     const handleEscape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
@@ -105,7 +120,7 @@ export function ReaderChatDrawer({
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [isSuspended, onClose]);
+  }, [isOpen, isSuspended, onClose]);
 
   const submitQuestion = useCallback(
     async (rawQuestion: string) => {
@@ -186,6 +201,10 @@ export function ReaderChatDrawer({
   }, [bookId]);
 
   const activeScope = SCOPE_OPTIONS.find((option) => option.value === scope);
+
+  // Fica montado mesmo fechado: um envio em andamento e a lista não podem ser
+  // perdidos ao fechar o painel. Só a interface some.
+  if (!isOpen) return null;
 
   return (
     <div className={styles.layer}>
@@ -346,7 +365,7 @@ export function ReaderChatDrawer({
         </div>
         <p className={styles.scopeHint}>{activeScope?.hint}</p>
 
-        <div className={styles.messages}>
+        <div className={styles.messages} ref={messagesRef}>
           {isLoading && (
             <p className={styles.status} aria-live="polite">
               Carregando conversa…
