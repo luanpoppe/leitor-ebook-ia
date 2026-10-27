@@ -59,7 +59,7 @@ const MAX_QUERIES = 3;
 const MAX_READ_SECTIONS = 3;
 const MAX_IMAGE_CONTEXT_CHUNKS = 6;
 const MAX_IMAGE_SEARCH_RESULTS = 3;
-const IMAGE_PROMPT_MAX_TOKENS = 800;
+const IMAGE_PROMPT_MAX_TOKENS = 2_500;
 
 type AiCallParams = Parameters<NonNullable<AiClient>['call']>[0];
 type ChatTools = NonNullable<NonNullable<AiCallParams['agent']>['tools']>;
@@ -423,17 +423,17 @@ export class ChatService {
       subject,
       plan.queries,
     );
-    const imagePrompt = await this.buildImagePrompt(book, subject, blocks);
+    const imagePlan = await this.buildImagePlan(book, subject, blocks);
     this.logger.log(
-      `Prompt de imagem (${subject}): ${imagePrompt.slice(0, 400)}`,
+      `Prompt de imagem (${subject}): ${imagePlan.prompt.slice(0, 400)}`,
     );
     const image = await this.imageService.generate({
       bookId: book.id,
       conversationId: conversation.id,
-      prompt: imagePrompt,
+      prompt: imagePlan.prompt,
     });
 
-    const answer = `Aqui está a imagem de ${subject}, criada com base em ${blocks.length} trecho(s) do livro.`;
+    const answer = `Aqui está a imagem de ${subject}.\n\n${imagePlan.explanation}`;
     const title = conversation.title ?? buildTitle(input.question);
     const exchange = await this.conversationRepository.saveExchange({
       conversationId: conversation.id,
@@ -513,11 +513,11 @@ export class ChatService {
     return { blocks, citations };
   }
 
-  private async buildImagePrompt(
+  private async buildImagePlan(
     book: Book,
     subject: string,
     context: string[],
-  ): Promise<string> {
+  ): Promise<{ prompt: string; explanation: string }> {
     if (this.client === null) throw new ChatUnavailableError();
 
     const excerpts = context.length > 0 ? context.join('\n\n') : '(sem trechos)';
@@ -525,14 +525,14 @@ export class ChatService {
       aiModel: CHAT_MODEL,
       outputSchema: z.object({
         prompt: z.string().trim().min(10).max(2_000),
+        explanation: z.string().trim().min(20).max(1_200),
       }),
       systemPrompt: [
-        'Você escreve prompts para um modelo de geração de imagem.',
-        'A partir das descrições do livro e do pedido do leitor, descreva a cena ou personagem em inglês.',
-        'Inclua aparência, roupas, ambiente, luz e clima, usando SOMENTE o que os trechos informam.',
+        'Você prepara a geração de uma imagem a partir de um livro e explica a escolha.',
+        'Devolva dois campos:',
+        '- prompt: em inglês, descrição visual detalhada (aparência, roupas, ambiente, luz, clima e estilo de ilustração de fantasia), sem texto e sem marca d\'água, usando SOMENTE o que os trechos informam.',
+        '- explanation: em português do Brasil, breve (no máximo 1.000 caracteres): comece com uma frase sobre a cena e liste de 2 a 4 itens no formato "- **elemento** — por que entrou", ligando cada escolha a um trecho e mencionando o capítulo quando ajudar. Não repita o prompt em inglês e não invente fatos.',
         'Quando faltar detalhe, complete de forma coerente com o texto, sem contradizê-lo.',
-        'Estilo: ilustração de fantasia, pintura digital, sem texto, sem marca d\'água, sem molduras.',
-        'Devolva apenas o prompt final.',
       ].join('\n'),
       messages: [
         AIMessages.human(
@@ -553,7 +553,7 @@ export class ChatService {
       aiModelsFallback: [CHAT_FALLBACK_MODEL],
     });
 
-    return response.prompt;
+    return { prompt: response.prompt, explanation: response.explanation };
   }
 
   private async requestAnswer(    book: ChatBookMetadata,
