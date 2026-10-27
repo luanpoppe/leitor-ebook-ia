@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { env } from "@/env";
+import { getApiBaseUrl } from "@/utils/http";
 import { ChatMessageText, describeCitation } from "./chat-message-text";
 import { listBookImages, type BookImage } from "./images-api";
 import type { ChatCitation, ChatScope, ChatSelection } from "./types";
@@ -287,7 +287,7 @@ export function ReaderChatDrawer({
                   }
                 >
                   <img
-                    src={`${env.NEXT_PUBLIC_API_URL}${image.url}`}
+                    src={`${getApiBaseUrl()}${image.url}`}
                     alt={image.prompt.slice(0, 90)}
                     className={styles.galleryImage}
                     loading="lazy"
@@ -411,7 +411,7 @@ export function ReaderChatDrawer({
                         }
                       >
                         <img
-                          src={`${env.NEXT_PUBLIC_API_URL}${message.imageUrl}`}
+                          src={`${getApiBaseUrl()}${message.imageUrl}`}
                           alt="Imagem gerada a partir do livro"
                           className={styles.messageImage}
                           loading="lazy"
@@ -507,7 +507,7 @@ export function ReaderChatDrawer({
           onClick={() => setSelectedImage(null)}
         >
           <img
-            src={`${env.NEXT_PUBLIC_API_URL}${selectedImage.url}`}
+            src={`${getApiBaseUrl()}${selectedImage.url}`}
             alt={selectedImage.prompt.slice(0, 120)}
             className={styles.lightboxImage}
           />
