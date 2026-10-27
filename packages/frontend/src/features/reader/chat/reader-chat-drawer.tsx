@@ -79,7 +79,10 @@ export function ReaderChatDrawer({
   const [galleryImages, setGalleryImages] = useState<BookImage[]>([]);
   const [isGalleryLoading, setIsGalleryLoading] = useState(false);
   const [galleryError, setGalleryError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<BookImage | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{
+    url: string;
+    prompt: string;
+  } | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Abriu a partir de uma seleção: o teclado já pode ir para a pergunta.
@@ -276,7 +279,12 @@ export function ReaderChatDrawer({
                   key={image.id}
                   type="button"
                   className={styles.galleryItem}
-                  onClick={() => setSelectedImage(image)}
+                  onClick={() =>
+                    setSelectedImage({
+                      url: image.url,
+                      prompt: image.prompt,
+                    })
+                  }
                 >
                   <img
                     src={`${env.NEXT_PUBLIC_API_URL}${image.url}`}
@@ -390,12 +398,25 @@ export function ReaderChatDrawer({
                         </p>
                       )}
                     {message.imageUrl !== null && (
-                      <img
-                        src={`${env.NEXT_PUBLIC_API_URL}${message.imageUrl}`}
-                        alt="Imagem gerada a partir do livro"
-                        className={styles.messageImage}
-                        loading="lazy"
-                      />
+                      <button
+                        type="button"
+                        className={styles.messageImageButton}
+                        title="Ver em tamanho cheio"
+                        aria-label="Abrir imagem em tamanho cheio"
+                        onClick={() =>
+                          setSelectedImage({
+                            url: message.imageUrl ?? "",
+                            prompt: message.content,
+                          })
+                        }
+                      >
+                        <img
+                          src={`${env.NEXT_PUBLIC_API_URL}${message.imageUrl}`}
+                          alt="Imagem gerada a partir do livro"
+                          className={styles.messageImage}
+                          loading="lazy"
+                        />
+                      </button>
                     )}
                     {message.imageUrl !== null &&
                       message.citations.length > 0 && (
