@@ -22,7 +22,11 @@ interface PointerStart {
   x: number;
   y: number;
   pointerId: number;
+  startedAt: number;
 }
+
+// Toque longo no celular é seleção de texto (ou menu do navegador), não virada.
+const LONG_PRESS_MS = 400;
 
 export function ReaderPageInteraction({
   isBlocked,
@@ -43,6 +47,7 @@ export function ReaderPageInteraction({
         x: event.clientX,
         y: event.clientY,
         pointerId: event.pointerId,
+        startedAt: Date.now(),
       };
     },
     []
@@ -81,6 +86,10 @@ export function ReaderPageInteraction({
 
       // Seleção de texto com o mouse é do usuário, não da virada (EDGE-03).
       if (hasSelectedText()) return;
+
+      // Toque longo (seleção no celular) também não vira página.
+      const pressDuration = Date.now() - pointerStart.startedAt;
+      if (pressDuration >= LONG_PRESS_MS) return;
 
       const dx = event.clientX - pointerStart.x;
       const dy = event.clientY - pointerStart.y;

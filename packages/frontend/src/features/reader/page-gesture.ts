@@ -19,7 +19,10 @@ export class PageGesture {
     return dx < 0 ? "next" : "previous";
   }
 
-  /** Toque parado resolvido pelas faixas de largura (25% / 50% / 25%). */
+  /**
+   * Toque parado resolvido pelas faixas de largura (25% / 50% / 25%). O centro
+   * não faz nada por enquanto: o sumário só abre pelo botão da barra.
+   */
   static resolveTap(x: number, viewportWidth: number): PageTurnIntent {
     if (viewportWidth <= 0) return null;
 
@@ -29,6 +32,6 @@ export class PageGesture {
     if (x < leftZoneEnd) return "previous";
     if (x > rightZoneStart) return "next";
 
-    return "open-toc";
+    return null;
   }
 }
