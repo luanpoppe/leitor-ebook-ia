@@ -22,37 +22,11 @@
   outline-offset: 2px;
 }
 
-.bar {
-  position: fixed;
-  z-index: 68;
-  right: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  left: 16px;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.barButton {
-  pointer-events: auto;
-  padding: 12px 22px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--accent-ink);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgb(17 24 39 / 0.35);
-}
-
-.barButton:hover {
-  background: var(--accent);
-}
-
-.barButton:focus-visible {
-  outline: 2px solid var(--accent-ink);
-  outline-offset: 2px;
+/* No toque, a ação vive na barra superior (ReaderToolbar). */
+@media (pointer: coarse) {
+  .action {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {

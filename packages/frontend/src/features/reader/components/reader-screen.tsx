@@ -788,6 +788,8 @@ export function ReaderScreen({
         onToggleMode={handleToggleMode}
         isChatOpen={isChatOpen}
         onToggleChat={handleToggleChat}
+        hasTextSelection={textSelection !== null && !isChatOpen}
+        onAskSelection={handleAskSelection}
       />
 
       <main ref={mainRef} className={styles.main}>

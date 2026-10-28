@@ -177,6 +177,37 @@
   color: var(--accent-ink);
 }
 
+/* Ação da seleção no toque: fica na barra, longe do menu nativo. */
+.selectionButton {
+  display: none;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-ink);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.selectionButton:hover {
+  background: var(--accent);
+}
+
+.selectionButton:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .selectionButton {
+    display: inline-flex;
+  }
+}
+
 .fontSizeValue {
   min-width: 34px;
   padding: 0 2px;

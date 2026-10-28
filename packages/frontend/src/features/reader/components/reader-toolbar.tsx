@@ -34,6 +34,9 @@ interface ReaderToolbarProps {
   onToggleMode: () => void;
   isChatOpen: boolean;
   onToggleChat: () => void;
+  /** Seleção ativa: no toque a ação aparece na barra, não sobre a seleção. */
+  hasTextSelection: boolean;
+  onAskSelection: () => void;
 }
 
 const BACK_LABEL = "Voltar para a ficha do livro";
@@ -124,6 +127,8 @@ export function ReaderToolbar({
   onToggleMode,
   isChatOpen,
   onToggleChat,
+  hasTextSelection,
+  onAskSelection,
 }: ReaderToolbarProps): JSX.Element {
   const progressPercent = resolveProgress(chapterProgress);
   const bookPercent =
@@ -207,6 +212,17 @@ export function ReaderToolbar({
       </div>
 
       <div className={styles.controls}>
+        {hasTextSelection && (
+          <button
+            type="button"
+            data-reader-selection-action=""
+            onClick={onAskSelection}
+            className={styles.selectionButton}
+          >
+            Perguntar à IA
+          </button>
+        )}
+
         <div className={styles.controlGroup}>
           <button
             type="button"
