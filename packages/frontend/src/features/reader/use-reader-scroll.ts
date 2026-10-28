@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WindowFetcher } from "./window/window-fetcher";
 import {
-  MAX_SCROLL_SEGMENTS,
   ScrollSegments,
   type ScrollSegment,
 } from "./window/scroll-segments";
 import {
-  WINDOW_BACKTRACK,
-  WINDOW_SIZE,
+  SCROLL_WINDOW_BACKTRACK,
+  SCROLL_WINDOW_SIZE,
   type WindowPoint,
 } from "./window/window-types";
 
@@ -72,7 +71,10 @@ export function useReaderScroll({
   const [error, setError] = useState<Error | null>(null);
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
 
-  const fetcher = useMemo(() => new WindowFetcher(bookId), [bookId]);
+  const fetcher = useMemo(
+    () => new WindowFetcher(bookId, SCROLL_WINDOW_SIZE),
+    [bookId]
+  );
 
   const segmentsRef = useRef<ScrollSegment[]>([]);
   const enabledRef = useRef(enabled);
@@ -107,10 +109,10 @@ export function useReaderScroll({
         const isAlreadyCovered = isLastSameChapter && segment.offset <= last.offset;
         if (isAlreadyCovered) return;
 
-        // Anexar descarta o trecho mais antigo.
-        return commitSegments(
-          [...current, segment].slice(-MAX_SCROLL_SEGMENTS)
-        );
+        // A lista guarda o texto já carregado; a view troca os trechos fora da
+        // tela por espaçadores medidos. Não descartar aqui evita o salto de
+        // rolagem que acontecia ao remover um trecho acima da posição atual.
+        return commitSegments([...current, segment]);
       }
 
       const first = current[0];
@@ -123,10 +125,9 @@ export function useReaderScroll({
         : segment;
       if (nextSegment.paragraphs.length === 0) return;
 
-      // Prepender descarta o trecho mais novo.
-      return commitSegments(
-        [nextSegment, ...current].slice(0, MAX_SCROLL_SEGMENTS)
-      );
+      // Mesmo motivo do append: o trecho antigo continua na lista (fora da
+      // tela ele vira espaçador), então a posição não salta ao prepender.
+      return commitSegments([nextSegment, ...current]);
     },
     [commitSegments]
   );
@@ -182,7 +183,7 @@ export function useReaderScroll({
       const headWindow = await fetcher.get(headPoint);
 
       // A primeira busca só revela o tamanho; o que aparece acima é a cauda.
-      const tailOffset = Math.max(0, headWindow.totalLength - WINDOW_SIZE);
+      const tailOffset = Math.max(0, headWindow.totalLength - SCROLL_WINDOW_SIZE);
       if (tailOffset === 0) return ScrollSegments.fromWindow(headWindow);
 
       const tailPoint = { position: previousPosition, offset: tailOffset };
@@ -209,7 +210,7 @@ export function useReaderScroll({
 
       // Busca um pouco antes do offset para haver texto acima do ponto, sem
       // empurrar o ponto para fora da janela.
-      const fetchOffset = Math.max(0, openOffset - WINDOW_BACKTRACK);
+      const fetchOffset = Math.max(0, openOffset - SCROLL_WINDOW_BACKTRACK);
       const startPoint = { position: chapterPosition, offset: fetchOffset };
       void runLoad("reset", () => loadSegment(startPoint));
     },
@@ -247,7 +248,7 @@ export function useReaderScroll({
     if (first === undefined) return;
 
     if (first.offset > 0) {
-      const previousOffset = Math.max(0, first.offset - WINDOW_SIZE);
+      const previousOffset = Math.max(0, first.offset - SCROLL_WINDOW_SIZE);
       const previousPoint = {
         position: first.position,
         offset: previousOffset,

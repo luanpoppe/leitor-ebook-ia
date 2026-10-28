@@ -6,6 +6,11 @@ export const WINDOW_SIZE = 20_000;
 // paginação não acha a página e abre no começo (ou no fim) da janela.
 export const WINDOW_BACKTRACK = 4_000;
 
+// A rolagem contínua usa janelas bem menores: o DOM tem no máximo três
+// segmentos, então ~12 mil caracteres em vez dos 60 mil de uma janela cheia.
+export const SCROLL_WINDOW_SIZE = 4_000;
+export const SCROLL_WINDOW_BACKTRACK = 1_000;
+
 export interface TextWindow {
   position: number;
   offset: number;
