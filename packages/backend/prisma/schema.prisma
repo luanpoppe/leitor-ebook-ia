@@ -44,6 +44,7 @@ model Book {
   readingProgress ReadingProgress?
   conversations Conversation[]
   images GeneratedImage[]
+  notes Note[]
 
   @@index([createdAt(sort: Desc), id(sort: Desc)], map: "books_created_at_idx")
   @@map("books")
@@ -163,4 +164,23 @@ model ChapterSection {
   @@unique([chapterId, position])
   @@index([chapterId, startOffset])
   @@map("chapter_sections")
+}
+
+/**
+ * Anotação do leitor sobre um livro. O conteúdo é markdown livre e pode ter
+ * sido escrito manualmente ou pela IA pelo chat.
+ */
+model Note {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  bookId          String   @map("book_id") @db.Uuid
+  title           String   @db.VarChar(120)
+  content         String
+  /** Capítulo de origem; null quando a nota é geral do livro. */
+  chapterPosition Int?     @map("chapter_position")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, updatedAt(sort: Desc)], map: "notes_book_updated_idx")
+  @@map("notes")
 }

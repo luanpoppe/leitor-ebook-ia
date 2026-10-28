@@ -19,6 +19,10 @@ import {
   ConversationNotFoundError,
 } from '../../chat/chat.errors';
 import {
+  InvalidNoteChapterError,
+  NoteNotFoundError,
+} from '../../notes/notes.errors';
+import {
   InvalidStorageInputError,
   StorageObjectNotFoundError,
   StorageUnavailableError,
@@ -61,6 +65,8 @@ interface ErrorBody {
   ConversationNotFoundError,
   ChatUnavailableError,
   ChatContextUnavailableError,
+  NoteNotFoundError,
+  InvalidNoteChapterError,
   MulterError,
 )
 export class EbooksExceptionFilter extends BaseExceptionFilter {
@@ -144,6 +150,12 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
     }
     if (exception instanceof ConversationNotFoundError) {
       return HttpStatus.NOT_FOUND;
+    }
+    if (exception instanceof NoteNotFoundError) {
+      return HttpStatus.NOT_FOUND;
+    }
+    if (exception instanceof InvalidNoteChapterError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
     }
     if (exception instanceof ChatContextUnavailableError) {
       return HttpStatus.UNPROCESSABLE_ENTITY;

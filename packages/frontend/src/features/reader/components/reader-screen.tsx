@@ -25,6 +25,7 @@ import { ReaderChatDrawer } from "../chat/reader-chat-drawer";
 import { ReaderCitationPreview } from "../chat/reader-citation-preview";
 import type { ChatCitation, ChatSelection } from "../chat/types";
 import { ReaderSearchDrawer } from "../search/reader-search-drawer";
+import { ReaderNotesDrawer } from "../notes/reader-notes-drawer";
 import { useTextSelection } from "../use-text-selection";
 import { ReaderSelectionAction } from "./reader-selection-action";
 import { ReaderToolbar } from "./reader-toolbar";
@@ -92,6 +93,7 @@ export function ReaderScreen({
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
   const [metrics, setMetrics] = useState<ReaderPageMetrics | null>(null);
   // Capítulo que abre na última página: voltar do começo do capítulo seguinte.
@@ -124,10 +126,14 @@ export function ReaderScreen({
   const previewOriginRef = useRef<ReaderPoint | null>(null);
   const isScrollMode = mode === "scroll";
 
-  // Só observa seleção com a leitura limpa (sem sumário, chat ou prévia por cima).
+  // Só observa seleção com a leitura limpa (sem sumário, chat, notas ou prévia).
   const textSelection = useTextSelection(
     mainRef,
-    !isChatOpen && citationPreview === null && !isTocOpen && !isSearchOpen
+    !isChatOpen &&
+      citationPreview === null &&
+      !isTocOpen &&
+      !isSearchOpen &&
+      !isNotesOpen
   );
 
   // A view mede a área e publica a régua; uma identidade nova a cada render
@@ -299,6 +305,7 @@ export function ReaderScreen({
   const handleToggleToc = useCallback(() => {
     setIsChatOpen(false);
     setIsSearchOpen(false);
+    setIsNotesOpen(false);
     setChatSelection(null);
     setIsTocOpen((isOpen) => !isOpen);
   }, []);
@@ -310,6 +317,7 @@ export function ReaderScreen({
   const handleOpenSearch = useCallback(() => {
     setIsTocOpen(false);
     setIsChatOpen(false);
+    setIsNotesOpen(false);
     setChatSelection(null);
     setIsSearchOpen(true);
   }, []);
@@ -321,6 +329,7 @@ export function ReaderScreen({
   const handleToggleChat = useCallback(() => {
     setIsTocOpen(false);
     setIsSearchOpen(false);
+    setIsNotesOpen(false);
     setChatSelection(null);
     setIsChatOpen((isOpen) => !isOpen);
   }, []);
@@ -328,6 +337,19 @@ export function ReaderScreen({
   const handleCloseChat = useCallback(() => {
     setChatSelection(null);
     setIsChatOpen(false);
+  }, []);
+
+  const handleOpenNotes = useCallback(() => {
+    setIsTocOpen(false);
+    setIsSearchOpen(false);
+    setIsChatOpen(false);
+    setChatSelection(null);
+    setCitationPreview(null);
+    setIsNotesOpen(true);
+  }, []);
+
+  const handleCloseNotes = useCallback(() => {
+    setIsNotesOpen(false);
   }, []);
 
   // Pular para um ponto do livro nos dois modos. A citação usa isto e o
@@ -385,6 +407,7 @@ export function ReaderScreen({
       before: textSelection.before,
     });
     setIsTocOpen(false);
+    setIsNotesOpen(false);
     setIsChatOpen(true);
     window.getSelection()?.removeAllRanges();
   }, [textSelection]);
@@ -443,6 +466,14 @@ export function ReaderScreen({
       goToChapter(position);
     },
     [currentPosition, goToChapter, isScrollMode, restartChapter]
+  );
+
+  const handleGoToNoteChapter = useCallback(
+    (position: number) => {
+      setIsNotesOpen(false);
+      handleSelectChapter(position);
+    },
+    [handleSelectChapter]
   );
 
   const handleOpenFirstChapter = useCallback(() => {
@@ -635,6 +666,7 @@ export function ReaderScreen({
     isReadingBlocked ||
     isChatOpen ||
     isSearchOpen ||
+    isNotesOpen ||
     citationPreview !== null;
   const isChunkErrorVisible =
     !isScrollMode && pageError !== null && errorKind === null && !hasReachedEnd;
@@ -771,6 +803,7 @@ export function ReaderScreen({
         isTocOpen={isTocOpen}
         onToggleToc={handleToggleToc}
         onOpenSearch={handleOpenSearch}
+        onOpenNotes={handleOpenNotes}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
         onPrevious={handlePreviousChapter}
@@ -827,6 +860,7 @@ export function ReaderScreen({
           onClearSelection={handleClearChatSelection}
           isSuspended={citationPreview !== null}
           onClose={handleCloseChat}
+          onOpenNotes={handleOpenNotes}
           onCitationSelect={handleCitationSelect}
         />
 
@@ -835,6 +869,15 @@ export function ReaderScreen({
           bookId={bookId}
           onClose={handleCloseSearch}
           onSelect={handleSearchSelect}
+        />
+      )}
+
+      {isNotesOpen && (
+        <ReaderNotesDrawer
+          bookId={bookId}
+          currentChapterPosition={currentPosition}
+          onClose={handleCloseNotes}
+          onGoToChapter={handleGoToNoteChapter}
         />
       )}
 

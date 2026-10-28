@@ -12,6 +12,7 @@ import { EbooksModule } from './api/ebooks/ebooks.module';
 import { ChatModule } from './chat/chat.module';
 import { ImagesModule } from './images/images.module';
 import { SearchModule } from './search/search.module';
+import { NotesModule } from './notes/notes.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { SearchModule } from './search/search.module';
     ChatModule,
     SearchModule,
     ImagesModule,
+    NotesModule,
   ],
   controllers: [AppController],
 })

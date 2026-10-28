@@ -17,6 +17,7 @@ interface ReaderToolbarProps {
   isTocOpen: boolean;
   onToggleToc: () => void;
   onOpenSearch: () => void;
+  onOpenNotes: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
   onPrevious: () => void;
@@ -45,6 +46,7 @@ const NEXT_LABEL = "Próximo capítulo";
 const TOC_LABEL = "Sumário";
 const SEARCH_LABEL = "Buscar";
 const CHAT_LABEL = "Chat";
+const NOTES_LABEL = "Anotações";
 const DECREASE_FONT_LABEL = "Diminuir fonte";
 const INCREASE_FONT_LABEL = "Aumentar fonte";
 const LIGHT_THEME_ACTION_LABEL = "Usar tema sépia";
@@ -110,6 +112,7 @@ export function ReaderToolbar({
   isTocOpen,
   onToggleToc,
   onOpenSearch,
+  onOpenNotes,
   hasPrevious,
   hasNext,
   onPrevious,
@@ -273,6 +276,15 @@ export function ReaderToolbar({
           className={resolveIsChatButtonActive(isChatOpen)}
         >
           {CHAT_LABEL}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenNotes}
+          aria-label={NOTES_LABEL}
+          className={styles.button}
+        >
+          {NOTES_LABEL}
         </button>
 
         <div className={styles.controlGroup}>

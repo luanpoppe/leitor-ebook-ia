@@ -13,6 +13,8 @@ import { ImageService } from '../images/image.service';
 import { EmbeddingService } from '../indexing/embedding.service';
 import { EmbeddingUnavailableError } from '../indexing/indexing.errors';
 import { SearchService } from '../search/search.service';
+import { NotesService } from '../notes/notes.service';
+import { ChatNotesTools } from './chat-notes-tools';
 import {
   ChatPromptBuilder,
   MAX_SEARCH_EXCERPTS,
@@ -20,6 +22,7 @@ import {
   type ChatCitation,
   type ChatExcerpt,
 } from './chat-prompt.builder';
+import type { ChatTools } from './chat-tools.types';
 import { ChatQueryPlanner } from './chat-query-planner';
 import type { ChatPlan } from './chat-query-planner';
 import {
@@ -61,9 +64,6 @@ const MAX_IMAGE_CONTEXT_CHUNKS = 6;
 const MAX_IMAGE_SEARCH_RESULTS = 3;
 const IMAGE_PROMPT_MAX_TOKENS = 2_500;
 
-type AiCallParams = Parameters<NonNullable<AiClient>['call']>[0];
-type ChatTools = NonNullable<NonNullable<AiCallParams['agent']>['tools']>;
-
 interface AskInput {
   question: string;
   scope: ChatScope;
@@ -97,6 +97,7 @@ export class ChatService {
     private readonly embeddingService: EmbeddingService,
     private readonly queryPlanner: ChatQueryPlanner,
     private readonly searchService: SearchService,
+    private readonly notesService: NotesService,
     private readonly imageService: ImageService,
     @Inject(AI_CLIENT) private readonly client: AiClient,
   ) {}
@@ -202,7 +203,7 @@ export class ChatService {
       input.question,
       excerpts,
       history,
-      this.buildSearchTools(book.id),
+      this.buildTools(book.id),
     );
 
     const citations = ChatPromptBuilder.toCitations(excerpts);
@@ -379,6 +380,14 @@ export class ChatService {
       offset: range.start,
       text: chapter.text,
     };
+  }
+
+  /** Ferramentas do chat: busca exata no livro e anotações do leitor. */
+  private buildTools(bookId: string): ChatTools {
+    return [
+      ...this.buildSearchTools(bookId),
+      ...ChatNotesTools.build(this.notesService, bookId),
+    ];
   }
 
   /** Ferramenta de busca exata que o modelo decide quando usar. */

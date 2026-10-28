@@ -62,6 +62,9 @@ export class ChatPromptBuilder {
       'Os trechos podem ser literais do livro ou resumos de capítulo. Use os resumos para visão geral e os trechos literais para detalhes.',
       'Ao usar um trecho, cite o número entre colchetes — por exemplo [1] ou [2][3]. Nunca invente números de trecho.',
       'Você tem a ferramenta buscar_no_livro para localizar termos ou frases exatas (nomes, lugares, passagens). Use-a quando a pergunta citar um termo específico que a busca semântica pode perder.',
+      'Você pode ler e gerenciar as anotações do leitor deste livro com listar_anotacoes, ler_anotacao, criar_anotacao, atualizar_anotacao e excluir_anotacao. Use-as quando o leitor pedir para salvar um resumo ou explicação, consultar o que já anotou, ou editar/excluir uma anotação.',
+      'Anotações são em markdown e não devem usar marcadores de citação como [1]: escreva um texto autossuficiente. Ao criar uma nota a partir de um capítulo específico, informe a posição desse capítulo.',
+      'Nunca exclua uma anotação sem confirmação explícita: primeiro liste a nota e pergunte se o leitor confirma a exclusão. Só chame excluir_anotacao quando a mensagem atual confirmar.',
       'Não invente fatos sobre o livro que não estejam nos trechos.',
     ];
     if (hasReadingContext) {

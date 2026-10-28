@@ -28,6 +28,7 @@ interface ReaderChatDrawerProps {
   /** Um modal está por cima: o Esc é dele, não do chat. */
   isSuspended?: boolean;
   onClose(): void;
+  onOpenNotes(): void;
   onCitationSelect(citation: ChatCitation): void;
 }
 
@@ -59,6 +60,7 @@ export function ReaderChatDrawer({
   onClearSelection,
   isSuspended = false,
   onClose,
+  onOpenNotes,
   onCitationSelect,
 }: ReaderChatDrawerProps): JSX.Element | null {
   const {
@@ -229,6 +231,13 @@ export function ReaderChatDrawer({
           </div>
 
           <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.smallButton}
+              onClick={onOpenNotes}
+            >
+              Anotações
+            </button>
             <button
               type="button"
               className={styles.smallButton}
