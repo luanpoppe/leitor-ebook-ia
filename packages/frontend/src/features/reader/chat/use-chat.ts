@@ -119,6 +119,7 @@ export function useChat(bookId: string, enabled: boolean): UseChatResult {
         selection: input.selection ?? null,
         imageUrl: null,
         citations: [],
+        noteActions: [],
         createdAt: new Date().toISOString(),
       };
       setMessages((current) => [...current, optimisticMessage]);

@@ -14,7 +14,7 @@ import { EmbeddingService } from '../indexing/embedding.service';
 import { EmbeddingUnavailableError } from '../indexing/indexing.errors';
 import { SearchService } from '../search/search.service';
 import { NotesService } from '../notes/notes.service';
-import { ChatNotesTools } from './chat-notes-tools';
+import { ChatNotesTools, type ChatNoteAction } from './chat-notes-tools';
 import {
   ChatPromptBuilder,
   MAX_SEARCH_EXCERPTS,
@@ -198,12 +198,13 @@ export class ChatService {
       conversation.id,
       HISTORY_LIMIT,
     );
+    const noteActions = new Map<string, ChatNoteAction>();
     const answer = await this.requestAnswer(
       book,
       input.question,
       excerpts,
       history,
-      this.buildTools(book.id),
+      this.buildTools(book.id, noteActions),
     );
 
     const citations = ChatPromptBuilder.toCitations(excerpts);
@@ -215,6 +216,7 @@ export class ChatService {
       answer,
       citations,
       selection: input.selection ?? null,
+      noteActions: [...noteActions.values()],
     });
 
     this.logger.log(
@@ -383,10 +385,15 @@ export class ChatService {
   }
 
   /** Ferramentas do chat: busca exata no livro e anotações do leitor. */
-  private buildTools(bookId: string): ChatTools {
+  private buildTools(
+    bookId: string,
+    noteActions: Map<string, ChatNoteAction>,
+  ): ChatTools {
     return [
       ...this.buildSearchTools(bookId),
-      ...ChatNotesTools.build(this.notesService, bookId),
+      ...ChatNotesTools.build(this.notesService, bookId, (action) => {
+        noteActions.set(action.noteId, action);
+      }),
     ];
   }
 
@@ -784,6 +791,7 @@ function toMessage(
         ? null
         : `/ebooks/${bookId}/images/${message.imageId}`,
     citations: toCitations(message.citations),
+    noteActions: toNoteActions(message.noteActions),
     createdAt: message.createdAt.toISOString(),
   };
 }
@@ -809,4 +817,11 @@ function toCitations(value: unknown): ChatCitation[] {
   if (!isArray) return [];
 
   return value as ChatCitation[];
+}
+
+function toNoteActions(value: unknown): ChatNoteAction[] {
+  const isArray = Array.isArray(value);
+  if (!isArray) return [];
+
+  return value as ChatNoteAction[];
 }

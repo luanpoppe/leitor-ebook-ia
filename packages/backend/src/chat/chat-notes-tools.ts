@@ -8,13 +8,23 @@ import type { ChatTools } from './chat-tools.types';
 const LIST_LIMIT = 20;
 const EXCERPT_LENGTH = 300;
 
+export interface ChatNoteAction {
+  noteId: string;
+  title: string;
+  action: 'created' | 'updated';
+}
+
 /**
  * Ferramentas de anotações do chat. Todas operam no livro da conversa; o
  * modelo só recebe ids pelas ferramentas de leitura, então não há como uma
  * conversa tocar nas anotações de outro livro.
  */
 export class ChatNotesTools {
-  static build(notes: NotesService, bookId: string): ChatTools {
+  static build(
+    notes: NotesService,
+    bookId: string,
+    onNoteAction: (action: ChatNoteAction) => void,
+  ): ChatTools {
     const tools = new AITools();
 
     const listTool = tools.createTool({
@@ -67,6 +77,11 @@ export class ChatNotesTools {
             content: conteudo,
             chapterPosition: capitulo ?? null,
           });
+          onNoteAction({
+            noteId: note.id,
+            title: note.title,
+            action: 'created',
+          });
 
           return `Anotação criada: "${note.title}" (id ${note.id}).`;
         } catch (error) {
@@ -99,6 +114,11 @@ export class ChatNotesTools {
             ...(titulo !== undefined ? { title: titulo } : {}),
             ...(conteudo !== undefined ? { content: conteudo } : {}),
             ...(capitulo !== undefined ? { chapterPosition: capitulo } : {}),
+          });
+          onNoteAction({
+            noteId: note.id,
+            title: note.title,
+            action: 'updated',
           });
 
           return `Anotação atualizada: "${note.title}" (id ${note.id}).`;

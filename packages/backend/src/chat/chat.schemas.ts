@@ -36,6 +36,12 @@ export interface ChatCitationResponse {
   offset: number;
 }
 
+export interface ChatNoteActionResponse {
+  noteId: string;
+  title: string;
+  action: 'created' | 'updated';
+}
+
 export interface ChatMessageResponse {
   id: string;
   role: 'USER' | 'ASSISTANT';
@@ -45,6 +51,8 @@ export interface ChatMessageResponse {
   /** URL relativa da imagem gerada (só em mensagens ASSISTANT). */
   imageUrl: string | null;
   citations: ChatCitationResponse[];
+  /** Anotações criadas/editadas por ferramentas nesta resposta. */
+  noteActions: ChatNoteActionResponse[];
   createdAt: string;
 }
 

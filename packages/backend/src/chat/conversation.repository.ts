@@ -16,6 +16,7 @@ export interface StoredMessage {
   selection: string | null;
   imageId: string | null;
   citations: unknown;
+  noteActions: unknown;
   createdAt: Date;
 }
 
@@ -32,6 +33,8 @@ export interface SaveExchangeInput {
   question: string;
   answer: string;
   citations: unknown[];
+  /** Anotações criadas/editadas pelas ferramentas nesta resposta. */
+  noteActions?: unknown[];
   /** Trecho selecionado que a pergunta usou como foco. */
   selection?: string | null;
   /** Imagem gerada anexada à resposta. */
@@ -100,6 +103,7 @@ export class ConversationRepository {
             selection: true,
             imageId: true,
             citations: true,
+            noteActions: true,
             createdAt: true,
           },
         },
@@ -133,6 +137,7 @@ export class ConversationRepository {
         selection: true,
         imageId: true,
         citations: true,
+        noteActions: true,
         createdAt: true,
       },
     });
@@ -142,6 +147,7 @@ export class ConversationRepository {
 
   async saveExchange(input: SaveExchangeInput): Promise<SavedExchange> {
     const citations = input.citations as Prisma.InputJsonValue;
+    const noteActions = (input.noteActions ?? []) as Prisma.InputJsonValue;
 
     return this.prisma.$transaction(async (transaction) => {
       const userMessage = await transaction.chatMessage.create({
@@ -158,6 +164,7 @@ export class ConversationRepository {
           selection: true,
           imageId: true,
           citations: true,
+          noteActions: true,
           createdAt: true,
         },
       });
@@ -167,6 +174,7 @@ export class ConversationRepository {
           role: ChatRole.ASSISTANT,
           content: input.answer,
           citations,
+          noteActions,
           imageId: input.imageId ?? null,
         },
         select: {
@@ -176,6 +184,7 @@ export class ConversationRepository {
           selection: true,
           imageId: true,
           citations: true,
+          noteActions: true,
           createdAt: true,
         },
       });

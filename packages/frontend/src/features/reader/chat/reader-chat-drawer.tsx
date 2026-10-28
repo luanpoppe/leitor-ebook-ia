@@ -29,6 +29,7 @@ interface ReaderChatDrawerProps {
   isSuspended?: boolean;
   onClose(): void;
   onOpenNotes(): void;
+  onOpenNote(noteId: string): void;
   onCitationSelect(citation: ChatCitation): void;
 }
 
@@ -61,6 +62,7 @@ export function ReaderChatDrawer({
   isSuspended = false,
   onClose,
   onOpenNotes,
+  onOpenNote,
   onCitationSelect,
 }: ReaderChatDrawerProps): JSX.Element | null {
   const {
@@ -418,6 +420,20 @@ export function ReaderChatDrawer({
                       citations={message.citations}
                       onCitationSelect={onCitationSelect}
                     />
+                    {(message.noteActions?.length ?? 0) > 0 && (
+                      <div className={styles.messageNoteActions}>
+                        {(message.noteActions ?? []).map((noteAction) => (
+                          <button
+                            key={noteAction.noteId}
+                            type="button"
+                            className={styles.messageNoteButton}
+                            onClick={() => onOpenNote(noteAction.noteId)}
+                          >
+                            Abrir anotação: {noteAction.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {message.citations.length > 0 &&
                       message.imageUrl === null && (
                         <p className={styles.sources}>

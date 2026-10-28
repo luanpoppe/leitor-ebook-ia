@@ -94,6 +94,9 @@ export function ReaderScreen({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [notesInitialNoteId, setNotesInitialNoteId] = useState<string | null>(
+    null
+  );
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
   const [metrics, setMetrics] = useState<ReaderPageMetrics | null>(null);
   // Capítulo que abre na última página: voltar do começo do capítulo seguinte.
@@ -345,6 +348,17 @@ export function ReaderScreen({
     setIsChatOpen(false);
     setChatSelection(null);
     setCitationPreview(null);
+    setNotesInitialNoteId(null);
+    setIsNotesOpen(true);
+  }, []);
+
+  const handleOpenNote = useCallback((noteId: string) => {
+    setIsTocOpen(false);
+    setIsSearchOpen(false);
+    setIsChatOpen(false);
+    setChatSelection(null);
+    setCitationPreview(null);
+    setNotesInitialNoteId(noteId);
     setIsNotesOpen(true);
   }, []);
 
@@ -861,6 +875,7 @@ export function ReaderScreen({
           isSuspended={citationPreview !== null}
           onClose={handleCloseChat}
           onOpenNotes={handleOpenNotes}
+          onOpenNote={handleOpenNote}
           onCitationSelect={handleCitationSelect}
         />
 
@@ -876,6 +891,7 @@ export function ReaderScreen({
         <ReaderNotesDrawer
           bookId={bookId}
           currentChapterPosition={currentPosition}
+          initialNoteId={notesInitialNoteId}
           onClose={handleCloseNotes}
           onGoToChapter={handleGoToNoteChapter}
         />

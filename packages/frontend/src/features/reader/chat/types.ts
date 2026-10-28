@@ -22,7 +22,15 @@ export interface ChatMessage {
   /** URL relativa da imagem gerada (mensagens ASSISTANT). */
   imageUrl: string | null;
   citations: ChatCitation[];
+  /** Anotações criadas/editadas pelas ferramentas nesta resposta. */
+  noteActions: ChatNoteAction[];
   createdAt: string;
+}
+
+export interface ChatNoteAction {
+  noteId: string;
+  title: string;
+  action: "created" | "updated";
 }
 
 /** Seleção ativa no painel: o foco da próxima pergunta. */

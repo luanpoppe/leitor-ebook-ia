@@ -125,6 +125,8 @@ model ChatMessage {
   /** Trecho do livro que a pergunta usou como foco (mensagens do usuário). */
   selection      String?
   citations      Json?
+  /** Anotações criadas/editadas por ferramentas nesta resposta. */
+  noteActions    Json?        @map("note_actions")
   imageId        String?      @map("image_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

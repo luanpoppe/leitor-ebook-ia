@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import { useDialogPanel } from "@/features/shelf/hooks/use-dialog-panel";
 import { getApiErrorInfo } from "@/features/ebooks/api";
@@ -14,6 +14,8 @@ import styles from "./notes.module.css";
 interface ReaderNotesDrawerProps {
   bookId: string;
   currentChapterPosition: number | null;
+  /** Abre direto nesta anotação (ex.: botão "Abrir anotação" do chat). */
+  initialNoteId: string | null;
   onClose(): void;
   onGoToChapter(position: number): void;
 }
@@ -30,6 +32,7 @@ type NotesView =
 export function ReaderNotesDrawer({
   bookId,
   currentChapterPosition,
+  initialNoteId,
   onClose,
   onGoToChapter,
 }: ReaderNotesDrawerProps): JSX.Element {
@@ -41,6 +44,21 @@ export function ReaderNotesDrawer({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const appliedInitialNoteRef = useRef(false);
+
+  useEffect(() => {
+    if (initialNoteId === null || appliedInitialNoteRef.current) return;
+    if (isLoading) return;
+
+    appliedInitialNoteRef.current = true;
+    const initialNote = notes.find((note) => note.id === initialNoteId);
+    if (initialNote === undefined) {
+      setActionError("Anotação não encontrada. Ela pode ter sido excluída.");
+      return;
+    }
+
+    setView({ kind: "detail", note: initialNote });
+  }, [initialNoteId, isLoading, notes]);
 
   const filteredNotes = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
@@ -176,6 +194,10 @@ export function ReaderNotesDrawer({
                   placeholder="Buscar nas anotações…"
                   aria-label="Buscar nas anotações"
                 />
+              )}
+
+              {actionError !== null && (
+                <p className={styles.error}>{actionError}</p>
               )}
 
               {isLoading && <p className={styles.status}>Carregando…</p>}
