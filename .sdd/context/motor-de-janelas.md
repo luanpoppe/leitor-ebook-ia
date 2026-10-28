@@ -4,7 +4,7 @@
 
 ## O que é
 
-A base da leitura paginada: busca o texto do capítulo em trechos de até 20 mil caracteres, transforma cada trecho em páginas de altura medida e mantém o ponto de leitura quando a tipografia muda. Não materializa o capítulo inteiro; os modos página e rolagem consomem esse motor.
+A base da leitura paginada: busca o texto do capítulo em trechos de até 20 mil caracteres, transforma cada trecho em páginas de altura medida e mantém o ponto de leitura quando a tipografia muda. Não materializa o capítulo inteiro e ainda não está ligado à tela — quem consome é a feature seguinte (modo página).
 
 ## Como funciona
 

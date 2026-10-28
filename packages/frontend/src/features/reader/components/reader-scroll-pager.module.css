@@ -1,8 +1,0 @@
-.stage {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-  /* O gesto vertical é nosso; o horizontal (se houver) fica com o navegador. */
-  touch-action: pan-x;
-  user-select: text;
-}

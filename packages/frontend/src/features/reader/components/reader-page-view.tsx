@@ -21,8 +21,6 @@ export interface ReaderPageViewProps {
   /** Muda a cada página (ex.: `${position}:${pageIndex}`) para animar a entrada. */
   pageKey: string;
   direction: "next" | "previous" | null;
-  /** Eixo da animação de entrada: página horizontal, rolagem vertical. */
-  turnAxis?: "horizontal" | "vertical";
   fontSize: number;
   theme: ReaderTheme;
   alignment: ReaderAlignment;
@@ -39,7 +37,6 @@ export function ReaderPageView({
   page,
   pageKey,
   direction,
-  turnAxis = "horizontal",
   fontSize,
   theme,
   alignment,
@@ -141,7 +138,6 @@ export function ReaderPageView({
           key={pageKey}
           className={styles.page}
           data-direction={direction ?? "none"}
-          data-axis={turnAxis}
         >
           {paragraphs.map((paragraph, index) => (
             <p

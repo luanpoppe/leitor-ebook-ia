@@ -30,35 +30,6 @@
   animation: enterPrevious 220ms ease-out;
 }
 
-/* Rolagem "virtual": a página entra de baixo/cima, sem rolar o texto. */
-.page[data-axis="vertical"][data-direction="next"] {
-  animation: enterNextVertical 240ms ease-out;
-}
-
-.page[data-axis="vertical"][data-direction="previous"] {
-  animation: enterPreviousVertical 240ms ease-out;
-}
-
-@keyframes enterNextVertical {
-  from {
-    transform: translateY(100%);
-  }
-
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes enterPreviousVertical {
-  from {
-    transform: translateY(-100%);
-  }
-
-  to {
-    transform: translateY(0);
-  }
-}
-
 @keyframes enterNext {
   from {
     transform: translateX(100%);
@@ -81,9 +52,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .page[data-direction="next"],
-  .page[data-direction="previous"],
-  .page[data-axis="vertical"][data-direction="next"],
-  .page[data-axis="vertical"][data-direction="previous"] {
+  .page[data-direction="previous"] {
     animation: none;
   }
 }
