@@ -52,7 +52,7 @@
   right: 0;
   left: 0;
   z-index: 1;
-  height: clamp(40px, 7vh, 60px);
+  height: clamp(48px, 8vh, 68px);
   pointer-events: none;
 }
 
