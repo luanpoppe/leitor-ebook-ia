@@ -422,6 +422,9 @@ export const ReaderScrollView = forwardRef<
           {hasReachedEnd && <p className={styles.end}>Fim do livro</p>}
         </div>
       </div>
+
+      <div className={styles.fadeTop} aria-hidden="true" />
+      <div className={styles.fadeBottom} aria-hidden="true" />
     </div>
   );
 });
