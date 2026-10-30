@@ -10,7 +10,8 @@ import {
   useState,
 } from "react";
 import type { CSSProperties, JSX } from "react";
-import type { ReaderTheme } from "../reader-preferences";
+import { ReaderHeading } from "../heading";
+import type { ReaderAlignment, ReaderTheme } from "../reader-preferences";
 import type { ScrollErrorDirection, ScrollSegment } from "../use-reader-scroll";
 import styles from "./reader-scroll-view.module.css";
 
@@ -52,6 +53,7 @@ export interface ReaderScrollViewProps {
   hasReachedEnd: boolean;
   fontSize: number;
   theme: ReaderTheme;
+  alignment: ReaderAlignment;
   /** Quando muda (troca de modo ou de capítulo pelo sumário), a view rola até ali. */
   anchor: { position: number; offset: number } | null;
   onLoadMore(): void;
@@ -67,7 +69,7 @@ export const ReaderScrollView = forwardRef<
 >(function ReaderScrollView(props, ref): JSX.Element {
   const {
     segments, isLoading, error, errorDirection, hasReachedEnd, fontSize, theme,
-    anchor, onLoadMore, onLoadPrevious, onRetry, onVisibleChange,
+    alignment, anchor, onLoadMore, onLoadPrevious, onRetry, onVisibleChange,
   } = props;
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -376,6 +378,7 @@ export const ReaderScrollView = forwardRef<
           <p
             key={paragraph.offset}
             className={resolveParagraphClassName(
+              paragraph.text,
               paragraphIndex,
               segment.paragraphs.length,
               startsInsideParagraph,
@@ -399,7 +402,12 @@ export const ReaderScrollView = forwardRef<
   const isPrependError = errorDirection === "prepend";
 
   return (
-    <div className={styles.frame} data-theme={theme} style={containerStyle}>
+    <div
+      className={styles.frame}
+      data-theme={theme}
+      data-alignment={alignment}
+      style={containerStyle}
+    >
       <div
         ref={viewportRef} className={styles.viewport} role="region"
         aria-label="Texto do capítulo" tabIndex={0} onScroll={scheduleEvaluation}
@@ -414,6 +422,9 @@ export const ReaderScrollView = forwardRef<
           {hasReachedEnd && <p className={styles.end}>Fim do livro</p>}
         </div>
       </div>
+
+      <div className={styles.fadeTop} aria-hidden="true" />
+      <div className={styles.fadeBottom} aria-hidden="true" />
     </div>
   );
 });
@@ -526,11 +537,14 @@ function findSegmentByKey(
 }
 
 function resolveParagraphClassName(
+  text: string,
   index: number,
   paragraphCount: number,
   startsInsideParagraph: boolean,
   endsInsideParagraph: boolean
 ): string {
+  if (ReaderHeading.isHeading(text)) return styles.heading;
+
   const classNames = [styles.paragraph];
   if (index === 0 && startsInsideParagraph) {
     classNames.push(styles.paragraphFlushTop);

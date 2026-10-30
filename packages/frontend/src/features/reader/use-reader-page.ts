@@ -27,6 +27,7 @@ export interface UseReaderPageOptions {
 }
 
 export interface UseReaderPageResult {
+  pages: TextPage[];
   page: TextPage | null;
   pageIndex: number;
   totalPages: number;
@@ -163,6 +164,7 @@ export function useReaderPage({
   ]);
 
   return {
+    pages,
     page,
     pageIndex,
     totalPages: pages.length,

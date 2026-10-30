@@ -243,7 +243,7 @@ export class EbookUploadService {
   }
 
   private resolveTitle(originalname: string): string {
-    const filename = basename(originalname);
+    const filename = basename(this.decodeFilename(originalname));
     const extension = extname(filename);
     const rawTitle = filename
       .slice(0, filename.length - extension.length)
@@ -252,6 +252,17 @@ export class EbookUploadService {
     if (rawTitle.length === 0) return FALLBACK_TITLE;
 
     return rawTitle.slice(0, MAX_TITLE_LENGTH);
+  }
+
+  /**
+   * O parser de multipart entrega o nome do arquivo como latin1; reinterpretar
+   * os bytes como UTF-8 devolve os acentos corretos ("PolÃtica" → "Política").
+   * Se a reinterpretação não for válida, mantém o nome original.
+   */
+  private decodeFilename(originalname: string): string {
+    const decoded = Buffer.from(originalname, 'latin1').toString('utf8');
+
+    return decoded.includes('\uFFFD') ? originalname : decoded;
   }
 
   private toApiStatus(status: BookStatus): string {

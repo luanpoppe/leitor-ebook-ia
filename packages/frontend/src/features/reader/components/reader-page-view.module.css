@@ -63,8 +63,18 @@
 
 /* Precisa casar com reader-measure-layer.module.css: a régua mede esta página. */
 .paragraph {
-  margin: 0 0 1.25em;
+  margin: 0 0 0.7em;
   font-size: var(--reader-font-size, 18px);
+  line-height: 1.75;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Título de capítulo que veio como parágrafo do EPUB. */
+.heading {
+  margin: 0 0 0.7em;
+  font-size: var(--reader-font-size, 18px);
+  font-weight: 700;
   line-height: 1.75;
   overflow-wrap: break-word;
   hyphens: auto;
@@ -78,4 +88,9 @@
 .frame[data-theme="light"] {
   background: #fdfcf9;
   color: #2a2724;
+}
+
+/* Justificado quando o leitor escolhe; o padrao continua a esquerda. */
+.frame[data-alignment="justify"] .paragraph {
+  text-align: justify;
 }

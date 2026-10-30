@@ -9,14 +9,20 @@ import {
   type ExtractionInput,
   type ExtractionResult,
 } from './content.types';
+import { ChapterSeparatorDetector } from './chapter-separator.detector';
 import { EpubParser } from './epub-parser';
 import { PdfParser } from './pdf-parser';
 import { StreamUtils } from './stream-utils';
+import { TextNormalizer } from './text-normalizer';
 import { TxtParser } from './txt-parser';
 
 const MAX_COVER_BYTES = 5 * 1024 * 1024;
 const COVER_SIZE_MESSAGE =
   'A capa do livro excede o limite de tamanho suportado.';
+// Só vale consultar a IA quando o livro é grande o bastante para ter capítulos
+// e a divisão padrão deixou poucos capítulos ou capítulos gigantes.
+const MIN_TEXT_FOR_DETECTION = 50_000;
+const MAX_AVERAGE_CHAPTER_LENGTH = 60_000;
 
 export interface ExtractedContent {
   chapters: ExtractedChapter[];
@@ -44,6 +50,7 @@ export class ContentExtractor {
     private readonly epubParser: EpubParser,
     private readonly pdfParser: PdfParser,
     private readonly txtParser: TxtParser,
+    private readonly separatorDetector: ChapterSeparatorDetector,
     private readonly storage: FileStorageService,
   ) {}
 
@@ -55,10 +62,11 @@ export class ContentExtractor {
 
     const parser = this.selectParser(input.format);
     const result = await parser.parse(input.stream);
+    const chapters = await this.resolveChapters(result.chapters, result.fullText);
     const hasCover = result.metadata.cover !== undefined;
 
     this.logger.log(
-      `Conteúdo extraído: formato=${input.format}, capítulos=${result.chapters.length}, capa=${hasCover ? 'sim' : 'não'}`,
+      `Conteúdo extraído: formato=${input.format}, capítulos=${chapters.length}, capa=${hasCover ? 'sim' : 'não'}`,
     );
 
     // O backfill de títulos só reaproveita o texto, então não precisa reenviar
@@ -69,7 +77,7 @@ export class ContentExtractor {
       : undefined;
 
     return {
-      chapters: result.chapters,
+      chapters,
       fullText: result.fullText,
       metadata: {
         title: result.metadata.title,
@@ -77,6 +85,55 @@ export class ContentExtractor {
       },
       coverStorageKey,
     };
+  }
+
+  /**
+   * Só consulta a IA quando a divisão padrão parece ter falhado. O padrão
+   * devolvido é validado contra a amostra; se não render pelo menos dois
+   * capítulos novos, a divisão original fica.
+   */
+  private async resolveChapters(
+    chapters: ExtractedChapter[],
+    fullText: string,
+  ): Promise<ExtractedChapter[]> {
+    if (!this.shouldDetectSeparator(chapters, fullText)) return chapters;
+
+    const detected = await this.separatorDetector.detect(fullText);
+    if (detected === null) return chapters;
+
+    const splitChapters = TextNormalizer.splitByRegex(
+      chapters,
+      detected.regex,
+    );
+    const hasEnoughNewChapters = splitChapters.length >= chapters.length + 2;
+    if (!hasEnoughNewChapters) return chapters;
+
+    this.logger.log(
+      `Separação por IA aplicada: ${chapters.length} → ${splitChapters.length} capítulos (padrão ${detected.pattern}).`,
+    );
+
+    return splitChapters.map((chapter, index) => ({
+      ...chapter,
+      position: index + 1,
+    }));
+  }
+
+  private shouldDetectSeparator(
+    chapters: ExtractedChapter[],
+    fullText: string,
+  ): boolean {
+    if (fullText.length < MIN_TEXT_FOR_DETECTION) return false;
+    if (chapters.length === 0) return true;
+
+    const totalLength = chapters.reduce(
+      (sum, chapter) => sum + chapter.text.length,
+      0,
+    );
+    const averageLength = totalLength / chapters.length;
+    const hasTooFewChapters = chapters.length <= 2;
+    const hasHugeChapters = averageLength > MAX_AVERAGE_CHAPTER_LENGTH;
+
+    return hasTooFewChapters || hasHugeChapters;
   }
 
   /**

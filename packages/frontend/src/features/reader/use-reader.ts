@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getApiErrorInfo } from "@/features/ebooks/api";
@@ -59,7 +59,9 @@ export function useReader(
   );
 
   const isBookIdInformed = bookId.trim().length > 0;
-  // O progresso só decide a abertura quando a URL não trouxe um capítulo.
+  // O progresso é lido sempre: a URL pode trazer o capítulo, mas o offset salvo
+  // ainda vale quando é o mesmo capítulo. Sem capítulo na URL, ele também
+  // decide qual capítulo abre.
   const shouldReadProgress = initialChapterPosition === null;
 
   const chaptersQuery = useQuery<ChapterSummary[], Error>({
@@ -71,13 +73,24 @@ export function useReader(
   const progressQuery = useQuery<ReadingProgress | null, Error>({
     queryKey: readerKeys.progress(bookId),
     queryFn: () => fetchReadingProgress(bookId),
-    enabled: isBookIdInformed && shouldReadProgress,
+    enabled: isBookIdInformed,
   });
 
   const chapters = chaptersQuery.data ?? [];
   const savedProgress = progressQuery.data ?? null;
   const isStillResolvingInitialChapter =
-    shouldReadProgress && (chaptersQuery.isLoading || progressQuery.isLoading);
+    progressQuery.isLoading ||
+    (shouldReadProgress && chaptersQuery.isLoading);
+  // O ponto de retomada é congelado na abertura: as gravações seguintes
+  // atualizam o progresso salvo, mas não podem reposicionar a página que já
+  // está aberta.
+  const openingProgressRef = useRef<ReadingProgress | null>(null);
+  const hasResolvedOpeningRef = useRef(false);
+  if (!hasResolvedOpeningRef.current && !isStillResolvingInitialChapter) {
+    hasResolvedOpeningRef.current = true;
+    openingProgressRef.current = savedProgress;
+  }
+  const openingProgress = openingProgressRef.current;
   const resolvedPosition = resolveCurrentPosition(
     initialChapterPosition,
     navigatedPosition,
@@ -101,15 +114,16 @@ export function useReader(
   const errorKind = resolveErrorKind(
     chaptersQuery.error,
     progressQuery.error,
-    chapterQuery.error
+    chapterQuery.error,
+    shouldReadProgress
   );
 
-  const isOpeningAtSavedChapter =
-    shouldReadProgress && navigatedPosition === null;
+  const isOpeningAtSavedChapter = navigatedPosition === null;
   const isAtSavedChapter =
-    savedProgress !== null && resolvedPosition === savedProgress.chapterPosition;
+    openingProgress !== null &&
+    resolvedPosition === openingProgress.chapterPosition;
   const resumeOffset =
-    isOpeningAtSavedChapter && isAtSavedChapter ? savedProgress.offset : 0;
+    isOpeningAtSavedChapter && isAtSavedChapter ? openingProgress.offset : 0;
 
   const hasPrevious = chapter?.previousPosition != null;
   const hasNext = chapter?.nextPosition != null;
@@ -197,8 +211,8 @@ function resolveCurrentPosition(
   chapters: ChapterSummary[]
 ): number | null {
   if (navigatedPosition !== null) return navigatedPosition;
-  if (initialChapterPosition !== null) return initialChapterPosition;
   if (isStillResolvingInitialChapter) return null;
+  if (initialChapterPosition !== null) return initialChapterPosition;
 
   if (savedProgress !== null) return savedProgress.chapterPosition;
 
@@ -215,7 +229,8 @@ function resolveFirstChapterPosition(chapters: ChapterSummary[]): number {
 function resolveErrorKind(
   chaptersError: Error | null,
   progressError: Error | null,
-  chapterError: Error | null
+  chapterError: Error | null,
+  isProgressRequired: boolean
 ): ReaderErrorKind | null {
   if (chaptersError) {
     const chaptersErrorInfo = getApiErrorInfo(chaptersError);
@@ -224,9 +239,10 @@ function resolveErrorKind(
     return "unknown";
   }
 
-  // O progresso salvo decide a abertura; se ele falhar, não dá para retomar com
-  // segurança, então a tela oferece "Tentar de novo" em vez de abrir do zero.
-  if (progressError) return "unknown";
+  // O progresso salvo decide a abertura quando a URL não trouxe capítulo; se
+  // ele falhar nesse caso, não dá para retomar com segurança. Com capítulo na
+  // URL, a leitura abre nele mesmo sem o progresso.
+  if (progressError && isProgressRequired) return "unknown";
 
   if (chapterError) {
     const chapterErrorInfo = getApiErrorInfo(chapterError);

@@ -42,6 +42,10 @@ model Book {
 
   chapters Chapter[]
   readingProgress ReadingProgress?
+  conversations Conversation[]
+  images GeneratedImage[]
+  notes Note[]
+  dictionaryEntries DictionaryEntry[]
 
   @@index([createdAt(sort: Desc), id(sort: Desc)], map: "books_created_at_idx")
   @@map("books")
@@ -53,9 +57,12 @@ model Chapter {
   position Int
   title    String? @db.VarChar(200)
   text     String
+  /** Resumo gerado na ingestão; null quando ainda não foi resumido. */
+  summary  String?
 
   book   Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chunks Chunk[]
+  sections ChapterSection[]
 
   @@unique([bookId, position])
   @@map("chapters")
@@ -88,4 +95,119 @@ model ReadingProgress {
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@map("reading_progress")
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+
+  @@map("chat_role")
+}
+
+model Conversation {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  bookId    String        @map("book_id") @db.Uuid
+  title     String?       @db.VarChar(120)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  book      Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  images    GeneratedImage[]
+
+  @@index([bookId, updatedAt(sort: Desc)], map: "conversations_book_updated_idx")
+  @@map("conversations")
+}
+
+model ChatMessage {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  role           ChatRole
+  content        String
+  /** Trecho do livro que a pergunta usou como foco (mensagens do usuário). */
+  selection      String?
+  citations      Json?
+  /** Anotações criadas/editadas por ferramentas nesta resposta. */
+  noteActions    Json?        @map("note_actions")
+  imageId        String?      @map("image_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  image          GeneratedImage? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt], map: "chat_messages_conversation_created_idx")
+  @@map("chat_messages")
+}
+
+model GeneratedImage {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  bookId         String       @map("book_id") @db.Uuid
+  conversationId String?      @map("conversation_id") @db.Uuid
+  prompt         String
+  model          String
+  storageKey     String       @map("storage_key")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  book           Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  messages       ChatMessage[]
+  dictionaryEntry DictionaryEntry?
+
+  @@index([bookId, createdAt(sort: Desc)], map: "generated_images_book_created_idx")
+  @@map("generated_images")
+}
+
+
+model ChapterSection {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  chapterId   String  @map("chapter_id") @db.Uuid
+  position    Int
+  startOffset Int     @map("start_offset")
+  endOffset   Int     @map("end_offset")
+  summary     String
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, position])
+  @@index([chapterId, startOffset])
+  @@map("chapter_sections")
+}
+
+/**
+ * Anotação do leitor sobre um livro. O conteúdo é markdown livre e pode ter
+ * sido escrito manualmente ou pela IA pelo chat.
+ */
+model Note {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  bookId          String   @map("book_id") @db.Uuid
+  title           String   @db.VarChar(120)
+  content         String
+  /** Capítulo de origem; null quando a nota é geral do livro. */
+  chapterPosition Int?     @map("chapter_position")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, updatedAt(sort: Desc)], map: "notes_book_updated_idx")
+  @@map("notes")
+}
+
+/**
+ * Dicionário pessoal: uma entrada por palavra (normalizada), com o significado
+ * e, quando houver, o livro/trecho onde ela apareceu.
+ */
+model DictionaryEntry {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  word            String   @db.VarChar(120)
+  normalizedWord  String   @unique @map("normalized_word") @db.VarChar(120)
+  meaning         String
+  example         String?
+  quote           String?
+  bookId          String?  @map("book_id") @db.Uuid
+  chapterPosition Int?     @map("chapter_position")
+  imageId         String?  @unique @map("image_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  book            Book?    @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  image           GeneratedImage? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+
+  @@index([updatedAt(sort: Desc)], map: "dictionary_entries_updated_idx")
+  @@map("dictionary_entries")
 }

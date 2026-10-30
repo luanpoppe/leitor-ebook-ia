@@ -12,6 +12,16 @@ import {
   InvalidReadingProgressError,
 } from '../../catalog/catalog.errors';
 import { QueueUnavailableError } from '../../ingestion/ingestion.errors';
+import { ImageGenerationError } from '../../images/image-generation.service';
+import {
+  ChatContextUnavailableError,
+  ChatUnavailableError,
+  ConversationNotFoundError,
+} from '../../chat/chat.errors';
+import {
+  InvalidNoteChapterError,
+  NoteNotFoundError,
+} from '../../notes/notes.errors';
 import {
   InvalidStorageInputError,
   StorageObjectNotFoundError,
@@ -52,6 +62,11 @@ interface ErrorBody {
   UnsupportedEbookFormatError,
   EmptyEbookFileError,
   InvalidEbookStatusError,
+  ConversationNotFoundError,
+  ChatUnavailableError,
+  ChatContextUnavailableError,
+  NoteNotFoundError,
+  InvalidNoteChapterError,
   MulterError,
 )
 export class EbooksExceptionFilter extends BaseExceptionFilter {
@@ -132,6 +147,24 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
     }
     if (exception instanceof InvalidStorageInputError) {
       return HttpStatus.BAD_REQUEST;
+    }
+    if (exception instanceof ConversationNotFoundError) {
+      return HttpStatus.NOT_FOUND;
+    }
+    if (exception instanceof NoteNotFoundError) {
+      return HttpStatus.NOT_FOUND;
+    }
+    if (exception instanceof InvalidNoteChapterError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof ChatContextUnavailableError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof ChatUnavailableError) {
+      return HttpStatus.SERVICE_UNAVAILABLE;
+    }
+    if (exception instanceof ImageGenerationError) {
+      return HttpStatus.SERVICE_UNAVAILABLE;
     }
     return null;
   }

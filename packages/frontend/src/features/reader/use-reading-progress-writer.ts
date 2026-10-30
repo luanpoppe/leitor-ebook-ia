@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { saveReadingProgress } from "./api";
 import { ReaderProgressBeacon } from "./reader-progress-beacon";
+import { readerKeys } from "./use-reader";
 
 // Ficar 2 s parado no mesmo ponto já conta como "terminei de rolar".
 export const SAVE_DEBOUNCE_MS = 2_000;
@@ -21,6 +23,7 @@ export function useReadingProgressWriter(
   const pendingRef = useRef<ReadingPoint | null>(null);
   const lastSavedRef = useRef<ReadingPoint | null>(savedPoint);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryClient = useQueryClient();
 
   // O progresso salvo chega depois da primeira renderização; marcá-lo como
   // "já gravado" evita um PUT redundante quando a tela reporta o ponto restaurado.
@@ -51,13 +54,20 @@ export function useReadingProgressWriter(
       offset: pending.offset,
     };
     const request = saveReadingProgress(bookId, input);
-    request.catch(() => {
-      // Gravação é best-effort: engolir o erro mantém a leitura fluindo, e
-      // liberar a marca permite que a próxima mudança tente o mesmo ponto.
-      const isStillMarked = isSamePoint(lastSavedRef.current, pending);
-      if (isStillMarked) lastSavedRef.current = null;
-    });
-  }, [bookId]);
+    request
+      .then((progress) => {
+        // Mantém o cache do React Query no ponto que acabou de ser salvo: ao
+        // reabrir o livro na mesma sessão, a retomada usa o último ponto e não
+        // o valor da abertura anterior.
+        queryClient.setQueryData(readerKeys.progress(bookId), progress);
+      })
+      .catch(() => {
+        // Gravação é best-effort: engolir o erro mantém a leitura fluindo, e
+        // liberar a marca permite que a próxima mudança tente o mesmo ponto.
+        const isStillMarked = isSamePoint(lastSavedRef.current, pending);
+        if (isStillMarked) lastSavedRef.current = null;
+      });
+  }, [bookId, queryClient]);
 
   const scheduleSave = useCallback(
     (chapterPosition: number, offset: number) => {

@@ -28,6 +28,10 @@ Guarda onde o leitor parou em cada ebook — capítulo e offset em caracteres �
 
 ## Notas
 
+- O cliente lê o progresso sempre, inclusive quando a URL traz `?capitulo=N`: o capítulo da URL vence a escolha do capítulo, mas o offset salvo é usado quando é o mesmo capítulo; um capítulo diferente abre no começo.
+- A gravação normal é debounce de ~2 s, com flush em troca de capítulo, `visibilitychange` e desmontagem. No `pagehide`, o cliente usa `navigator.sendBeacon` (que só envia POST) e o backend tem um POST equivalente ao PUT.
+- O ponto de retomada é congelado na abertura: saves seguintes atualizam o progresso salvo e o cache do React Query, mas não reposicionam a página que já está aberta.
+
 - O debounce (~2 s) e o descarregamento ao trocar de capítulo/aba são responsabilidade do cliente (feature de tela de leitura), não do contrato.
 - Validado contra o Dom Casmurro (`01a15f7c-…`): capítulo 3 tem 53.872 caracteres; 99999999 → 422, posição 9 → 404, livro inexistente → 404.
 - Achado de code review fora do escopo: `GET /chapters/:position?offset=2147483647` estoura int4 no `substr("text", offset + 1, …)` — teto deveria ser `2_147_483_646`.

@@ -11,11 +11,13 @@ export class WindowFetcher {
   static readonly MAX_WINDOWS = 3;
 
   private readonly bookId: string;
+  private readonly windowSize: number;
   private readonly cache = new Map<string, TextWindow>();
   private readonly inFlight = new Map<string, Promise<TextWindow>>();
 
-  constructor(bookId: string) {
+  constructor(bookId: string, windowSize: number = WINDOW_SIZE) {
     this.bookId = bookId;
+    this.windowSize = windowSize;
   }
 
   /** Devolve do cache ou busca; deduplica requisição em voo. */
@@ -62,7 +64,7 @@ export class WindowFetcher {
         this.bookId,
         point.position,
         point.offset,
-        WINDOW_SIZE
+        this.windowSize
       );
       const textWindow = WindowFetcher.toTextWindow(page);
       this.remember(key, textWindow);

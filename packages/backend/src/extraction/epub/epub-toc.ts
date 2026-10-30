@@ -100,14 +100,18 @@ export class EpubTableOfContentsReader {
     const spineLinks = anchors
       .map((match) => ({
         path: EpubArchive.resolveHref(currentPath, match[1]),
-        text: HtmlToText.convert(match[2]),
+        text: EpubTableOfContentsReader.collapseWhitespace(
+          HtmlToText.convert(match[2]),
+        ),
       }))
       .filter((link) => link.path !== currentPath)
       .filter((link) => spinePathSet.has(link.path));
 
     if (spineLinks.length < MIN_CONTENTS_LINK_COUNT) return false;
 
-    const plainText = HtmlToText.convert(html);
+    const plainText = EpubTableOfContentsReader.collapseWhitespace(
+      HtmlToText.convert(html),
+    );
     if (plainText.length === 0) return false;
     if (plainText.length >= MAX_CONTENTS_TEXT_LENGTH) return false;
 
@@ -119,6 +123,15 @@ export class EpubTableOfContentsReader {
       linkTextLength >= plainText.length * MIN_LINK_TEXT_RATIO;
 
     return linksCoverMostText;
+  }
+
+  /**
+   * O HTML de sumário costuma vir com muita indentação entre os links; sem
+   * colapsar os espaços, o texto "parece" maior do que os rótulos e a página
+   * deixa de ser reconhecida como sumário.
+   */
+  private static collapseWhitespace(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
   }
 
   private static findNcxItem(

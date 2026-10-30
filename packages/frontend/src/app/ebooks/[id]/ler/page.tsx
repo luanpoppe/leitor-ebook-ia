@@ -22,11 +22,14 @@ function ReaderRoute(): JSX.Element {
   const bookId = resolveBookId(params?.id);
   const rawChapter = searchParams.get("capitulo");
   const initialChapterPosition = resolveChapterPosition(rawChapter);
+  const rawConversation = searchParams.get("conversa");
+  const initialConversationId = resolveConversationId(rawConversation);
 
   return (
     <ReaderScreen
       bookId={bookId}
       initialChapterPosition={initialChapterPosition}
+      initialConversationId={initialConversationId}
     />
   );
 }
@@ -56,4 +59,18 @@ function resolveChapterPosition(rawChapter: string | null): number | null {
   if (!isValidPosition) return null;
 
   return parsedPosition;
+}
+
+// Só UUID vira conversa inicial; qualquer outra coisa é ignorada.
+const CONVERSATION_PARAM_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveConversationId(rawConversation: string | null): string | null {
+  if (rawConversation === null) return null;
+
+  const conversationId = rawConversation.trim();
+  const isValid = CONVERSATION_PARAM_PATTERN.test(conversationId);
+  if (!isValid) return null;
+
+  return conversationId;
 }

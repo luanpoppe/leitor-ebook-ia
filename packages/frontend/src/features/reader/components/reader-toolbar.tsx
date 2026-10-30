@@ -2,18 +2,24 @@
 
 import Link from "next/link";
 import type { CSSProperties, JSX } from "react";
-import type { ReaderMode, ReaderTheme } from "../reader-preferences";
+import type { ReaderAlignment, ReaderMode, ReaderTheme } from "../reader-preferences";
 import styles from "./reader-toolbar.module.css";
 
 interface ReaderToolbarProps {
   bookTitle: string;
   backHref: string;
+  /** Rótulo do voltar; o leitor troca quando veio da página de conversas. */
+  backLabel?: string;
   currentPosition: number | null;
   chaptersCount: number;
   pageLabel?: string | null;
+  /** 0 a 1: posição no livro inteiro (capítulos anteriores + fração do atual). */
+  bookProgress: number | null;
   chapterProgress: number;
   isTocOpen: boolean;
   onToggleToc: () => void;
+  onOpenSearch: () => void;
+  onOpenNotes: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
   onPrevious: () => void;
@@ -25,18 +31,30 @@ interface ReaderToolbarProps {
   onIncreaseFont: () => void;
   theme: ReaderTheme;
   onToggleTheme: () => void;
+  alignment: ReaderAlignment;
+  onToggleAlignment: () => void;
   mode: ReaderMode;
   onToggleMode: () => void;
+  isChatOpen: boolean;
+  onToggleChat: () => void;
+  /** Seleção ativa: no toque a ação aparece na barra, não sobre a seleção. */
+  hasTextSelection: boolean;
+  onAskSelection: () => void;
 }
 
 const BACK_LABEL = "Voltar para a ficha do livro";
 const PREVIOUS_LABEL = "Capítulo anterior";
 const NEXT_LABEL = "Próximo capítulo";
 const TOC_LABEL = "Sumário";
+const SEARCH_LABEL = "Buscar";
+const CHAT_LABEL = "Chat";
+const NOTES_LABEL = "Anotações";
 const DECREASE_FONT_LABEL = "Diminuir fonte";
 const INCREASE_FONT_LABEL = "Aumentar fonte";
 const LIGHT_THEME_ACTION_LABEL = "Usar tema sépia";
 const SEPIA_THEME_ACTION_LABEL = "Usar tema claro";
+const JUSTIFY_ACTION_LABEL = "Justificar texto";
+const LEFT_ALIGN_ACTION_LABEL = "Alinhar à esquerda";
 
 function resolveProgress(chapterProgress: number): number {
   if (!Number.isFinite(chapterProgress)) return 0;
@@ -79,15 +97,25 @@ function resolveIsTocButtonActive(isTocOpen: boolean): string {
   return `${styles.button} ${styles.buttonActive}`;
 }
 
+function resolveIsChatButtonActive(isChatOpen: boolean): string {
+  if (!isChatOpen) return styles.button;
+
+  return `${styles.button} ${styles.buttonActive}`;
+}
+
 export function ReaderToolbar({
   bookTitle,
   backHref,
+  backLabel = BACK_LABEL,
   currentPosition,
   chaptersCount,
   pageLabel,
+  bookProgress,
   chapterProgress,
   isTocOpen,
   onToggleToc,
+  onOpenSearch,
+  onOpenNotes,
   hasPrevious,
   hasNext,
   onPrevious,
@@ -99,12 +127,22 @@ export function ReaderToolbar({
   onIncreaseFont,
   theme,
   onToggleTheme,
+  alignment,
+  onToggleAlignment,
   mode,
   onToggleMode,
+  isChatOpen,
+  onToggleChat,
+  hasTextSelection,
+  onAskSelection,
 }: ReaderToolbarProps): JSX.Element {
   const progressPercent = resolveProgress(chapterProgress);
+  const bookPercent =
+    bookProgress === null ? null : Math.round(bookProgress * 100);
   const chapterLabel = resolveChapterLabel(currentPosition, chaptersCount);
   const themeActionLabel = resolveThemeActionLabel(theme);
+  const alignmentActionLabel =
+    alignment === "justify" ? LEFT_ALIGN_ACTION_LABEL : JUSTIFY_ACTION_LABEL;
   const modeTargetLabel = resolveModeTargetLabel(mode);
   const modeActionLabel = resolveModeActionLabel(mode);
   const progressFillStyle = {
@@ -116,8 +154,8 @@ export function ReaderToolbar({
       <div className={styles.identity}>
         <Link
           href={backHref}
-          aria-label={BACK_LABEL}
-          title={BACK_LABEL}
+          aria-label={backLabel}
+          title={backLabel}
           className={styles.backButton}
         >
           ←
@@ -134,15 +172,34 @@ export function ReaderToolbar({
           >
             {chapterLabel}
           </span>
-          {pageLabel ? (
-            <span
-              className={styles.pageLabel}
-              title={pageLabel}
-              role="status"
-              aria-live="polite"
-            >
-              {pageLabel}
-            </span>
+          {pageLabel || bookPercent !== null ? (
+            <div className={styles.progressLabels}>
+              {pageLabel ? (
+                <span
+                  className={styles.pageLabel}
+                  title={pageLabel}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {pageLabel}
+                </span>
+              ) : null}
+              {pageLabel && bookPercent !== null ? (
+                <span className={styles.labelSeparator} aria-hidden="true">
+                  ·
+                </span>
+              ) : null}
+              {bookPercent !== null ? (
+                <span
+                  className={styles.bookLabel}
+                  title={`${bookPercent}% do livro`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {bookPercent}% do livro
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
@@ -161,6 +218,17 @@ export function ReaderToolbar({
       </div>
 
       <div className={styles.controls}>
+        {hasTextSelection && (
+          <button
+            type="button"
+            data-reader-selection-action=""
+            onClick={onAskSelection}
+            className={styles.selectionButton}
+          >
+            Perguntar à IA
+          </button>
+        )}
+
         <div className={styles.controlGroup}>
           <button
             type="button"
@@ -192,6 +260,34 @@ export function ReaderToolbar({
           className={resolveIsTocButtonActive(isTocOpen)}
         >
           {TOC_LABEL}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          aria-label={SEARCH_LABEL}
+          className={styles.button}
+        >
+          {SEARCH_LABEL}
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleChat}
+          aria-expanded={isChatOpen}
+          aria-label={CHAT_LABEL}
+          className={resolveIsChatButtonActive(isChatOpen)}
+        >
+          {CHAT_LABEL}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenNotes}
+          aria-label={NOTES_LABEL}
+          className={styles.button}
+        >
+          {NOTES_LABEL}
         </button>
 
         <div className={styles.controlGroup}>
@@ -228,6 +324,17 @@ export function ReaderToolbar({
           className={styles.themeButton}
         >
           {themeActionLabel}
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleAlignment}
+          aria-label={alignmentActionLabel}
+          aria-pressed={alignment === "justify"}
+          title={alignmentActionLabel}
+          className={styles.themeButton}
+        >
+          {(alignment === "justify" ? "Esquerda" : "Justificar")}
         </button>
 
         <button

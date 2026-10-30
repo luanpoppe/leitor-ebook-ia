@@ -21,12 +21,25 @@ import {
   type ReaderScrollViewHandle,
 } from "./reader-scroll-view";
 import { ReaderTocDrawer } from "./reader-toc-drawer";
+import { ReaderChatDrawer } from "../chat/reader-chat-drawer";
+import { ReaderCitationPreview } from "../chat/reader-citation-preview";
+import type { ChatCitation, ChatSelection } from "../chat/types";
+import { ReaderSearchDrawer } from "../search/reader-search-drawer";
+import { ReaderNotesDrawer } from "../notes/reader-notes-drawer";
+import { useTextSelection } from "../use-text-selection";
+import { ReaderSelectionAction } from "./reader-selection-action";
 import { ReaderToolbar } from "./reader-toolbar";
 import styles from "./reader-screen.module.css";
 import messageStyles from "./reader-message.module.css";
 
 const FIRST_CHAPTER_POSITION = 1;
 const CHUNK_ERROR_MESSAGE = "Falha ao carregar o trecho do capítulo.";
+// Contexto do chat: a página atual e as duas anteriores, com teto de caracteres
+// para o prompt não crescer sem limite em páginas muito grandes.
+const READING_CONTEXT_PAGES_BEFORE = 2;
+const MAX_READING_CONTEXT_CHARS = 12_000;
+const SCROLL_CONTEXT_AHEAD_CHARS = 1_500;
+const READING_CONTEXT_FALLBACK_CHARS = 6_000;
 // O carregamento cobre a área sem desmontar a view que a mede.
 const PAGE_LOADING_STYLE: CSSProperties = {
   position: "absolute",
@@ -36,6 +49,8 @@ const PAGE_LOADING_STYLE: CSSProperties = {
 interface ReaderScreenProps {
   bookId: string;
   initialChapterPosition: number | null;
+  /** Conversa aberta ao entrar pela página de conversas. */
+  initialConversationId: string | null;
 }
 
 // Ponto de leitura: capítulo + offset do primeiro parágrafo visível.
@@ -47,6 +62,7 @@ interface ReaderPoint {
 export function ReaderScreen({
   bookId,
   initialChapterPosition,
+  initialConversationId,
 }: ReaderScreenProps): JSX.Element {
   const {
     chapters,
@@ -65,17 +81,27 @@ export function ReaderScreen({
   const {
     fontSize,
     theme,
+    alignment,
     canIncrease,
     canDecrease,
     increaseFont,
     decreaseFont,
     toggleTheme,
+    toggleAlignment,
   } = useReaderPreferences();
   const { mode, toggleMode } = useReaderMode();
   const { scheduleSave } = useReadingProgressWriter(bookId, savedProgress);
   const { ebook } = useEbookDetail(bookId);
 
   const [isTocOpen, setIsTocOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(
+    initialConversationId !== null
+  );
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [notesInitialNoteId, setNotesInitialNoteId] = useState<string | null>(
+    null
+  );
   const [hasReachedEnd, setHasReachedEnd] = useState(false);
   const [metrics, setMetrics] = useState<ReaderPageMetrics | null>(null);
   // Capítulo que abre na última página: voltar do começo do capítulo seguinte.
@@ -95,9 +121,28 @@ export function ReaderScreen({
   // para o motor abrir na janela certa em vez do começo do capítulo.
   const [scrollOffset, setScrollOffset] = useState<number | null>(null);
   const [scrollAnchor, setScrollAnchor] = useState<ReaderPoint | null>(null);
+  const [citationPreview, setCitationPreview] = useState<ChatCitation | null>(
+    null
+  );
+  // Onde a leitura estava quando a citação foi aberta, para o "voltar".
+  const [returnPoint, setReturnPoint] = useState<ReaderPoint | null>(null);
+  // Trecho selecionado que o chat vai usar como foco da pergunta.
+  const [chatSelection, setChatSelection] = useState<ChatSelection | null>(null);
 
   const scrollRef = useRef<ReaderScrollViewHandle>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const previewOriginRef = useRef<ReaderPoint | null>(null);
   const isScrollMode = mode === "scroll";
+
+  // Só observa seleção com a leitura limpa (sem sumário, chat, notas ou prévia).
+  const textSelection = useTextSelection(
+    mainRef,
+    !isChatOpen &&
+      citationPreview === null &&
+      !isTocOpen &&
+      !isSearchOpen &&
+      !isNotesOpen
+  );
 
   // A view mede a área e publica a régua; uma identidade nova a cada render
   // dispararia repaginação em loop.
@@ -143,9 +188,9 @@ export function ReaderScreen({
   }, [chapter, goPrevious, hasPrevious]);
 
   const {
+    pages,
     page,
     pageIndex,
-    totalPages,
     direction,
     error: pageError,
     goToNextPage,
@@ -266,11 +311,155 @@ export function ReaderScreen({
   }, [chapter, goPrevious, isScrollMode]);
 
   const handleToggleToc = useCallback(() => {
+    setIsChatOpen(false);
+    setIsSearchOpen(false);
+    setIsNotesOpen(false);
+    setChatSelection(null);
     setIsTocOpen((isOpen) => !isOpen);
   }, []);
 
   const handleCloseToc = useCallback(() => {
     setIsTocOpen(false);
+  }, []);
+
+  const handleOpenSearch = useCallback(() => {
+    setIsTocOpen(false);
+    setIsChatOpen(false);
+    setIsNotesOpen(false);
+    setChatSelection(null);
+    setIsSearchOpen(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setIsSearchOpen(false);
+  }, []);
+
+  const handleToggleChat = useCallback(() => {
+    setIsTocOpen(false);
+    setIsSearchOpen(false);
+    setIsNotesOpen(false);
+    setChatSelection(null);
+    setIsChatOpen((isOpen) => !isOpen);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setChatSelection(null);
+    setIsChatOpen(false);
+  }, []);
+
+  const handleOpenNotes = useCallback(() => {
+    setIsTocOpen(false);
+    setIsSearchOpen(false);
+    setIsChatOpen(false);
+    setChatSelection(null);
+    setCitationPreview(null);
+    setNotesInitialNoteId(null);
+    setIsNotesOpen(true);
+  }, []);
+
+  const handleOpenNote = useCallback((noteId: string) => {
+    setIsTocOpen(false);
+    setIsSearchOpen(false);
+    setIsChatOpen(false);
+    setChatSelection(null);
+    setCitationPreview(null);
+    setNotesInitialNoteId(noteId);
+    setIsNotesOpen(true);
+  }, []);
+
+  const handleCloseNotes = useCallback(() => {
+    setIsNotesOpen(false);
+  }, []);
+
+  // Pular para um ponto do livro nos dois modos. A citação usa isto e o
+  // "voltar" reusa o mesmo caminho.
+  const navigateToPoint = useCallback(
+    (point: ReaderPoint) => {
+      setHasReachedEnd(false);
+      setLandAtEndPosition(null);
+
+      if (isScrollMode) {
+        setScrollOffset(point.offset);
+        setScrollAnchor(point);
+      } else {
+        setPageOffset(point.offset);
+      }
+
+      const isSameChapter = point.position === currentPosition;
+      if (isSameChapter) return;
+
+      goToChapter(point.position);
+    },
+    [currentPosition, goToChapter, isScrollMode]
+  );
+
+  const handleSearchSelect = useCallback(
+    (position: number, offset: number) => {
+      setIsSearchOpen(false);
+      navigateToPoint({ position, offset });
+    },
+    [navigateToPoint]
+  );
+
+  // Citação do chat: abre a prévia sem mover a leitura principal.
+  const handleCitationSelect = useCallback(
+    (citation: ChatCitation) => {
+      previewOriginRef.current = {
+        position: currentPosition ?? FIRST_CHAPTER_POSITION,
+        offset: isScrollMode ? visiblePoint.offset : page?.startOffset ?? 0,
+      };
+      setCitationPreview(citation);
+    },
+    [currentPosition, isScrollMode, page, visiblePoint.offset]
+  );
+
+  const handleCloseCitationPreview = useCallback(() => {
+    setCitationPreview(null);
+  }, []);
+
+  // Seleção virou pergunta: abre o chat com o trecho fixado.
+  const handleAskSelection = useCallback(() => {
+    if (textSelection === null) return;
+
+    setChatSelection({
+      text: textSelection.text,
+      before: textSelection.before,
+    });
+    setIsTocOpen(false);
+    setIsNotesOpen(false);
+    setIsChatOpen(true);
+    window.getSelection()?.removeAllRanges();
+  }, [textSelection]);
+
+  const handleClearChatSelection = useCallback(() => {
+    setChatSelection(null);
+  }, []);
+
+  const handleGoToReadingFromPreview = useCallback(
+    (citation: ChatCitation) => {
+      const origin = previewOriginRef.current;
+      if (origin !== null) setReturnPoint(origin);
+
+      navigateToPoint({
+        position: citation.chapterPosition,
+        offset: citation.offset,
+      });
+      setCitationPreview(null);
+      setIsChatOpen(false);
+      setChatSelection(null);
+    },
+    [navigateToPoint]
+  );
+
+  const handleReturnToPoint = useCallback(() => {
+    if (returnPoint === null) return;
+
+    navigateToPoint(returnPoint);
+    setReturnPoint(null);
+  }, [navigateToPoint, returnPoint]);
+
+  const handleDismissReturnPoint = useCallback(() => {
+    setReturnPoint(null);
   }, []);
 
   const handleSelectChapter = useCallback(
@@ -296,6 +485,14 @@ export function ReaderScreen({
       goToChapter(position);
     },
     [currentPosition, goToChapter, isScrollMode, restartChapter]
+  );
+
+  const handleGoToNoteChapter = useCallback(
+    (position: number) => {
+      setIsNotesOpen(false);
+      handleSelectChapter(position);
+    },
+    [handleSelectChapter]
   );
 
   const handleOpenFirstChapter = useCallback(() => {
@@ -368,15 +565,63 @@ export function ReaderScreen({
   );
 
   const readerTitle = ebook?.title ?? "Leitura";
-  const backHref = `/ebooks/${bookId}`;
+  const backHref =
+    initialConversationId === null
+      ? `/ebooks/${bookId}`
+      : `/conversas/${initialConversationId}`;
+  const backLabel =
+    initialConversationId === null
+      ? undefined
+      : "Voltar para a conversa";
   const chaptersCount = chapters.length;
   const toolbarPosition = isScrollMode
     ? visiblePoint.position
     : currentPosition;
   const pageLabel =
-    isScrollMode || page === null
+    isScrollMode || page === null || chapter === null
       ? null
-      : `Página ${pageIndex + 1} de ${totalPages}`;
+      : `${Math.round(
+          resolveChapterProgress(page.startOffset, chapter.totalLength) * 100
+        )}% do capítulo`;
+
+  // Progresso do livro: capítulos anteriores inteiros + a fração lida do atual.
+  const bookProgress = useMemo(() => {
+    if (chapters.length === 0) return null;
+
+    const totalWords = chapters.reduce(
+      (sum, item) => sum + item.wordCount,
+      0
+    );
+    if (totalWords <= 0) return null;
+
+    const position = isScrollMode ? visiblePoint.position : toolbarPosition;
+    if (position === null) return null;
+
+    const wordsBefore = chapters
+      .filter((item) => item.position < position)
+      .reduce((sum, item) => sum + item.wordCount, 0);
+    const currentChapter = chapters.find((item) => item.position === position);
+    const currentWords = currentChapter?.wordCount ?? 0;
+    const offset = isScrollMode ? visiblePoint.offset : page?.startOffset ?? 0;
+    const isChapterLoaded =
+      chapter !== null &&
+      chapter.position === position &&
+      chapter.totalLength > 0;
+    const chapterFraction = isChapterLoaded
+      ? Math.min(Math.max(offset / chapter.totalLength, 0), 1)
+      : 0;
+    const progress = (wordsBefore + currentWords * chapterFraction) / totalWords;
+
+    return Math.min(Math.max(progress, 0), 1);
+  }, [
+    chapter,
+    chapters,
+    isScrollMode,
+    page,
+    toolbarPosition,
+    visiblePoint.offset,
+    visiblePoint.position,
+  ]);
 
   // Na rolagem o trecho visível conhece o total do capítulo; o capítulo da tela
   // é só o fallback enquanto a view ainda não reportou.
@@ -404,9 +649,51 @@ export function ReaderScreen({
   // Falha de trecho na rolagem não trava o texto já carregado; só a ausência de
   // capítulo e o erro global impedem a leitura.
   const isScrollReadingBlocked = errorKind !== null || chapter === null;
+  // Faixa enviada ao chat: página atual + duas anteriores (ou a tela atual na
+  // rolagem). O backend busca esse texto no capítulo.
+  const chatContext = useMemo(() => {
+    if (isScrollMode) {
+      const end = visiblePoint.offset + SCROLL_CONTEXT_AHEAD_CHARS;
+      const start = Math.max(0, end - MAX_READING_CONTEXT_CHARS);
+
+      return { start, end };
+    }
+
+    const currentPage = page;
+    if (currentPage === null) {
+      return {
+        start: Math.max(0, openingPageOffset - READING_CONTEXT_FALLBACK_CHARS),
+        end: openingPageOffset,
+      };
+    }
+
+    const firstPageIndex = Math.max(0, pageIndex - READING_CONTEXT_PAGES_BEFORE);
+    const firstPage = pages[firstPageIndex] ?? currentPage;
+    const start = Math.max(0, firstPage.startOffset);
+    const end = currentPage.endOffset;
+
+    return {
+      start: Math.max(start, end - MAX_READING_CONTEXT_CHARS),
+      end,
+    };
+  }, [
+    isScrollMode,
+    openingPageOffset,
+    page,
+    pageIndex,
+    pages,
+    visiblePoint.offset,
+  ]);
+
   const isReadingBlocked = isScrollMode
     ? isScrollReadingBlocked
     : isPageReadingBlocked;
+  const isReadingLocked =
+    isReadingBlocked ||
+    isChatOpen ||
+    isSearchOpen ||
+    isNotesOpen ||
+    citationPreview !== null;
   const isChunkErrorVisible =
     !isScrollMode && pageError !== null && errorKind === null && !hasReachedEnd;
   // Falha tem o aviso do rodapé; página nula sem falha é carga em andamento.
@@ -416,7 +703,7 @@ export function ReaderScreen({
   useReaderKeyboard({
     mode,
     isTocOpen,
-    isReadingBlocked,
+    isReadingBlocked: isReadingLocked,
     onCloseToc: handleCloseToc,
     onNext: goToNextPage,
     onPrevious: goToPreviousPage,
@@ -458,6 +745,7 @@ export function ReaderScreen({
           hasReachedEnd={hasScrollReachedEnd}
           fontSize={fontSize}
           theme={theme}
+          alignment={alignment}
           anchor={scrollAnchor}
           onLoadMore={loadMore}
           onLoadPrevious={loadPrevious}
@@ -511,6 +799,7 @@ export function ReaderScreen({
           direction={direction}
           fontSize={fontSize}
           theme={theme}
+          alignment={alignment}
           onMetricsChange={handleMetricsChange}
         />
 
@@ -532,12 +821,16 @@ export function ReaderScreen({
       <ReaderToolbar
         bookTitle={readerTitle}
         backHref={backHref}
+        backLabel={backLabel}
         currentPosition={toolbarPosition}
         chaptersCount={chaptersCount}
         pageLabel={pageLabel}
+        bookProgress={bookProgress}
         chapterProgress={chapterProgress}
         isTocOpen={isTocOpen}
         onToggleToc={handleToggleToc}
+        onOpenSearch={handleOpenSearch}
+        onOpenNotes={handleOpenNotes}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
         onPrevious={handlePreviousChapter}
@@ -549,11 +842,17 @@ export function ReaderScreen({
         onIncreaseFont={increaseFont}
         theme={theme}
         onToggleTheme={toggleTheme}
+        alignment={alignment}
+        onToggleAlignment={toggleAlignment}
         mode={mode}
         onToggleMode={handleToggleMode}
+        isChatOpen={isChatOpen}
+        onToggleChat={handleToggleChat}
+        hasTextSelection={textSelection !== null && !isChatOpen}
+        onAskSelection={handleAskSelection}
       />
 
-      <main className={styles.main}>
+      <main ref={mainRef} className={styles.main}>
         {renderBody()}
 
         {isChunkErrorVisible && (
@@ -571,6 +870,84 @@ export function ReaderScreen({
           onSelect={handleSelectChapter}
           onClose={handleCloseToc}
         />
+      )}
+
+      <ReaderChatDrawer
+        bookId={bookId}
+        isOpen={isChatOpen}
+        initialConversationId={initialConversationId}
+        position={
+            isScrollMode
+              ? visiblePoint.position
+              : toolbarPosition ?? FIRST_CHAPTER_POSITION
+          }
+          offset={isScrollMode ? visiblePoint.offset : page?.startOffset ?? 0}
+          contextStart={chatContext.start}
+          contextEnd={chatContext.end}
+          selection={chatSelection}
+          onClearSelection={handleClearChatSelection}
+          isSuspended={citationPreview !== null}
+          onClose={handleCloseChat}
+          onOpenNotes={handleOpenNotes}
+          onOpenNote={handleOpenNote}
+          onCitationSelect={handleCitationSelect}
+        />
+
+      {isSearchOpen && (
+        <ReaderSearchDrawer
+          bookId={bookId}
+          onClose={handleCloseSearch}
+          onSelect={handleSearchSelect}
+        />
+      )}
+
+      {isNotesOpen && (
+        <ReaderNotesDrawer
+          bookId={bookId}
+          currentChapterPosition={currentPosition}
+          initialNoteId={notesInitialNoteId}
+          onClose={handleCloseNotes}
+          onGoToChapter={handleGoToNoteChapter}
+        />
+      )}
+
+      {citationPreview !== null && (
+        <ReaderCitationPreview
+          bookId={bookId}
+          citation={citationPreview}
+          fontSize={fontSize}
+          theme={theme}
+          alignment={alignment}
+          onClose={handleCloseCitationPreview}
+          onGoToReading={handleGoToReadingFromPreview}
+        />
+      )}
+
+      {textSelection !== null && !isChatOpen && (
+        <ReaderSelectionAction
+          selection={textSelection}
+          onAsk={handleAskSelection}
+        />
+      )}
+
+      {returnPoint !== null && (
+        <div className={styles.returnBar} role="status">
+          <button
+            type="button"
+            className={styles.returnButton}
+            onClick={handleReturnToPoint}
+          >
+            ← Voltar para onde eu estava
+          </button>
+          <button
+            type="button"
+            className={styles.returnDismiss}
+            onClick={handleDismissReturnPoint}
+            aria-label="Descartar retorno"
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   );

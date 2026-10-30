@@ -20,9 +20,6 @@ export interface ScrollSegment {
   lastChar: string;
 }
 
-/** Teto de trechos vivos na rolagem: anterior, atual e próximo. */
-export const MAX_SCROLL_SEGMENTS = 3;
-
 const PARAGRAPH_SEPARATOR = "\n\n";
 
 /**

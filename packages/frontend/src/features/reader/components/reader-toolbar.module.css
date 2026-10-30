@@ -85,6 +85,25 @@
   text-overflow: ellipsis;
 }
 
+.progressLabels {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.bookLabel {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.labelSeparator {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .progressZone {
   flex: 1 1 140px;
   min-width: 120px;
@@ -156,6 +175,37 @@
 .buttonActive {
   background: var(--accent-soft);
   color: var(--accent-ink);
+}
+
+/* Ação da seleção no toque: fica na barra, longe do menu nativo. */
+.selectionButton {
+  display: none;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-ink);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.selectionButton:hover {
+  background: var(--accent);
+}
+
+.selectionButton:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .selectionButton {
+    display: inline-flex;
+  }
 }
 
 .fontSizeValue {

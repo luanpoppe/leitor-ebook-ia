@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { formatDate, formatExtension } from "@/features/ebooks/format";
 import type { EbookSummary } from "@/features/ebooks/types";
 import { ShortTitle } from "../short-title";
@@ -12,6 +13,8 @@ interface LeadCardProps {
 }
 
 export function LeadCard({ ebook, onOpen }: LeadCardProps) {
+  const isReady = ebook.status === "ready";
+  const readingHref = `/ebooks/${ebook.id}/ler`;
   const handleOpen = () => onOpen(ebook.id);
 
   return (
@@ -31,9 +34,19 @@ export function LeadCard({ ebook, onOpen }: LeadCardProps) {
         {ebook.author && <p className={styles.leadAuthor}>{ebook.author}</p>}
 
         <div className={styles.leadActions}>
-          <button type="button" onClick={handleOpen} className={styles.leadOpen}>
-            Abrir livro
-          </button>
+          {isReady ? (
+            <Link href={readingHref} className={styles.leadOpen}>
+              Abrir livro
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={handleOpen}
+              className={styles.leadOpen}
+            >
+              Abrir livro
+            </button>
+          )}
           <span className={styles.leadMeta}>
             {formatExtension(ebook.format)} · {formatDate(ebook.createdAt)}
           </span>

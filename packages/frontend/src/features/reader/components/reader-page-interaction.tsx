@@ -22,7 +22,11 @@ interface PointerStart {
   x: number;
   y: number;
   pointerId: number;
+  startedAt: number;
 }
+
+// Toque longo no celular é seleção de texto (ou menu do navegador), não virada.
+const LONG_PRESS_MS = 400;
 
 export function ReaderPageInteraction({
   isBlocked,
@@ -38,11 +42,14 @@ export function ReaderPageInteraction({
     (event: ReactPointerEvent<HTMLDivElement>) => {
       // Só o botão principal inicia gesto; o direito abre menu do navegador.
       if (event.button !== 0) return;
+      // Com texto selecionado, arrastar é ajuste da seleção, não virada.
+      if (hasSelectedText()) return;
 
       pointerStartRef.current = {
         x: event.clientX,
         y: event.clientY,
         pointerId: event.pointerId,
+        startedAt: Date.now(),
       };
     },
     []
@@ -82,11 +89,21 @@ export function ReaderPageInteraction({
       // Seleção de texto com o mouse é do usuário, não da virada (EDGE-03).
       if (hasSelectedText()) return;
 
+      // Toque longo (seleção no celular) também não vira página.
+      const pressDuration = Date.now() - pointerStart.startedAt;
+      if (pressDuration >= LONG_PRESS_MS) return;
+
       const dx = event.clientX - pointerStart.x;
       const dy = event.clientY - pointerStart.y;
 
       const swipeDirection = PageGesture.resolveSwipe(dx, dy);
       if (swipeDirection !== null) {
+        // No toque, arrastar é seleção de texto (o navegador desenha os
+        // seletores); a virada no celular fica nas zonas de toque. No mouse, o
+        // arrasto continua virando página.
+        const isTouch = event.pointerType === "touch";
+        if (isTouch) return;
+
         runIntent(swipeDirection);
         return;
       }

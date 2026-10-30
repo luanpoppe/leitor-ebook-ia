@@ -21,6 +21,19 @@ export interface AdjacentPositions {
   nextPosition: number | null;
 }
 
+export interface ChapterSummaryRecord {
+  position: number;
+  title: string | null;
+  summary: string;
+}
+
+export interface ChapterSectionRecord {
+  position: number;
+  startOffset: number;
+  endOffset: number;
+  summary: string;
+}
+
 interface ChapterSummaryRow {
   id: string;
   position: number;
@@ -142,6 +155,48 @@ export class ChapterReadingRepository {
       previousPosition: this.toNullableNumber(row.previous_position),
       nextPosition: this.toNullableNumber(row.next_position),
     };
+  }
+
+  /** Resumos gerados na ingestão, para o planejador do chat escolher capítulos. */
+  async listChapterSummaries(bookId: string): Promise<ChapterSummaryRecord[]> {
+    const rows = await this.prisma.chapter.findMany({
+      where: { bookId, summary: { not: null } },
+      orderBy: { position: 'asc' },
+      select: { position: true, title: true, summary: true },
+    });
+
+    return rows.flatMap((row) => {
+      if (row.summary === null) return [];
+
+      return [
+        { position: row.position, title: row.title, summary: row.summary },
+      ];
+    });
+  }
+
+  /** Resumos das partes do capítulo que o leitor já passou. */
+  async listReadSections(
+    bookId: string,
+    position: number,
+    upToOffset: number,
+    limit: number,
+  ): Promise<ChapterSectionRecord[]> {
+    const rows = await this.prisma.chapterSection.findMany({
+      where: {
+        chapter: { bookId, position },
+        endOffset: { lte: upToOffset },
+      },
+      orderBy: { position: 'desc' },
+      take: limit,
+      select: {
+        position: true,
+        startOffset: true,
+        endOffset: true,
+        summary: true,
+      },
+    });
+
+    return rows.reverse();
   }
 
   private toChapterSummary(row: ChapterSummaryRow): ChapterSummary {

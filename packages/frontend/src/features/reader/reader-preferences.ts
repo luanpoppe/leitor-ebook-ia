@@ -1,15 +1,18 @@
 export type ReaderTheme = "light" | "sepia";
 export type ReaderMode = "page" | "scroll";
+export type ReaderAlignment = "left" | "justify";
 
 export const FONT_SIZE_STEPS = [16, 18, 20, 22, 24] as const;
 
 export const DEFAULT_FONT_SIZE = 18;
 export const DEFAULT_THEME: ReaderTheme = "light";
 export const DEFAULT_READER_MODE: ReaderMode = "page";
+export const DEFAULT_ALIGNMENT: ReaderAlignment = "left";
 
 export const FONT_SIZE_STORAGE_KEY = "folio.reader.font-size";
 export const THEME_STORAGE_KEY = "folio.reader.theme";
 export const READER_MODE_STORAGE_KEY = "reader-mode";
+export const ALIGNMENT_STORAGE_KEY = "folio.reader.alignment";
 
 const LAST_FONT_SIZE_INDEX = FONT_SIZE_STEPS.length - 1;
 
@@ -69,4 +72,18 @@ export function toggleReaderMode(mode: ReaderMode): ReaderMode {
   if (mode === "page") return "scroll";
 
   return "page";
+}
+
+/** Resolve o alinhamento guardado; qualquer coisa fora dos dois cai no padrão. */
+export function resolveAlignment(rawValue: string | null): ReaderAlignment {
+  if (rawValue === "justify") return "justify";
+  if (rawValue === "left") return "left";
+
+  return DEFAULT_ALIGNMENT;
+}
+
+export function toggleAlignment(alignment: ReaderAlignment): ReaderAlignment {
+  if (alignment === "left") return "justify";
+
+  return "left";
 }

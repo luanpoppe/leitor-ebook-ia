@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, JSX } from "react";
 import type { ReaderTheme } from "../reader-preferences";
+import type { ReaderAlignment } from "../reader-preferences";
+import { ReaderHeading } from "../heading";
 import type { ReaderPageMetrics } from "../use-reader-page";
 import type { TextPage } from "../window/page-paginator";
 import {
@@ -21,6 +23,7 @@ export interface ReaderPageViewProps {
   direction: "next" | "previous" | null;
   fontSize: number;
   theme: ReaderTheme;
+  alignment: ReaderAlignment;
   /** Régua + altura útil; chamado quando a área é medida ou redimensionada. */
   onMetricsChange(metrics: ReaderPageMetrics): void;
 }
@@ -36,6 +39,7 @@ export function ReaderPageView({
   direction,
   fontSize,
   theme,
+  alignment,
   onMetricsChange,
 }: ReaderPageViewProps): JSX.Element {
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -100,7 +104,7 @@ export function ReaderPageView({
     // muda com a fonte e o motor só repagina quando a função muda. A largura da
     // coluna nem sempre acompanha a fonte (coluna limitada pela tela, não 68ch).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fontSize, measureEpoch, width]
+    [alignment, fontSize, measureEpoch, width]
   );
 
   useEffect(() => {
@@ -116,7 +120,12 @@ export function ReaderPageView({
   } as CSSProperties;
 
   return (
-    <div className={styles.frame} data-theme={theme} style={containerStyle}>
+    <div
+      className={styles.frame}
+      data-theme={theme}
+      data-alignment={alignment}
+      style={containerStyle}
+    >
       <div
         ref={contentRef}
         className={styles.content}
@@ -131,7 +140,14 @@ export function ReaderPageView({
           data-direction={direction ?? "none"}
         >
           {paragraphs.map((paragraph, index) => (
-            <p key={index} className={styles.paragraph}>
+            <p
+              key={index}
+              className={
+                ReaderHeading.isHeading(paragraph)
+                  ? styles.heading
+                  : styles.paragraph
+              }
+            >
               {paragraph}
             </p>
           ))}
@@ -142,6 +158,7 @@ export function ReaderPageView({
         ref={measureLayerRef}
         fontSize={fontSize}
         width={width}
+        alignment={alignment}
         cacheEpoch={measureEpoch}
       />
     </div>

@@ -1,4 +1,4 @@
-import { env } from "@/env";
+import { getApiBaseUrl } from "@/utils/http";
 import type { SaveReadingProgressInput } from "./types";
 
 /**
@@ -20,7 +20,7 @@ export class ReaderProgressBeacon {
 }
 
 function buildProgressUrl(bookId: string): string {
-  return `${env.NEXT_PUBLIC_API_URL}/ebooks/${bookId}/progress`;
+  return `${getApiBaseUrl()}/ebooks/${bookId}/progress`;
 }
 
 function trySendBeacon(url: string, body: string): boolean {

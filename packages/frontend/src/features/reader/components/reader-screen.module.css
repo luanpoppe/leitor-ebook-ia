@@ -36,3 +36,46 @@
   color: var(--muted);
   font-size: 15px;
 }
+
+/* Volta rapida depois de pular para o trecho citado. */
+.returnBar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 3px 3px 12px;
+  border-radius: 999px;
+  background: var(--accent-ink);
+  color: #fff;
+  box-shadow: 0 6px 20px rgb(17 24 39 / 0.3);
+  transform: translateX(-50%);
+}
+
+.returnButton {
+  padding: 6px 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.returnDismiss {
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 14px;
+  opacity: 0.8;
+  cursor: pointer;
+}
+
+.returnButton:focus-visible,
+.returnDismiss:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}

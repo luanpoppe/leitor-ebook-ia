@@ -22,4 +22,6 @@
 - [tela-de-leitura](./tela-de-leitura.md) — rota `/ebooks/[id]/ler`: sumário em drawer, tipografia, teclado, retomada, gravação com debounce/beacon e estados de erro/fim
 - [motor-de-janelas](./motor-de-janelas.md) — trechos de até 20 mil caracteres, páginas medidas, pré-busca, âncora de repaginação e camada de medição
 - [modo-pagina](./modo-pagina.md) — leitura página a página: composição da tela, medição, gestos, teclado, indicador e aviso de falha
-- [modo-rolagem](./modo-rolagem.md) — leitura contínua: motor de três trechos, virtualização por espaçador, travessia de capítulo e preferência de modo
+- [modo-rolagem](./modo-rolagem.md) - leitura contínua: janelas de 4 mil caracteres, virtualização por espaçador, travessia de capítulo e preferência de modo
+- [anotacoes](./anotacoes.md) — anotações em markdown por livro: tabela `notes`, CRUD, ferramentas do chat (criar/listar/ler/editar/excluir com confirmação) e painel no leitor
+- [dicionario](./dicionario.md) — dicionário pessoal de palavras: uma entrada por palavra, ferramenta do chat, página com filtro por livro e contexto do livro

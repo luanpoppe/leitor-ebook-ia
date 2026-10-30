@@ -1,18 +1,22 @@
 .frame {
+  position: relative;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: #fdfcf9;
+  --reader-bg: #fdfcf9;
+  background: var(--reader-bg);
   color: #2a2724;
 }
 
 .frame[data-theme="sepia"] {
-  background: #f4ecd8;
+  --reader-bg: #f4ecd8;
+  background: var(--reader-bg);
   color: #3f3428;
 }
 
 .frame[data-theme="light"] {
-  background: #fdfcf9;
+  --reader-bg: #fdfcf9;
+  background: var(--reader-bg);
   color: #2a2724;
 }
 
@@ -22,15 +26,44 @@
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   /* A posição é compensada à mão (prepend e espaçador); a âncora automática do
      navegador somaria uma segunda correção e faria o texto pular. */
   overflow-anchor: none;
   outline: none;
 }
 
+.viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .viewport:focus-visible {
   box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* O texto some suavemente nas bordas: o centro fica nítido e é ele que o olho
+   acompanha enquanto o resto passa. */
+.fadeTop,
+.fadeBottom {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: clamp(48px, 8vh, 68px);
+  pointer-events: none;
+}
+
+.fadeTop {
+  top: 0;
+  background: linear-gradient(to bottom, var(--reader-bg) 0%, transparent 100%);
+}
+
+.fadeBottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--reader-bg) 0%, transparent 100%);
 }
 
 /* Mesma coluna e tipografia de reader-page-view.module.css. */
@@ -57,8 +90,17 @@
 }
 
 .paragraph {
-  margin: 0 0 1.25em;
+  margin: 0 0 0.7em;
   font-size: var(--reader-font-size, 18px);
+  line-height: 1.75;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.heading {
+  margin: 0 0 0.7em;
+  font-size: var(--reader-font-size, 18px);
+  font-weight: 700;
   line-height: 1.75;
   overflow-wrap: break-word;
   hyphens: auto;
@@ -127,4 +169,9 @@
   line-height: 1.4;
   text-align: center;
   opacity: 0.7;
+}
+
+/* Justificado quando o leitor escolhe; o padrao continua a esquerda. */
+.frame[data-alignment="justify"] .paragraph {
+  text-align: justify;
 }

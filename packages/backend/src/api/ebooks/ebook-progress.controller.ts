@@ -2,8 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpStatus,
   Param,
+  Post,
   Put,
   Res,
 } from '@nestjs/common';
@@ -61,6 +63,24 @@ export class EbookProgressController {
     description: 'Offset além do fim do capítulo.',
   })
   save(
+    @Param('bookId') bookId: string,
+    @Body() body: SaveReadingProgressDto,
+  ): Promise<ReadingProgressResponse> {
+    return this.progressService.save(bookId, {
+      chapterPosition: body.chapterPosition,
+      offset: body.offset,
+    });
+  }
+
+  /**
+   * `navigator.sendBeacon` só envia POST; é o caminho usado no fechamento da
+   * aba. Mesmo corpo e mesmas regras do PUT.
+   */
+  @Post()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Salva o progresso no fechamento da aba (beacon)' })
+  @ApiResponse({ status: 200, description: 'Progresso de leitura salvo.' })
+  saveFromBeacon(
     @Param('bookId') bookId: string,
     @Body() body: SaveReadingProgressDto,
   ): Promise<ReadingProgressResponse> {

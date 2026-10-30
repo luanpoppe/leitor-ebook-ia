@@ -36,45 +36,65 @@ export function BookCard({
   const handleOpen = () => onOpen(ebook.id);
   const handleReprocess = () => onReprocess(ebook.id);
 
+  const cardContent = (
+    <>
+      <BookCover
+        title={ebook.title}
+        coverUrl={ebook.coverUrl}
+        format={ebook.format}
+      />
+
+      <span className={styles.cardBody}>
+        <span className={styles.cardTitle}>{ebook.title}</span>
+
+        {ebook.author && (
+          <span className={styles.cardAuthor}>{ebook.author}</span>
+        )}
+
+        <span className={styles.cardMeta}>
+          {formatExtension(ebook.format)} · {formatDate(ebook.createdAt)}
+        </span>
+
+        <span className={styles.cardStatus}>
+          <StatusMark status={ebook.status} />
+        </span>
+      </span>
+    </>
+  );
+
   return (
     <article className={cardClassName} data-book-id={ebook.id}>
-      <button
-        type="button"
-        onClick={handleOpen}
-        className={styles.cardButton}
-        aria-label={`Abrir ${ebook.title}`}
-      >
-        <BookCover
-          title={ebook.title}
-          coverUrl={ebook.coverUrl}
-          format={ebook.format}
-        />
-
-        <span className={styles.cardBody}>
-          <span className={styles.cardTitle}>{ebook.title}</span>
-
-          {ebook.author && (
-            <span className={styles.cardAuthor}>{ebook.author}</span>
-          )}
-
-          <span className={styles.cardMeta}>
-            {formatExtension(ebook.format)} · {formatDate(ebook.createdAt)}
-          </span>
-
-          <span className={styles.cardStatus}>
-            <StatusMark status={ebook.status} />
-          </span>
-        </span>
-      </button>
-
-      {isReady && (
+      {/* O cartão inteiro é o atalho de leitura: clicar no livro abre o
+          leitor. Livro que ainda não está pronto abre os detalhes, pois não
+          há texto para ler. */}
+      {isReady ? (
         <Link
           href={readingHref}
-          className={styles.readLink}
+          className={styles.cardButton}
           aria-label={`Ler ${ebook.title}`}
         >
-          Ler
+          {cardContent}
         </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={handleOpen}
+          className={styles.cardButton}
+          aria-label={`Ver detalhes de ${ebook.title}`}
+        >
+          {cardContent}
+        </button>
+      )}
+
+      {isReady && (
+        <button
+          type="button"
+          onClick={handleOpen}
+          className={styles.readLink}
+          aria-label={`Ver detalhes de ${ebook.title}`}
+        >
+          Detalhes
+        </button>
       )}
 
       {isFailed && (
