@@ -35,13 +35,16 @@ import {
   type ChatMessageResponse,
   type ChatScope,
   type ConversationListResponse,
+  type ConversationListWithBooksResponse,
   type ConversationResponse,
   type ConversationSummaryResponse,
+  type ConversationWithBookResponse,
 } from './chat.schemas';
 import { ChunkSearchRepository, type ChunkMatch } from './chunk-search.repository';
 import {
   ConversationRepository,
   type ConversationSummary,
+  type ConversationWithBookSummary,
   type ConversationWithMessages,
   type StoredMessage,
 } from './conversation.repository';
@@ -107,6 +110,13 @@ export class ChatService {
     const conversations = await this.conversationRepository.listByBook(book.id);
 
     return { items: conversations.map(toConversationSummary) };
+  }
+
+  /** Conversas de todos os livros (página global de conversas). */
+  async listAllConversations(): Promise<ConversationListWithBooksResponse> {
+    const conversations = await this.conversationRepository.listAll();
+
+    return { items: conversations.map(toConversationWithBook) };
   }
 
   async createConversation(bookId: string): Promise<ConversationResponse> {
@@ -758,6 +768,20 @@ function toConversationSummary(
 ): ConversationSummaryResponse {
   return {
     id: conversation.id,
+    title: conversation.title,
+    updatedAt: conversation.updatedAt.toISOString(),
+    messageCount: conversation.messageCount,
+  };
+}
+
+function toConversationWithBook(
+  conversation: ConversationWithBookSummary,
+): ConversationWithBookResponse {
+  return {
+    id: conversation.id,
+    bookId: conversation.bookId,
+    bookTitle: conversation.bookTitle,
+    bookAuthor: conversation.bookAuthor,
     title: conversation.title,
     updatedAt: conversation.updatedAt.toISOString(),
     messageCount: conversation.messageCount,

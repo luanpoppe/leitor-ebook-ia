@@ -33,7 +33,11 @@ export interface UseChatResult {
  * Estado do chat do livro. Carrega as conversas quando o painel abre, mantém a
  * conversa ativa e envia perguntas no escopo escolhido.
  */
-export function useChat(bookId: string, enabled: boolean): UseChatResult {
+export function useChat(
+  bookId: string,
+  enabled: boolean,
+  initialConversationId: string | null = null
+): UseChatResult {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<
@@ -68,7 +72,11 @@ export function useChat(bookId: string, enabled: boolean): UseChatResult {
       const items = await listConversations(bookId);
       setConversations(items);
 
-      const firstConversation = items[0];
+      const requestedConversation =
+        initialConversationId === null
+          ? undefined
+          : items.find((item) => item.id === initialConversationId);
+      const firstConversation = requestedConversation ?? items[0];
       if (firstConversation !== undefined) {
         await loadConversation(firstConversation.id);
         return;
@@ -90,7 +98,7 @@ export function useChat(bookId: string, enabled: boolean): UseChatResult {
     } finally {
       setIsLoading(false);
     }
-  }, [bookId, loadConversation]);
+  }, [bookId, initialConversationId, loadConversation]);
 
   useEffect(() => {
     if (!enabled) return;

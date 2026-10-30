@@ -90,10 +90,6 @@
   font-weight: 500;
 }
 
-.navItemMuted {
-  opacity: 0.55;
-}
-
 .navCount {
   color: var(--accent-ink);
   font-size: 12px;
@@ -129,6 +125,7 @@
     position: static;
     height: auto;
     overflow: visible;
+    flex-wrap: wrap;
     flex-direction: row;
     align-items: center;
     gap: 12px;
@@ -138,14 +135,20 @@
 
   .scope,
   .navLabel,
-  .navItemMuted,
   .sidebarFoot {
     display: none;
   }
 
   .nav {
     flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     margin-left: auto;
+  }
+
+  .navItem {
+    padding: 6px 9px;
+    font-size: 13px;
   }
 
   .canvas {

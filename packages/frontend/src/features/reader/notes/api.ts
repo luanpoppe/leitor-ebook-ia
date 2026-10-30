@@ -15,8 +15,28 @@ export interface NoteInput {
   chapterPosition: number | null;
 }
 
+export interface NoteBook {
+  id: string;
+  title: string;
+  author: string | null;
+}
+
+export interface AllBookNote extends BookNote {
+  book: NoteBook;
+}
+
 interface NoteListResponse {
   items: BookNote[];
+}
+
+interface AllNotesResponse {
+  items: AllBookNote[];
+}
+
+export async function listAllNotes(): Promise<AllBookNote[]> {
+  const response = await api.get<AllNotesResponse>("/notes");
+
+  return response.data.items;
 }
 
 export async function listNotes(bookId: string): Promise<BookNote[]> {

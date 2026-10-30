@@ -14,29 +14,59 @@ export interface UpdateNoteRecord {
   chapterPosition?: number | null;
 }
 
+export interface NoteWithBookRecord extends Note {
+  book: {
+    id: string;
+    title: string;
+    author: string | null;
+  };
+}
+
 const LIST_LIMIT = 200;
+const ALL_LIST_LIMIT = 300;
+
+function buildNoteSearchWhere(query?: string, bookId?: string) {
+  return {
+    ...(bookId !== undefined ? { bookId } : {}),
+    ...(query !== undefined
+      ? {
+          OR: [
+            { title: { contains: query, mode: 'insensitive' as const } },
+            { content: { contains: query, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
+}
 
 @Injectable()
 export class NotesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(bookId: string, query?: string): Promise<Note[]> {
-    const where = {
-      bookId,
-      ...(query !== undefined
-        ? {
-            OR: [
-              { title: { contains: query, mode: 'insensitive' as const } },
-              { content: { contains: query, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
-    };
+    const where = buildNoteSearchWhere(query, bookId);
 
     return this.prisma.note.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
       take: LIST_LIMIT,
+    });
+  }
+
+  async listAll(
+    query?: string,
+    bookId?: string,
+    limit = ALL_LIST_LIMIT,
+  ): Promise<NoteWithBookRecord[]> {
+    return this.prisma.note.findMany({
+      where: buildNoteSearchWhere(query, bookId),
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      include: {
+        book: {
+          select: { id: true, title: true, author: true },
+        },
+      },
     });
   }
 

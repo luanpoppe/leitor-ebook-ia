@@ -16,6 +16,14 @@ export const listNotesQuerySchema = z.object({
 
 export class ListNotesQueryDto extends createZodDto(listNotesQuerySchema) {}
 
+export const allNotesQuerySchema = z.object({
+  q: z.string().trim().min(2).max(120).optional(),
+  bookId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(300),
+});
+
+export class AllNotesQueryDto extends createZodDto(allNotesQuerySchema) {}
+
 export const createNoteSchema = z.object({
   title: z.string().trim().min(1).max(MAX_NOTE_TITLE_LENGTH),
   content: z.string().trim().min(1).max(MAX_NOTE_CONTENT_LENGTH),
@@ -51,6 +59,20 @@ export interface NoteResponse {
 
 export interface NoteListResponse {
   items: NoteResponse[];
+}
+
+export interface NoteBookResponse {
+  id: string;
+  title: string;
+  author: string | null;
+}
+
+export interface NoteWithBookResponse extends NoteResponse {
+  book: NoteBookResponse;
+}
+
+export interface NoteListWithBooksResponse {
+  items: NoteWithBookResponse[];
 }
 
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;

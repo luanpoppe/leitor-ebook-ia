@@ -5,13 +5,16 @@ import { BrandMark } from "./brand-mark";
 import styles from "./app-shell.module.css";
 
 interface AppShellProps {
-  active?: "shelf";
+  active?: "shelf" | "notes" | "conversations" | "settings";
   bookCount?: number;
   children: ReactNode;
 }
 
 export function AppShell({ active, bookCount, children }: AppShellProps) {
   const isShelfActive = active === "shelf";
+  const isNotesActive = active === "notes";
+  const isConversationsActive = active === "conversations";
+  const isSettingsActive = active === "settings";
 
   return (
     <div className={styles.root}>
@@ -46,18 +49,37 @@ export function AppShell({ active, bookCount, children }: AppShellProps) {
             )}
           </Link>
 
-          <span
-            className={`${styles.navItem} ${styles.navItemMuted}`}
-            title="Em breve"
+          <Link
+            href="/anotacoes"
+            className={`${styles.navItem} ${
+              isNotesActive ? styles.navItemActive : ""
+            }`}
+            aria-current={isNotesActive ? "page" : undefined}
+          >
+            Anotações
+          </Link>
+
+          <span className={styles.navLabel}>Mais</span>
+
+          <Link
+            href="/conversas"
+            className={`${styles.navItem} ${
+              isConversationsActive ? styles.navItemActive : ""
+            }`}
+            aria-current={isConversationsActive ? "page" : undefined}
           >
             Conversas
-          </span>
-          <span
-            className={`${styles.navItem} ${styles.navItemMuted}`}
-            title="Em breve"
+          </Link>
+
+          <Link
+            href="/ajustes"
+            className={`${styles.navItem} ${
+              isSettingsActive ? styles.navItemActive : ""
+            }`}
+            aria-current={isSettingsActive ? "page" : undefined}
           >
             Ajustes
-          </span>
+          </Link>
         </nav>
 
         <div className={styles.sidebarFoot}>

@@ -16,6 +16,8 @@ import styles from "./reader-chat-drawer.module.css";
 interface ReaderChatDrawerProps {
   bookId: string;
   isOpen: boolean;
+  /** Conversa aberta ao chegar pela página de conversas. */
+  initialConversationId?: string | null;
   /** Capítulo e offset do topo visível: base do escopo "até aqui". */
   position: number;
   offset: number;
@@ -53,6 +55,7 @@ const SCOPE_OPTIONS: Array<{
 export function ReaderChatDrawer({
   bookId,
   isOpen,
+  initialConversationId = null,
   position,
   offset,
   contextStart,
@@ -76,7 +79,7 @@ export function ReaderChatDrawer({
     openConversation,
     startNewConversation,
     retry,
-  } = useChat(bookId, isOpen);
+  } = useChat(bookId, isOpen, initialConversationId);
 
   const [scope, setScope] = useState<ChatScope>("up-to-current");
   const [question, setQuestion] = useState("");

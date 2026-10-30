@@ -9,6 +9,12 @@ export interface ConversationSummary {
   messageCount: number;
 }
 
+export interface ConversationWithBookSummary extends ConversationSummary {
+  bookId: string;
+  bookTitle: string;
+  bookAuthor: string | null;
+}
+
 export interface StoredMessage {
   id: string;
   role: ChatRole;
@@ -70,6 +76,32 @@ export class ConversationRepository {
 
     return rows.map((row) => ({
       id: row.id,
+      title: row.title,
+      updatedAt: row.updatedAt,
+      messageCount: row._count.messages,
+    }));
+  }
+
+  /** Conversas de todos os livros, para a página global de conversas. */
+  async listAll(): Promise<ConversationWithBookSummary[]> {
+    const rows = await this.prisma.conversation.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        bookId: true,
+        title: true,
+        updatedAt: true,
+        book: { select: { title: true, author: true } },
+        _count: { select: { messages: true } },
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      bookId: row.bookId,
+      bookTitle: row.book.title,
+      bookAuthor: row.book.author,
       title: row.title,
       updatedAt: row.updatedAt,
       messageCount: row._count.messages,

@@ -11,6 +11,7 @@ import {
 import type {
   CreateNoteInput,
   NoteResponse,
+  NoteWithBookResponse,
   UpdateNoteInput,
 } from './notes.schemas';
 
@@ -32,6 +33,20 @@ export class NotesService {
     const notes = await this.notes.list(bookId, query);
 
     return notes.map((note) => this.toResponse(note));
+  }
+
+  /** Todas as anotações da biblioteca, com o livro de cada uma. */
+  async listAll(
+    query?: string,
+    bookId?: string,
+    limit?: number,
+  ): Promise<NoteWithBookResponse[]> {
+    const notes = await this.notes.listAll(query, bookId, limit);
+
+    return notes.map((note) => ({
+      ...this.toResponse(note),
+      book: note.book,
+    }));
   }
 
   async get(bookId: string, noteId: string): Promise<NoteResponse> {

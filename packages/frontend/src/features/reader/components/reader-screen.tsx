@@ -49,6 +49,8 @@ const PAGE_LOADING_STYLE: CSSProperties = {
 interface ReaderScreenProps {
   bookId: string;
   initialChapterPosition: number | null;
+  /** Conversa aberta ao entrar pela página de conversas. */
+  initialConversationId: string | null;
 }
 
 // Ponto de leitura: capítulo + offset do primeiro parágrafo visível.
@@ -60,6 +62,7 @@ interface ReaderPoint {
 export function ReaderScreen({
   bookId,
   initialChapterPosition,
+  initialConversationId,
 }: ReaderScreenProps): JSX.Element {
   const {
     chapters,
@@ -91,7 +94,9 @@ export function ReaderScreen({
   const { ebook } = useEbookDetail(bookId);
 
   const [isTocOpen, setIsTocOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(
+    initialConversationId !== null
+  );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [notesInitialNoteId, setNotesInitialNoteId] = useState<string | null>(
@@ -862,6 +867,7 @@ export function ReaderScreen({
       <ReaderChatDrawer
         bookId={bookId}
         isOpen={isChatOpen}
+        initialConversationId={initialConversationId}
         position={
             isScrollMode
               ? visiblePoint.position

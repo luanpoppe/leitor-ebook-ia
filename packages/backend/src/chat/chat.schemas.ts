@@ -67,6 +67,20 @@ export interface ConversationListResponse {
   items: ConversationSummaryResponse[];
 }
 
+export interface ConversationWithBookResponse {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  bookAuthor: string | null;
+  title: string | null;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ConversationListWithBooksResponse {
+  items: ConversationWithBookResponse[];
+}
+
 export interface ConversationResponse {
   id: string;
   title: string | null;
