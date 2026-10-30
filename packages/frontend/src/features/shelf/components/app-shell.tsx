@@ -59,8 +59,6 @@ export function AppShell({ active, bookCount, children }: AppShellProps) {
             Anotações
           </Link>
 
-          <span className={styles.navLabel}>Mais</span>
-
           <Link
             href="/conversas"
             className={`${styles.navItem} ${

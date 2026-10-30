@@ -1,6 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { ConversationListWithBooksResponse } from './chat.schemas';
+import {
+  ConversationParamsDto,
+  type ConversationDetailWithBookResponse,
+  type ConversationListWithBooksResponse,
+} from './chat.schemas';
 import { ChatService } from './chat.service';
 
 /**
@@ -17,5 +21,15 @@ export class ConversationsController {
   @ApiResponse({ status: 200, description: 'Conversas com o livro de origem.' })
   list(): Promise<ConversationListWithBooksResponse> {
     return this.chatService.listAllConversations();
+  }
+
+  @Get(':conversationId')
+  @ApiOperation({ summary: 'Lê uma conversa com mensagens e livro' })
+  @ApiResponse({ status: 200, description: 'Conversa completa.' })
+  @ApiResponse({ status: 404, description: 'Conversa não encontrada.' })
+  get(
+    @Param() params: ConversationParamsDto,
+  ): Promise<ConversationDetailWithBookResponse> {
+    return this.chatService.getConversationById(params.conversationId);
   }
 }

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AIMessages, AITools, type AIModelNames } from '@luanpoppe/ai';
 import { z } from 'zod';
 import {
@@ -36,6 +36,7 @@ import {
   type ChatScope,
   type ConversationListResponse,
   type ConversationListWithBooksResponse,
+  type ConversationDetailWithBookResponse,
   type ConversationResponse,
   type ConversationSummaryResponse,
   type ConversationWithBookResponse,
@@ -44,6 +45,7 @@ import { ChunkSearchRepository, type ChunkMatch } from './chunk-search.repositor
 import {
   ConversationRepository,
   type ConversationSummary,
+  type ConversationWithBookAndMessages,
   type ConversationWithBookSummary,
   type ConversationWithMessages,
   type StoredMessage,
@@ -117,6 +119,18 @@ export class ChatService {
     const conversations = await this.conversationRepository.listAll();
 
     return { items: conversations.map(toConversationWithBook) };
+  }
+
+  async getConversationById(
+    conversationId: string,
+  ): Promise<ConversationDetailWithBookResponse> {
+    const conversation =
+      await this.conversationRepository.findWithMessagesById(conversationId);
+    if (conversation === null) {
+      throw new NotFoundException('Conversa não encontrada.');
+    }
+
+    return toConversationWithBookAndMessages(conversation);
   }
 
   async createConversation(bookId: string): Promise<ConversationResponse> {
@@ -785,6 +799,22 @@ function toConversationWithBook(
     title: conversation.title,
     updatedAt: conversation.updatedAt.toISOString(),
     messageCount: conversation.messageCount,
+  };
+}
+
+function toConversationWithBookAndMessages(
+  conversation: ConversationWithBookAndMessages,
+): ConversationDetailWithBookResponse {
+  return {
+    id: conversation.id,
+    bookId: conversation.bookId,
+    bookTitle: conversation.bookTitle,
+    bookAuthor: conversation.bookAuthor,
+    title: conversation.title,
+    updatedAt: conversation.updatedAt.toISOString(),
+    messages: conversation.messages.map((message) =>
+      toMessage(message, conversation.bookId),
+    ),
   };
 }
 

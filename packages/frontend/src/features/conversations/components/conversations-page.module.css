@@ -32,6 +32,51 @@
   font-size: 12px;
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+  flex: 1;
+}
+
+.filterField:last-child {
+  flex: 2;
+}
+
+.filterLabel {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.select,
+.input {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--accent-track);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.select:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 1px;
+}
+
 .list {
   display: flex;
   flex-direction: column;
@@ -138,5 +183,11 @@
 
   .title {
     font-size: 26px;
+  }
+
+  .filterField,
+  .filterField:last-child {
+    min-width: 100%;
+    flex: 1 1 100%;
   }
 }

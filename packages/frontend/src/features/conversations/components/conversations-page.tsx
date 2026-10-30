@@ -1,14 +1,75 @@
 "use client";
 
 import Link from "next/link";
-import type { JSX } from "react";
+import { useMemo, useState } from "react";
+import type { ChangeEvent, JSX } from "react";
 import { formatDate } from "@/features/ebooks/format";
 import { AppShell } from "@/features/shelf/components/app-shell";
 import { useAllConversations } from "../use-all-conversations";
 import styles from "./conversations-page.module.css";
 
+interface BookFilter {
+  id: string;
+  title: string;
+  author: string | null;
+  count: number;
+}
+
 export function ConversationsPage(): JSX.Element {
   const { conversations, isLoading, error, reload } = useAllConversations();
+  const [selectedBookId, setSelectedBookId] = useState("");
+  const [query, setQuery] = useState("");
+
+  const books = useMemo<BookFilter[]>(() => {
+    const byId = new Map<string, BookFilter>();
+
+    for (const conversation of conversations) {
+      const current = byId.get(conversation.bookId);
+      if (current === undefined) {
+        byId.set(conversation.bookId, {
+          id: conversation.bookId,
+          title: conversation.bookTitle,
+          author: conversation.bookAuthor,
+          count: 1,
+        });
+        continue;
+      }
+
+      byId.set(conversation.bookId, {
+        ...current,
+        count: current.count + 1,
+      });
+    }
+
+    return [...byId.values()].sort((left, right) =>
+      left.title.localeCompare(right.title, "pt-BR")
+    );
+  }, [conversations]);
+
+  const filteredConversations = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
+
+    return conversations.filter((conversation) => {
+      const matchesBook =
+        selectedBookId.length === 0 || conversation.bookId === selectedBookId;
+      if (!matchesBook) return false;
+      if (normalizedQuery.length === 0) return true;
+
+      const searchableText = [
+        conversation.title ?? "",
+        conversation.bookTitle,
+        conversation.bookAuthor ?? "",
+      ]
+        .join(" ")
+        .toLocaleLowerCase("pt-BR");
+
+      return searchableText.includes(normalizedQuery);
+    });
+  }, [conversations, query, selectedBookId]);
+
+  const handleBookChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedBookId(event.target.value);
+  };
 
   return (
     <AppShell active="conversations">
@@ -29,6 +90,39 @@ export function ConversationsPage(): JSX.Element {
         )}
       </header>
 
+      {!isLoading && error === null && conversations.length > 0 && (
+        <div className={styles.filters}>
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>Livro</span>
+            <select
+              value={selectedBookId}
+              onChange={handleBookChange}
+              className={styles.select}
+            >
+              <option value="">
+                Todos os livros ({conversations.length})
+              </option>
+              {books.map((book) => (
+                <option key={book.id} value={book.id}>
+                  {book.title} ({book.count})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>Tema</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tema da conversa, livro ou autor…"
+              className={styles.input}
+            />
+          </label>
+        </div>
+      )}
+
       {isLoading && <p className={styles.status}>Carregando conversas…</p>}
 
       {!isLoading && error !== null && (
@@ -47,12 +141,21 @@ export function ConversationsPage(): JSX.Element {
         </p>
       )}
 
-      {conversations.length > 0 && (
+      {!isLoading &&
+        error === null &&
+        conversations.length > 0 &&
+        filteredConversations.length === 0 && (
+          <p className={styles.empty}>
+            Nenhuma conversa encontrada com esses filtros.
+          </p>
+        )}
+
+      {filteredConversations.length > 0 && (
         <ul className={styles.list}>
-          {conversations.map((conversation) => (
+          {filteredConversations.map((conversation) => (
             <li key={conversation.id}>
               <Link
-                href={`/ebooks/${conversation.bookId}/ler?conversa=${conversation.id}`}
+                href={`/conversas/${conversation.id}`}
                 className={styles.item}
               >
                 <span className={styles.itemBook}>
@@ -73,9 +176,7 @@ export function ConversationsPage(): JSX.Element {
                   {formatDate(conversation.updatedAt)} ·{" "}
                   {conversation.messageCount}{" "}
                   {conversation.messageCount === 1 ? "mensagem" : "mensagens"}
-                  <span className={styles.itemAction}>
-                    Abrir no livro →
-                  </span>
+                  <span className={styles.itemAction}>Ver conversa →</span>
                 </span>
               </Link>
             </li>

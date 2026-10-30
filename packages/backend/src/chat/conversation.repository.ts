@@ -32,6 +32,13 @@ export interface ConversationWithMessages {
   messages: StoredMessage[];
 }
 
+export interface ConversationWithBookAndMessages extends ConversationWithMessages {
+  bookId: string;
+  bookTitle: string;
+  bookAuthor: string | null;
+  updatedAt: Date;
+}
+
 export interface SaveExchangeInput {
   conversationId: string;
   /** Preenchido só quando a conversa ainda não tem título. */
@@ -143,6 +150,45 @@ export class ConversationRepository {
     });
 
     return conversation ?? null;
+  }
+
+  async findWithMessagesById(
+    conversationId: string,
+  ): Promise<ConversationWithBookAndMessages | null> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: {
+        id: true,
+        title: true,
+        bookId: true,
+        updatedAt: true,
+        book: { select: { title: true, author: true } },
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            role: true,
+            content: true,
+            selection: true,
+            imageId: true,
+            citations: true,
+            noteActions: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    if (conversation === null) return null;
+
+    return {
+      id: conversation.id,
+      title: conversation.title,
+      bookId: conversation.bookId,
+      bookTitle: conversation.book.title,
+      bookAuthor: conversation.book.author,
+      updatedAt: conversation.updatedAt,
+      messages: conversation.messages,
+    };
   }
 
   async delete(bookId: string, conversationId: string): Promise<boolean> {

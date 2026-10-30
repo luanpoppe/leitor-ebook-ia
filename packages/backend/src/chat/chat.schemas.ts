@@ -81,6 +81,16 @@ export interface ConversationListWithBooksResponse {
   items: ConversationWithBookResponse[];
 }
 
+export interface ConversationDetailWithBookResponse {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  bookAuthor: string | null;
+  title: string | null;
+  updatedAt: string;
+  messages: ChatMessageResponse[];
+}
+
 export interface ConversationResponse {
   id: string;
   title: string | null;

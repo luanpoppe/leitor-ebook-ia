@@ -8,6 +8,8 @@ import styles from "./reader-toolbar.module.css";
 interface ReaderToolbarProps {
   bookTitle: string;
   backHref: string;
+  /** Rótulo do voltar; o leitor troca quando veio da página de conversas. */
+  backLabel?: string;
   currentPosition: number | null;
   chaptersCount: number;
   pageLabel?: string | null;
@@ -104,6 +106,7 @@ function resolveIsChatButtonActive(isChatOpen: boolean): string {
 export function ReaderToolbar({
   bookTitle,
   backHref,
+  backLabel = BACK_LABEL,
   currentPosition,
   chaptersCount,
   pageLabel,
@@ -151,8 +154,8 @@ export function ReaderToolbar({
       <div className={styles.identity}>
         <Link
           href={backHref}
-          aria-label={BACK_LABEL}
-          title={BACK_LABEL}
+          aria-label={backLabel}
+          title={backLabel}
           className={styles.backButton}
         >
           ←

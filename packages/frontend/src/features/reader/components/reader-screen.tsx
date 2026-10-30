@@ -565,7 +565,14 @@ export function ReaderScreen({
   );
 
   const readerTitle = ebook?.title ?? "Leitura";
-  const backHref = `/ebooks/${bookId}`;
+  const backHref =
+    initialConversationId === null
+      ? `/ebooks/${bookId}`
+      : `/conversas/${initialConversationId}`;
+  const backLabel =
+    initialConversationId === null
+      ? undefined
+      : "Voltar para a conversa";
   const chaptersCount = chapters.length;
   const toolbarPosition = isScrollMode
     ? visiblePoint.position
@@ -814,6 +821,7 @@ export function ReaderScreen({
       <ReaderToolbar
         bookTitle={readerTitle}
         backHref={backHref}
+        backLabel={backLabel}
         currentPosition={toolbarPosition}
         chaptersCount={chaptersCount}
         pageLabel={pageLabel}
