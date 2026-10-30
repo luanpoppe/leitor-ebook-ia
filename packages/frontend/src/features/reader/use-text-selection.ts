@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { PagePaginator } from "./window/page-paginator";
 
@@ -32,6 +32,10 @@ const MIN_SELECTION_LENGTH = 2;
 const MAX_SELECTION_LENGTH = 4_000;
 const MAX_BEFORE_LENGTH = 800;
 const SELECTION_ACTION_SELECTOR = "[data-reader-selection-action]";
+// No toque, tocar na barra pode colapsar a seleção antes do clique chegar no
+// botão de cor. O estado sobrevive por um instante para a ação usar os offsets
+// já capturados; se for um toque fora, o menu some logo depois.
+const COLLAPSED_CLEAR_DELAY_MS = 400;
 
 /**
  * Seleção de texto dentro da área de leitura. A ação aparece no pointerup (e
@@ -42,6 +46,7 @@ export function useTextSelection(
   enabled: boolean
 ): ReaderTextSelection | null {
   const [selection, setSelection] = useState<ReaderTextSelection | null>(null);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const readSelection = useCallback(() => {
     const container = containerRef.current;
@@ -118,14 +123,35 @@ export function useTextSelection(
     [readSelection]
   );
 
-  // Limpar a seleção (ao criar a marcação, por exemplo) precisa esconder o menu
-  // sem esperar o próximo pointerup.
-  const handleSelectionChange = useCallback(() => {
-    if (window.getSelection()?.isCollapsed !== false) setSelection(null);
+  const cancelClearTimer = useCallback(() => {
+    if (clearTimerRef.current === null) return;
+
+    clearTimeout(clearTimerRef.current);
+    clearTimerRef.current = null;
   }, []);
+
+  // Limpar a seleção (ao criar a marcação, por exemplo) precisa esconder o menu
+  // sem esperar o próximo pointerup. O pequeno atraso cobre o toque na barra:
+  // o navegador colapsa a seleção antes do clique, mas a ação ainda precisa dos
+  // offsets capturados.
+  const handleSelectionChange = useCallback(() => {
+    const isCollapsed = window.getSelection()?.isCollapsed !== false;
+    if (!isCollapsed) {
+      cancelClearTimer();
+      return;
+    }
+
+    if (clearTimerRef.current !== null) return;
+
+    clearTimerRef.current = setTimeout(() => {
+      clearTimerRef.current = null;
+      if (window.getSelection()?.isCollapsed !== false) setSelection(null);
+    }, COLLAPSED_CLEAR_DELAY_MS);
+  }, [cancelClearTimer]);
 
   useEffect(() => {
     if (!enabled) {
+      cancelClearTimer();
       setSelection(null);
       return;
     }
@@ -135,11 +161,18 @@ export function useTextSelection(
     document.addEventListener("selectionchange", handleSelectionChange);
 
     return () => {
+      cancelClearTimer();
       document.removeEventListener("pointerup", handlePointerUp);
       document.removeEventListener("keyup", readSelection);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [enabled, handlePointerUp, handleSelectionChange, readSelection]);
+  }, [
+    cancelClearTimer,
+    enabled,
+    handlePointerUp,
+    handleSelectionChange,
+    readSelection,
+  ]);
 
   return selection;
 }

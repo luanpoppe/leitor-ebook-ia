@@ -58,6 +58,7 @@ export interface ReaderScrollViewProps {
   alignment: ReaderAlignment;
   /** Marcações indexadas pela posição do capítulo. */
   highlightsByChapter: ReadonlyMap<number, BookHighlight[]>;
+  onHighlightClick?(highlight: BookHighlight, rect: DOMRect): void;
   /** Quando muda (troca de modo ou de capítulo pelo sumário), a view rola até ali. */
   anchor: { position: number; offset: number } | null;
   onLoadMore(): void;
@@ -73,8 +74,8 @@ export const ReaderScrollView = forwardRef<
 >(function ReaderScrollView(props, ref): JSX.Element {
   const {
     segments, isLoading, error, errorDirection, hasReachedEnd, fontSize, theme,
-    alignment, highlightsByChapter, anchor, onLoadMore, onLoadPrevious,
-    onRetry, onVisibleChange,
+    alignment, highlightsByChapter, onHighlightClick, anchor, onLoadMore,
+    onLoadPrevious, onRetry, onVisibleChange,
   } = props;
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -396,6 +397,7 @@ export const ReaderScrollView = forwardRef<
               text={paragraph.text}
               startOffset={paragraph.offset}
               highlights={highlights}
+              onHighlightClick={onHighlightClick}
             />
           </p>
         ))}

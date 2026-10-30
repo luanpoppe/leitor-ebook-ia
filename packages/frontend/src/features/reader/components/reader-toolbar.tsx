@@ -43,8 +43,10 @@ interface ReaderToolbarProps {
   onToggleChat: () => void;
   /** Seleção ativa: no toque as ações aparecem na barra, não sobre a seleção. */
   hasTextSelection: boolean;
+  isMultiPagePending: boolean;
   onAskSelection: () => void;
   onHighlightSelection: (color: HighlightColor) => void;
+  onStartMultiPage: () => void;
 }
 
 const BACK_LABEL = "Voltar para a ficha do livro";
@@ -148,8 +150,10 @@ export function ReaderToolbar({
   isChatOpen,
   onToggleChat,
   hasTextSelection,
+  isMultiPagePending,
   onAskSelection,
   onHighlightSelection,
+  onStartMultiPage,
 }: ReaderToolbarProps): JSX.Element {
   const progressPercent = resolveProgress(chapterProgress);
   const bookPercent =
@@ -235,7 +239,20 @@ export function ReaderToolbar({
       <div className={styles.controls}>
         {hasTextSelection && (
           <div className={styles.selectionTools} data-reader-selection-action="">
-            <HighlightColorPicker onSelect={onHighlightSelection} />
+            <HighlightColorPicker
+              onSelect={onHighlightSelection}
+              label={isMultiPagePending ? "Concluir" : "Marcar"}
+              actionLabel={isMultiPagePending ? "Concluir em" : "Marcar em"}
+            />
+            {!isMultiPagePending && (
+              <button
+                type="button"
+                onClick={onStartMultiPage}
+                className={styles.multiPageButton}
+              >
+                Várias páginas
+              </button>
+            )}
             <button
               type="button"
               onClick={onAskSelection}

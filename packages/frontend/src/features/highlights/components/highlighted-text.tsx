@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX, MouseEvent } from "react";
 import type { BookHighlight } from "../api";
 import styles from "./highlighted-text.module.css";
 
@@ -7,6 +7,7 @@ interface HighlightedTextProps {
   /** Offset absoluto do parágrafo no capítulo (code points). */
   startOffset: number;
   highlights: BookHighlight[];
+  onHighlightClick?(highlight: BookHighlight, rect: DOMRect): void;
 }
 
 interface TextPart {
@@ -23,6 +24,7 @@ export function HighlightedText({
   text,
   startOffset,
   highlights,
+  onHighlightClick,
 }: HighlightedTextProps): JSX.Element {
   const parts = splitByHighlights(text, startOffset, highlights);
 
@@ -33,11 +35,27 @@ export function HighlightedText({
           return <span key={`plain:${index}`}>{part.text}</span>;
         }
 
+        const highlight = part.highlight;
+        const handleClick = (event: MouseEvent<HTMLElement>): void => {
+          // Arrastar para selecionar o próprio texto não abre a remoção.
+          if (window.getSelection()?.isCollapsed === false) return;
+
+          event.stopPropagation();
+          onHighlightClick?.(
+            highlight,
+            event.currentTarget.getBoundingClientRect()
+          );
+        };
+
         return (
           <mark
-            key={`${part.highlight.id}:${index}`}
+            key={`${highlight.id}:${index}`}
             className={styles.highlight}
-            data-color={part.highlight.color}
+            data-color={highlight.color}
+            title="Clique para remover esta marcação"
+            onClick={handleClick}
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
           >
             {part.text}
           </mark>

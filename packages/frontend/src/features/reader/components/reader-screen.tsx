@@ -10,6 +10,7 @@ import type {
   BookHighlight,
   HighlightColor,
 } from "@/features/highlights/api";
+import { HighlightActionPopover } from "@/features/highlights/components/highlight-action-popover";
 import { ReaderHighlightsDrawer } from "@/features/highlights/components/reader-highlights-drawer";
 import { useBookHighlights } from "@/features/highlights/use-book-highlights";
 import { useReader } from "../use-reader";
@@ -67,6 +68,13 @@ interface ReaderScreenProps {
 interface ReaderPoint {
   position: number;
   offset: number;
+}
+
+// Início já escolhido de uma marcação que continua em outra página.
+interface PendingHighlightStart {
+  chapterPosition: number;
+  startOffset: number;
+  text: string;
 }
 
 export function ReaderScreen({
@@ -149,6 +157,13 @@ export function ReaderScreen({
   const [returnPoint, setReturnPoint] = useState<ReaderPoint | null>(null);
   // Trecho selecionado que o chat vai usar como foco da pergunta.
   const [chatSelection, setChatSelection] = useState<ChatSelection | null>(null);
+  // Marcação clicada no texto: o popover permite removê-la.
+  const [highlightAction, setHighlightAction] = useState<{
+    highlight: BookHighlight;
+    anchor: DOMRect;
+  } | null>(null);
+  const [pendingHighlightStart, setPendingHighlightStart] =
+    useState<PendingHighlightStart | null>(null);
 
   const scrollRef = useRef<ReaderScrollViewHandle>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -234,6 +249,11 @@ export function ReaderScreen({
     onPageChange: handlePageChange,
   });
 
+  // O popover é ancorado em pixels: qualquer virada de página o invalida.
+  useEffect(() => {
+    setHighlightAction(null);
+  }, [currentPosition, mode, pageIndex]);
+
   // Lista estável: uma array nova a cada render recriaria as cargas da rolagem.
   const chapterPositions = useMemo(
     () => chapters.map((chapterSummary) => chapterSummary.position),
@@ -247,6 +267,7 @@ export function ReaderScreen({
 
   const handleScrollPositionChange = useCallback(
     (position: number, offset: number) => {
+      setHighlightAction(null);
       setVisiblePoint({ position, offset });
       scheduleSave(position, offset);
     },
@@ -513,21 +534,65 @@ export function ReaderScreen({
         return;
       }
 
+      let highlightStart = startOffset;
+
+      if (pendingHighlightStart !== null) {
+        const isOtherChapter =
+          pendingHighlightStart.chapterPosition !== chapterPosition;
+        if (isOtherChapter) {
+          toast.error(
+            "A marcação iniciada precisa terminar no mesmo capítulo. Volte ao capítulo e selecione o fim."
+          );
+          return;
+        }
+
+        const isEndBeforeStart = endOffset <= pendingHighlightStart.startOffset;
+        if (isEndBeforeStart) {
+          toast.error("Selecione um trecho depois do início da marcação.");
+          return;
+        }
+
+        highlightStart = pendingHighlightStart.startOffset;
+      }
+
       try {
         await createHighlight({
           chapterPosition,
-          startOffset,
+          startOffset: highlightStart,
           endOffset,
           color,
         });
         window.getSelection()?.removeAllRanges();
+        setPendingHighlightStart(null);
         toast.success("Marcação criada.");
       } catch (cause) {
         toast.error(getApiErrorInfo(cause).message);
       }
     },
-    [createHighlight, textSelection]
+    [createHighlight, pendingHighlightStart, textSelection]
   );
+
+  const handleStartMultiPageHighlight = useCallback(() => {
+    if (textSelection === null) return;
+
+    const { chapterPosition, startOffset, text } = textSelection;
+    if (chapterPosition === null || startOffset === null) {
+      toast.error("Não foi possível identificar o início da marcação.");
+      return;
+    }
+
+    setPendingHighlightStart({
+      chapterPosition,
+      startOffset,
+      text: text.slice(0, 80),
+    });
+    window.getSelection()?.removeAllRanges();
+    toast.success("Marcação iniciada. Selecione o fim em outra página.");
+  }, [textSelection]);
+
+  const handleCancelPendingHighlight = useCallback(() => {
+    setPendingHighlightStart(null);
+  }, []);
 
   const handleChangeHighlightColor = useCallback(
     async (highlightId: string, color: HighlightColor): Promise<void> => {
@@ -540,9 +605,30 @@ export function ReaderScreen({
   const handleRemoveHighlight = useCallback(
     async (highlightId: string): Promise<void> => {
       await removeHighlight(highlightId);
+      setHighlightAction((current) =>
+        current?.highlight.id === highlightId ? null : current
+      );
       toast.success("Marcação removida.");
     },
     [removeHighlight]
+  );
+
+  const handleHighlightClick = useCallback(
+    (highlight: BookHighlight, anchor: DOMRect) => {
+      setHighlightAction({ highlight, anchor });
+    },
+    []
+  );
+
+  const handleRemoveHighlightFromPopover = useCallback(
+    async (highlight: BookHighlight): Promise<void> => {
+      try {
+        await handleRemoveHighlight(highlight.id);
+      } catch (cause) {
+        toast.error(getApiErrorInfo(cause).message);
+      }
+    },
+    [handleRemoveHighlight]
   );
 
   const handleGoToReadingFromPreview = useCallback(
@@ -860,6 +946,7 @@ export function ReaderScreen({
           theme={theme}
           alignment={alignment}
           highlightsByChapter={highlightsByChapter}
+          onHighlightClick={handleHighlightClick}
           anchor={scrollAnchor}
           onLoadMore={loadMore}
           onLoadPrevious={loadPrevious}
@@ -911,6 +998,7 @@ export function ReaderScreen({
           page={page}
           position={chapter.position}
           highlights={currentChapterHighlights}
+          onHighlightClick={handleHighlightClick}
           pageKey={`${chapter.position}:${pageIndex}`}
           direction={direction}
           fontSize={fontSize}
@@ -967,8 +1055,10 @@ export function ReaderScreen({
         isChatOpen={isChatOpen}
         onToggleChat={handleToggleChat}
         hasTextSelection={textSelection !== null && !isChatOpen}
+        isMultiPagePending={pendingHighlightStart !== null}
         onAskSelection={handleAskSelection}
         onHighlightSelection={(color) => void handleHighlightSelection(color)}
+        onStartMultiPage={handleStartMultiPageHighlight}
       />
 
       <main ref={mainRef} className={styles.main}>
@@ -981,6 +1071,17 @@ export function ReaderScreen({
           />
         )}
       </main>
+
+      {highlightAction !== null && (
+        <HighlightActionPopover
+          highlight={highlightAction.highlight}
+          anchor={highlightAction.anchor}
+          onRemove={() =>
+            void handleRemoveHighlightFromPopover(highlightAction.highlight)
+          }
+          onClose={() => setHighlightAction(null)}
+        />
+      )}
 
       {isTocOpen && (
         <ReaderTocDrawer
@@ -1058,13 +1159,37 @@ export function ReaderScreen({
       {textSelection !== null && !isChatOpen && (
         <ReaderSelectionAction
           selection={textSelection}
+          isMultiPagePending={pendingHighlightStart !== null}
           onAsk={handleAskSelection}
           onHighlight={(color) => void handleHighlightSelection(color)}
+          onStartMultiPage={handleStartMultiPageHighlight}
         />
       )}
 
+      {pendingHighlightStart !== null && (
+        <div className={styles.pendingBar} role="status">
+          <span className={styles.pendingText}>
+            Marcação iniciada em “{pendingHighlightStart.text}”. Selecione o fim
+            em outra página e escolha a cor.
+          </span>
+          <button
+            type="button"
+            className={styles.pendingCancel}
+            onClick={handleCancelPendingHighlight}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {returnPoint !== null && (
-        <div className={styles.returnBar} role="status">
+        <div
+          className={styles.returnBar}
+          style={
+            pendingHighlightStart === null ? undefined : { bottom: 76 }
+          }
+          role="status"
+        >
           <button
             type="button"
             className={styles.returnButton}

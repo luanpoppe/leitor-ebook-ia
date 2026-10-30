@@ -23,6 +23,7 @@ export interface ReaderPageViewProps {
   /** Posição do capítulo da página, usada para localizar as marcações. */
   position: number;
   highlights: BookHighlight[];
+  onHighlightClick?(highlight: BookHighlight, rect: DOMRect): void;
   /** Muda a cada página (ex.: `${position}:${pageIndex}`) para animar a entrada. */
   pageKey: string;
   direction: "next" | "previous" | null;
@@ -42,6 +43,7 @@ export function ReaderPageView({
   page,
   position,
   highlights,
+  onHighlightClick,
   pageKey,
   direction,
   fontSize,
@@ -164,6 +166,7 @@ export function ReaderPageView({
                 text={paragraph.text}
                 startOffset={paragraph.offset}
                 highlights={highlights}
+                onHighlightClick={onHighlightClick}
               />
             </p>
           ))}

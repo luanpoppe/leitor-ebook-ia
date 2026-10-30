@@ -11,8 +11,10 @@ const EDGE_PADDING_PX = 12;
 
 interface ReaderSelectionActionProps {
   selection: ReaderTextSelection;
+  isMultiPagePending: boolean;
   onAsk(): void;
   onHighlight(color: HighlightColor): void;
+  onStartMultiPage(): void;
 }
 
 /**
@@ -25,8 +27,10 @@ interface ReaderSelectionActionProps {
  */
 export function ReaderSelectionAction({
   selection,
+  isMultiPagePending,
   onAsk,
   onHighlight,
+  onStartMultiPage,
 }: ReaderSelectionActionProps): JSX.Element | null {
   const rect = selection.rect;
   if (rect === null) return null;
@@ -46,7 +50,16 @@ export function ReaderSelectionAction({
       style={style}
       onMouseDown={(event) => event.preventDefault()}
     >
-      <HighlightColorPicker onSelect={onHighlight} />
+      <HighlightColorPicker
+        onSelect={onHighlight}
+        label={isMultiPagePending ? "Concluir" : "Marcar"}
+        actionLabel={isMultiPagePending ? "Concluir em" : "Marcar em"}
+      />
+      {!isMultiPagePending && (
+        <button type="button" className={styles.multiPage} onClick={onStartMultiPage}>
+          Várias páginas
+        </button>
+      )}
       <span className={styles.separator} aria-hidden="true" />
       <button type="button" className={styles.ask} onClick={onAsk}>
         Perguntar à IA
