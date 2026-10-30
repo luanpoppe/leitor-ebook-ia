@@ -14,6 +14,7 @@ Transforma o arquivo enviado (EPUB, PDF, TXT ou Markdown) em capítulos com text
 - PDF (`pdf-parser.ts` + `src/extraction/pdf/`): usa `pdfjs-dist` (build legacy, o único que roda em Node), extrai texto por página e usa o outline para delimitar capítulos; sem outline, cai numa heurística de linhas de título.
 - TXT/Markdown (`txt-parser.ts`): divide por heading Markdown e por linhas `Capítulo/Capitulo/Cap./Chapter/Ch.` + número ou romano; sem marcador, o arquivo inteiro vira um capítulo.
 - `TextNormalizer` (`text-normalizer.ts`) padroniza o texto (hifenização, espaços, cabeçalho/rodapé repetido) e `normalizeChapters` descarta capítulo vazio e renumera.
+- `StructuralPageMerger` (`structural-page-merger.ts`) junta páginas de abertura curtas — `PARTE I`, `LIVRO`, `ATO`, página de título de capítulo, título com epígrafe — ao capítulo seguinte, desde que ele tenha conteúdo real. A página estrutural some como capítulo próprio e seu texto (parte, epígrafe) passa a abrir o capítulo.
 - `ContentExtractionError` é o erro de domínio; a ingestão traduz para `failed` com a mensagem. PDF sem camada de texto usa a mensagem exata `PDF sem texto extraível`.
 
 ## Decisões e porquês
@@ -21,6 +22,7 @@ Transforma o arquivo enviado (EPUB, PDF, TXT ou Markdown) em capítulos com text
 - **Parser EPUB dividido em módulos** (`epub/`): o arquivo único passava de 600 linhas; a separação (archive, package, toc, cover, html-to-text) mantém cada peça abaixo do limite do projeto sem mudar o comportamento.
 - **`pdfjs-dist` em vez de `pdf-parse`**: é a única lib madura que entrega texto por página **e** outline na mesma API. O build legacy é obrigatório em Node (o normal exige `DOMMatrix`), e `isEvalSupported: false` desliga JS embutido no PDF.
 - **Sumário removido por arquivo no EPUB e por corte de páginas no PDF**: o sumário não deve virar conteúdo do livro (CT-02). No EPUB o arquivo do nav/NCX é excluído; no PDF as páginas anteriores ao primeiro capítulo do outline são descartadas.
+- **Página estrutural absorvida pelo capítulo seguinte**: parte/título/epígrafe ocupava um capítulo quase vazio e quebrava a leitura. O merger só age em página curta, com título estrutural ou título repetido no texto, seguida de conteúdo real (≥ 1.000 caracteres) e fora de créditos/dedicatória/notas/agradecimentos; evita juntar notas ou seções de verdade.
 - **Heurística de títulos sem outline**: PDFs sem bookmark não têm estrutura confiável; a linha `Capítulo/Chapter + número/romano` e o título curto isolado são a melhor pista disponível.
 - **TXT/MD sem metadata**: título e autor ficam vazios de propósito — o pipeline usa o nome do arquivo como título quando não há metadata (CT-04).
 - **Capa bufferizada no extractor**: o contrato `ExtractedCover` não carrega o tamanho exigido pelo `putObject`; como capa é pequena, bufferizar é aceitável.

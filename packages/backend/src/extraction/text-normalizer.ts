@@ -1,5 +1,6 @@
 import { ChapterTitle } from './chapter-title';
 import type { ExtractedChapter } from './content.types';
+import { StructuralPageMerger } from './structural-page-merger';
 
 const SHORT_LINE_MAX_LENGTH = 80;
 const DEFAULT_MIN_OCCURRENCES = 3;
@@ -80,13 +81,16 @@ export class TextNormalizer {
       });
     });
 
-    return normalizedChapters
-      .filter((chapter) => chapter.text.trim().length > 0)
-      .map((chapter, index) => ({
-        position: index + 1,
-        title: ChapterTitle.normalize(chapter.title),
-        text: chapter.text,
-      }));
+    const nonEmptyChapters = normalizedChapters.filter(
+      (chapter) => chapter.text.trim().length > 0,
+    );
+    const mergedChapters = StructuralPageMerger.merge(nonEmptyChapters);
+
+    return mergedChapters.map((chapter, index) => ({
+      position: index + 1,
+      title: ChapterTitle.normalize(chapter.title),
+      text: chapter.text,
+    }));
   }
 
   /**
