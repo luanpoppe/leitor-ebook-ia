@@ -6,6 +6,7 @@ import { IndexingModule } from '../indexing/indexing.module';
 import { SearchModule } from '../search/search.module';
 import { NotesModule } from '../notes/notes.module';
 import { DictionaryModule } from '../dictionary/dictionary.module';
+import { HighlightsModule } from '../highlights/highlights.module';
 import { ChatController } from './chat.controller';
 import { ConversationsController } from './conversations.controller';
 import { ChatQueryPlanner } from './chat-query-planner';
@@ -21,6 +22,7 @@ import { ConversationRepository } from './conversation.repository';
     ImagesModule,
     NotesModule,
     DictionaryModule,
+    HighlightsModule,
   ],
   controllers: [ChatController, ConversationsController],
   providers: [

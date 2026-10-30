@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { RefObject } from "react";
+import { PagePaginator } from "./window/page-paginator";
 
 export interface ReaderSelectionRect {
   top: number;
@@ -15,6 +16,15 @@ export interface ReaderTextSelection {
   /** Texto imediatamente anterior à seleção, para dar contexto à IA. */
   before: string;
   rect: ReaderSelectionRect | null;
+  /** Capítulo e offsets do trecho; null se a seleção atravessa capítulos. */
+  chapterPosition: number | null;
+  startOffset: number | null;
+  endOffset: number | null;
+}
+
+interface BoundaryOffset {
+  chapterPosition: number;
+  offset: number;
 }
 
 const MIN_SELECTION_LENGTH = 2;
@@ -57,16 +67,28 @@ export function useTextSelection(
     const isInside =
       container.contains(range.startContainer) &&
       container.contains(range.endContainer);
-    const text = browserSelection.toString().trim();
+    const rawText = browserSelection.toString();
+    const text = rawText.trim();
     if (!isInside || text.length < MIN_SELECTION_LENGTH) {
       setSelection(null);
       return;
     }
 
+    const startBoundary = readBoundaryOffset(
+      container,
+      range.startContainer,
+      range.startOffset
+    );
+    const endBoundary = readBoundaryOffset(
+      container,
+      range.endContainer,
+      range.endOffset
+    );
+    const offsets = resolveSelectionOffsets(rawText, startBoundary, endBoundary);
     const rect = range.getBoundingClientRect();
     const before = readTextBefore(container, range);
     setSelection({
-      text: text.slice(0, MAX_SELECTION_LENGTH),
+      text: Array.from(text).slice(0, MAX_SELECTION_LENGTH).join(""),
       before,
       rect: {
         top: rect.top,
@@ -74,6 +96,7 @@ export function useTextSelection(
         width: rect.width,
         height: rect.height,
       },
+      ...offsets,
     });
   }, [containerRef]);
 
@@ -95,6 +118,12 @@ export function useTextSelection(
     [readSelection]
   );
 
+  // Limpar a seleção (ao criar a marcação, por exemplo) precisa esconder o menu
+  // sem esperar o próximo pointerup.
+  const handleSelectionChange = useCallback(() => {
+    if (window.getSelection()?.isCollapsed !== false) setSelection(null);
+  }, []);
+
   useEffect(() => {
     if (!enabled) {
       setSelection(null);
@@ -103,14 +132,110 @@ export function useTextSelection(
 
     document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("keyup", readSelection);
+    document.addEventListener("selectionchange", handleSelectionChange);
 
     return () => {
       document.removeEventListener("pointerup", handlePointerUp);
       document.removeEventListener("keyup", readSelection);
+      document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [enabled, handlePointerUp, readSelection]);
+  }, [enabled, handlePointerUp, handleSelectionChange, readSelection]);
 
   return selection;
+}
+
+function resolveSelectionOffsets(
+  rawText: string,
+  start: BoundaryOffset | null,
+  end: BoundaryOffset | null
+): Pick<ReaderTextSelection, "chapterPosition" | "startOffset" | "endOffset"> {
+  const withoutOffsets = {
+    chapterPosition: null,
+    startOffset: null,
+    endOffset: null,
+  };
+
+  if (start === null || end === null) return withoutOffsets;
+  if (start.chapterPosition !== end.chapterPosition) return withoutOffsets;
+
+  const leadingLength = rawText.length - rawText.trimStart().length;
+  const trailingLength = rawText.length - rawText.trimEnd().length;
+  const leadingCodePoints = PagePaginator.countCodePoints(
+    rawText,
+    0,
+    leadingLength
+  );
+  const trailingCodePoints = PagePaginator.countCodePoints(
+    rawText,
+    rawText.length - trailingLength,
+    rawText.length
+  );
+  const startOffset = start.offset + leadingCodePoints;
+  const endOffset = Math.min(
+    end.offset - trailingCodePoints,
+    startOffset + MAX_SELECTION_LENGTH
+  );
+
+  if (endOffset <= startOffset) return withoutOffsets;
+
+  return {
+    chapterPosition: start.chapterPosition,
+    startOffset,
+    endOffset,
+  };
+}
+
+/**
+ * Offset absoluto de uma extremidade da seleção. O parágrafo tem o offset do
+ * começo no DOM; a distância até a extremidade é contada em code points para
+ * casar com os offsets que o backend usa no capítulo.
+ */
+function readBoundaryOffset(
+  container: HTMLElement,
+  node: Node,
+  nodeOffset: number
+): BoundaryOffset | null {
+  const paragraph = findAttributeOwner(node, "data-offset");
+  if (paragraph === null || !container.contains(paragraph)) return null;
+
+  const positionElement = findAttributeOwner(paragraph, "data-position");
+  const rawOffset = paragraph.getAttribute("data-offset");
+  const rawPosition = positionElement?.getAttribute("data-position") ?? null;
+  if (rawOffset === null || rawPosition === null) return null;
+
+  const localRange = document.createRange();
+  try {
+    localRange.setStart(paragraph, 0);
+    const isParagraphBoundary = node === paragraph;
+    const localEndOffset = isParagraphBoundary
+      ? Math.min(nodeOffset, paragraph.childNodes.length)
+      : nodeOffset;
+    localRange.setEnd(node, localEndOffset);
+  } catch {
+    return null;
+  }
+
+  const localText = localRange.toString();
+  const localCodePoints = PagePaginator.countCodePoints(
+    localText,
+    0,
+    localText.length
+  );
+
+  return {
+    chapterPosition: Number(rawPosition),
+    offset: Number(rawOffset) + localCodePoints,
+  };
+}
+
+function findAttributeOwner(
+  node: Node,
+  attribute: string
+): HTMLElement | null {
+  const element =
+    node instanceof Element ? node : node.parentElement ?? null;
+
+  return element?.closest<HTMLElement>(`[${attribute}]`) ?? null;
 }
 
 /** Texto entre o começo da área de leitura e o início da seleção. */

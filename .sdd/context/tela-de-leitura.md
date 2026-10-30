@@ -9,8 +9,8 @@ A rota `/ebooks/[id]/ler` permite ler o ebook capítulo a capítulo sobre o text
 
 ## Como funciona
 
-- `ReadingPage` (`app/ebooks/[id]/ler/page.tsx`) lê o id e o `?capitulo` (só dígitos, ≥ 1) e monta `ReaderScreen` dentro de um `Suspense` (exigência do `useSearchParams`).
-- `useReader` carrega sumário, progresso e capítulo (React Query) e resolve a abertura: navegação do usuário → `?capitulo` → progresso salvo → primeiro capítulo. Sincroniza o capítulo atual com a URL via `router.replace`.
+- `ReadingPage` (`app/ebooks/[id]/ler/page.tsx`) lê o id, o `?capitulo` (só dígitos, ≥ 1) e o `?offset` opcional (só dígitos, ≥ 0, usado por links de marcação) e monta `ReaderScreen` dentro de um `Suspense` (exigência do `useSearchParams`).
+- `useReader` carrega sumário, progresso e capítulo (React Query) e resolve a abertura: navegação do usuário → `?capitulo` + `?offset` → `?capitulo` → progresso salvo → primeiro capítulo. O offset da URL vale só na primeira montagem, para voltar ao capítulo não puxar a leitura de novo para o destaque. Sincroniza o capítulo atual com a URL via `router.replace`.
 - `useReaderPreferences` guarda fonte (16–24 px, padrão 18) e tema (`light`/`sepia`) em `localStorage`, lendo depois de montar para não divergir na hidratação.
 - `useReadingProgressWriter` agenda o `PUT` com debounce de 2 s só quando a posição muda e descarrega ao trocar de capítulo, ocultar a aba (`visibilitychange`) e fechar a página (`pagehide` + `ReaderProgressBeacon`).
 - `ReaderChapterView` é a área rolável: divide `chapter.text` por `\n\n`, guarda `data-offset` acumulado, restaura `resumeOffset` e reporta o offset do primeiro parágrafo visível.

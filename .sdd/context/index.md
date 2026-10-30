@@ -25,3 +25,4 @@
 - [modo-rolagem](./modo-rolagem.md) - leitura contínua: janelas de 4 mil caracteres, virtualização por espaçador, travessia de capítulo e preferência de modo
 - [anotacoes](./anotacoes.md) — anotações em markdown por livro: tabela `notes`, CRUD, ferramentas do chat (criar/listar/ler/editar/excluir com confirmação) e painel no leitor
 - [dicionario](./dicionario.md) — dicionário pessoal de palavras: uma entrada por palavra, ferramenta do chat, página com filtro por livro e contexto do livro
+- [marcacoes](./marcacoes.md) — marcações de texto em quatro tons claros: offsets em code points, renderização nos dois modos, painel no leitor com salto/retorno, página global e ferramenta do chat

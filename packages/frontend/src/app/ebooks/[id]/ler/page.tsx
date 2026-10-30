@@ -22,6 +22,8 @@ function ReaderRoute(): JSX.Element {
   const bookId = resolveBookId(params?.id);
   const rawChapter = searchParams.get("capitulo");
   const initialChapterPosition = resolveChapterPosition(rawChapter);
+  const rawOffset = searchParams.get("offset");
+  const initialOffset = resolveOffset(rawOffset);
   const rawConversation = searchParams.get("conversa");
   const initialConversationId = resolveConversationId(rawConversation);
 
@@ -29,6 +31,7 @@ function ReaderRoute(): JSX.Element {
     <ReaderScreen
       bookId={bookId}
       initialChapterPosition={initialChapterPosition}
+      initialOffset={initialOffset}
       initialConversationId={initialConversationId}
     />
   );
@@ -59,6 +62,19 @@ function resolveChapterPosition(rawChapter: string | null): number | null {
   if (!isValidPosition) return null;
 
   return parsedPosition;
+}
+
+// Offset do link só vale com capítulo na URL; qualquer outro valor é ignorado.
+const OFFSET_PARAM_PATTERN = /^\d+$/;
+
+function resolveOffset(rawOffset: string | null): number | null {
+  if (rawOffset === null) return null;
+
+  const isValidFormat = OFFSET_PARAM_PATTERN.test(rawOffset);
+  if (!isValidFormat) return null;
+
+  const parsedOffset = Number.parseInt(rawOffset, 10);
+  return Number.isSafeInteger(parsedOffset) ? parsedOffset : null;
 }
 
 // Só UUID vira conversa inicial; qualquer outra coisa é ignorada.

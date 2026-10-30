@@ -46,6 +46,8 @@ export interface UseReaderScrollResult {
   retry(): void;
   /** A view informa qual trecho/parágrafo está no topo visível. */
   reportVisible(position: number, offset: number): void;
+  /** Descarta os trechos atuais se o ponto pedido ainda não estiver carregado. */
+  jumpToPoint(position: number, offset: number): void;
 }
 
 type LoadDirection = "reset" | "append" | "prepend";
@@ -276,6 +278,17 @@ export function useReaderScroll({
     loadChapter(position, initialOffset);
   }, [initialOffset, loadChapter, position, runLoad]);
 
+  // Pular para um ponto explícito (marcação, citação ou retorno) recomeça a
+  // janela ali. Mesmo que o trecho já esteja na lista, ele pode estar
+  // virtualizado como espaçador; recarregar garante que o parágrafo exista no
+  // DOM para a âncora da view rolar até ele.
+  const jumpToPoint = useCallback(
+    (targetPosition: number, offset: number) => {
+      loadChapter(targetPosition, offset);
+    },
+    [loadChapter]
+  );
+
   const reportVisible = useCallback(
     (visiblePosition: number, offset: number) => {
       const isLoaded = segmentsRef.current.some(
@@ -329,6 +342,7 @@ export function useReaderScroll({
     loadPrevious,
     retry,
     reportVisible,
+    jumpToPoint,
   };
 }
 

@@ -177,7 +177,19 @@
   color: var(--accent-ink);
 }
 
-/* Ação da seleção no toque: fica na barra, longe do menu nativo. */
+/* Ações da seleção no toque: ficam na barra, longe do menu nativo. */
+.selectionTools {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (pointer: coarse) {
+  .selectionTools {
+    display: inline-flex;
+  }
+}
+
 .selectionButton {
   display: none;
   align-items: center;

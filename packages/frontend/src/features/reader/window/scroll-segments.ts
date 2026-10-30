@@ -1,4 +1,5 @@
 import { PagePaginator } from "./page-paginator";
+import { TextParagraphs } from "./text-paragraphs";
 import type { TextWindow } from "./window-types";
 
 export interface ScrollParagraph {
@@ -19,8 +20,6 @@ export interface ScrollSegment {
   /** Último caractere do texto: `"\n"` avisa que a janela fechou um parágrafo. */
   lastChar: string;
 }
-
-const PARAGRAPH_SEPARATOR = "\n\n";
 
 /**
  * Matemática dos trechos da rolagem: divide uma janela em parágrafos com offset
@@ -45,7 +44,7 @@ export class ScrollSegments {
       key: `${textWindow.position}:${textWindow.offset}`,
       position: textWindow.position,
       offset: textWindow.offset,
-      paragraphs: ScrollSegments.toParagraphs(text, textWindow.offset),
+      paragraphs: TextParagraphs.split(text, textWindow.offset),
       nextOffset: didTrim
         ? textWindow.offset + trimmedCodePoints
         : textWindow.nextOffset,
@@ -125,35 +124,6 @@ export class ScrollSegments {
 
     const codePoints = Array.from(text);
     return codePoints[codePoints.length - 1] ?? "";
-  }
-
-  // Divide por `\n\n` somando também o separador: sem ele, o offset de um
-  // parágrafo distante do começo ficaria menor que o do mesmo ponto no backend.
-  private static toParagraphs(
-    text: string,
-    baseOffset: number
-  ): ScrollParagraph[] {
-    const paragraphs: ScrollParagraph[] = [];
-    let codePointOffset = baseOffset;
-    let cursor = 0;
-
-    while (cursor <= text.length) {
-      const separatorIndex = text.indexOf(PARAGRAPH_SEPARATOR, cursor);
-      const blockEnd = separatorIndex === -1 ? text.length : separatorIndex;
-      const block = text.slice(cursor, blockEnd);
-
-      if (block.length > 0) {
-        paragraphs.push({ offset: codePointOffset, text: block });
-      }
-
-      codePointOffset += PagePaginator.countCodePoints(text, cursor, blockEnd);
-      if (separatorIndex === -1) break;
-
-      codePointOffset += PARAGRAPH_SEPARATOR.length;
-      cursor = blockEnd + PARAGRAPH_SEPARATOR.length;
-    }
-
-    return paragraphs;
   }
 }
 

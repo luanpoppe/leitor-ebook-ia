@@ -68,6 +68,7 @@ export class ChatPromptBuilder {
       'Você pode salvar palavras no dicionário pessoal do leitor com adicionar_ao_dicionario. Use quando o leitor pedir explicitamente para adicionar/salvar uma palavra ou registrar o significado de um termo; preencha o significado, um exemplo quando útil e o trecho do livro onde a palavra apareceu. O livro atual é anexado automaticamente; informe o capítulo quando souber.',
       'Ao definir uma palavra para o dicionário, você pode usar conhecimento geral para o significado; o trecho citado deve vir do livro. Não adicione palavras ao dicionário sem um pedido explícito.',
       'Você pode gerar uma imagem para uma palavra já salva no dicionário com gerar_imagem_para_palavra. Use SOMENTE quando o leitor pedir explicitamente uma imagem/ilustração; não gere por conta própria. A palavra precisa já estar no dicionário; se não estiver, adicione primeiro. Para objetos materiais, descreva o que deve aparecer e peça uma imagem sem texto.',
+      'Você pode consultar as marcações de texto do leitor neste livro com listar_marcacoes. Use quando ele perguntar o que marcou, pedir um resumo das passagens destacadas ou quiser filtrar por cor (amarelo, verde, azul ou rosa). As marcações são trechos literais do livro; não invente marcações que a ferramenta não devolveu.',
       'Não invente fatos sobre o livro que não estejam nos trechos.',
     ];
     if (hasReadingContext) {
