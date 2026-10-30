@@ -26,7 +26,7 @@ export class ImageService {
 
   async generate(input: {
     bookId: string;
-    conversationId: string;
+    conversationId?: string | null;
     prompt: string;
   }): Promise<GeneratedImageResponse> {
     const file = await this.generation.generate(input.prompt);
@@ -44,7 +44,7 @@ export class ImageService {
 
     const record = await this.repository.create({
       bookId: input.bookId,
-      conversationId: input.conversationId,
+      conversationId: input.conversationId ?? null,
       prompt: input.prompt,
       model: this.generation.model,
       storageKey,
@@ -66,6 +66,20 @@ export class ImageService {
     imageId: string,
   ): Promise<{ stream: Readable; contentType: string }> {
     const image = await this.repository.findById(bookId, imageId);
+    if (image === null) {
+      throw new NotFoundException(`Imagem ${imageId} não encontrada.`);
+    }
+
+    return {
+      stream: await this.storage.get(image.storageKey),
+      contentType: image.storageKey.endsWith('.jpg') ? 'image/jpeg' : 'image/png',
+    };
+  }
+
+  async getFileById(
+    imageId: string,
+  ): Promise<{ stream: Readable; contentType: string }> {
+    const image = await this.repository.findByIdAny(imageId);
     if (image === null) {
       throw new NotFoundException(`Imagem ${imageId} não encontrada.`);
     }

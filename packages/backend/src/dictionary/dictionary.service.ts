@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EbookNotFoundError } from '../catalog/catalog.errors';
 import { EbookRepository } from '../catalog/ebook.repository';
 import {
@@ -41,6 +41,36 @@ export class DictionaryService {
     const entries = await this.dictionary.list(query, bookId);
 
     return entries.map((entry) => this.toResponse(entry));
+  }
+
+  async findByWord(rawWord: string): Promise<DictionaryEntryResponse | null> {
+    const word = this.cleanWord(rawWord);
+    const normalizedWord = word.toLocaleLowerCase('pt-BR');
+    const entry = await this.dictionary.findByNormalizedWord(normalizedWord);
+
+    return entry === null ? null : this.toResponse(entry);
+  }
+
+  async attachImage(
+    entryId: string,
+    imageId: string,
+  ): Promise<DictionaryEntryResponse> {
+    const entry = await this.dictionary.attachImage(entryId, imageId);
+
+    this.logger.log(
+      `Imagem vinculada ao dicionário: entryId=${entry.id}, imagem=${imageId}.`,
+    );
+
+    return this.toResponse(entry);
+  }
+
+  async getImageId(entryId: string): Promise<string | null> {
+    const entry = await this.dictionary.findById(entryId);
+    if (entry === null) {
+      throw new NotFoundException('Palavra não encontrada no dicionário.');
+    }
+
+    return entry.imageId;
   }
 
   async save(input: SaveDictionaryInput): Promise<SaveDictionaryResult> {
@@ -127,6 +157,8 @@ export class DictionaryService {
       quote: entry.quote,
       chapterPosition: entry.chapterPosition,
       book: entry.book,
+      imageUrl:
+        entry.imageId === null ? null : `/dictionary/${entry.id}/image`,
       createdAt: entry.createdAt.toISOString(),
       updatedAt: entry.updatedAt.toISOString(),
     };

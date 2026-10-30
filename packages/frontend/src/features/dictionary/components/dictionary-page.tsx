@@ -1,8 +1,13 @@
 "use client";
 
+/* As imagens do dicionário vêm do backend dinâmico; não passam pelo otimizador
+   do next/image. */
+/* eslint-disable @next/next/no-img-element */
+
 import { useMemo, useState } from "react";
 import type { ChangeEvent, JSX } from "react";
 import { formatDate } from "@/features/ebooks/format";
+import { getApiBaseUrl } from "@/utils/http";
 import { AppShell } from "@/features/shelf/components/app-shell";
 import type { DictionaryEntry } from "../api";
 import { useDictionary } from "../use-dictionary";
@@ -164,7 +169,17 @@ export function DictionaryPage(): JSX.Element {
                 className={styles.card}
                 onClick={() => setSelectedEntry(entry)}
               >
-                <span className={styles.cardWord}>{entry.word}</span>
+                <span className={styles.cardTop}>
+                  <span className={styles.cardWord}>{entry.word}</span>
+                  {entry.imageUrl !== null && (
+                    <img
+                      src={`${getApiBaseUrl()}${entry.imageUrl}`}
+                      alt={`Imagem de ${entry.word}`}
+                      className={styles.cardThumbnail}
+                      loading="lazy"
+                    />
+                  )}
+                </span>
                 <span className={styles.cardMeaning}>
                   {truncate(entry.meaning)}
                 </span>

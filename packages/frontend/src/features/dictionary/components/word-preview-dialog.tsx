@@ -1,8 +1,13 @@
 "use client";
 
+/* As imagens do dicionário vêm do backend dinâmico; não passam pelo otimizador
+   do next/image. */
+/* eslint-disable @next/next/no-img-element */
+
 import Link from "next/link";
 import type { JSX } from "react";
 import { formatDate } from "@/features/ebooks/format";
+import { getApiBaseUrl } from "@/utils/http";
 import { useDialogPanel } from "@/features/shelf/hooks/use-dialog-panel";
 import type { DictionaryEntry } from "../api";
 import styles from "./word-preview-dialog.module.css";
@@ -60,6 +65,14 @@ export function WordPreviewDialog({
         </header>
 
         <div className={styles.body}>
+          {entry.imageUrl !== null && (
+            <img
+              src={`${getApiBaseUrl()}${entry.imageUrl}`}
+              alt={`Imagem ilustrativa de ${entry.word}`}
+              className={styles.image}
+            />
+          )}
+
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Significado</h3>
             <p className={styles.meaning}>{entry.meaning}</p>

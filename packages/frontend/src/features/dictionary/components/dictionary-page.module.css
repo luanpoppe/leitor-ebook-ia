@@ -125,6 +125,21 @@
   line-height: 1.2;
 }
 
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardThumbnail {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
 .cardMeaning {
   color: var(--text);
   font-size: 12px;

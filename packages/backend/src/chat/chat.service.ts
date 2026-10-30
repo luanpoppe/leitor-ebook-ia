@@ -211,7 +211,7 @@ export class ChatService {
       selection: input.selection,
     });
 
-    if (plan.wantsImage) {
+    if (plan.wantsImage && !plan.wantsDictionaryImage) {
       return this.askWithImage(book, conversation, input, plan);
     }
 
@@ -231,7 +231,7 @@ export class ChatService {
       input.question,
       excerpts,
       history,
-      this.buildTools(book.id, noteActions),
+      this.buildTools(book.id, conversation.id, noteActions),
     );
 
     const citations = ChatPromptBuilder.toCitations(excerpts);
@@ -414,6 +414,7 @@ export class ChatService {
   /** Ferramentas do chat: busca exata no livro e anotações do leitor. */
   private buildTools(
     bookId: string,
+    conversationId: string,
     noteActions: Map<string, ChatNoteAction>,
   ): ChatTools {
     return [
@@ -421,7 +422,12 @@ export class ChatService {
       ...ChatNotesTools.build(this.notesService, bookId, (action) => {
         noteActions.set(action.noteId, action);
       }),
-      ...ChatDictionaryTools.build(this.dictionaryService, bookId),
+      ...ChatDictionaryTools.build(
+        this.dictionaryService,
+        this.imageService,
+        bookId,
+        conversationId,
+      ),
     ];
   }
 

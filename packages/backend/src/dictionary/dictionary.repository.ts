@@ -69,9 +69,25 @@ export class DictionaryRepository {
 
   async findByNormalizedWord(
     normalizedWord: string,
-  ): Promise<DictionaryEntry | null> {
+  ): Promise<DictionaryEntryWithBook | null> {
     return this.prisma.dictionaryEntry.findUnique({
       where: { normalizedWord },
+      include: BOOK_SELECT,
+    });
+  }
+
+  async findById(id: string): Promise<DictionaryEntry | null> {
+    return this.prisma.dictionaryEntry.findUnique({ where: { id } });
+  }
+
+  async attachImage(
+    id: string,
+    imageId: string,
+  ): Promise<DictionaryEntryWithBook> {
+    return this.prisma.dictionaryEntry.update({
+      where: { id },
+      data: { imageId },
+      include: BOOK_SELECT,
     });
   }
 

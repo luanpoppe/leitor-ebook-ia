@@ -28,6 +28,7 @@ const chatPlanSchema = z.object({
     .max(MAX_PLANNED_CHAPTERS)
     .default([]),
   wantsImage: z.boolean().default(false),
+  wantsDictionaryImage: z.boolean().default(false),
   imageSubject: z.string().trim().max(300).default(''),
 });
 
@@ -65,6 +66,7 @@ export class ChatQueryPlanner {
       queries: [input.question],
       chapters: [],
       wantsImage: false,
+      wantsDictionaryImage: false,
       imageSubject: '',
     };
     if (this.client === null) return fallback;
@@ -103,6 +105,7 @@ export class ChatQueryPlanner {
       'Para perguntas sobre o livro inteiro (enredo, final, temas, personagens), escolha os capítulos que melhor cobrem o arco — inclusive o último capítulo narrativo quando a pergunta for sobre o desfecho.',
       'Não se preocupe com spoilers: o leitor escolheu consultar o livro todo.',
       'wantsImage: true somente se o leitor estiver pedindo para gerar, desenhar ou criar uma imagem.',
+      'wantsDictionaryImage: true somente se a imagem pedida for para uma palavra do dicionário pessoal (ex.: "gera uma imagem de tulipa e coloca no dicionário"). Nesse caso o app usa a ferramenta do dicionário, não a imagem de cena do livro.',
       'imageSubject: quando wantsImage for true, o que a imagem deve retratar (personagem, lugar ou cena) em poucas palavras; senão devolva string vazia.',
     ];
     if (input.selection !== undefined) {
@@ -193,6 +196,7 @@ export class ChatQueryPlanner {
       queries: queries.slice(0, MAX_QUERIES),
       chapters: chapters.slice(0, MAX_PLANNED_CHAPTERS),
       wantsImage: plan.wantsImage,
+      wantsDictionaryImage: plan.wantsDictionaryImage,
       imageSubject: plan.wantsImage ? plan.imageSubject.trim() : '',
     };
   }

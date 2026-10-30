@@ -80,6 +80,15 @@
   padding: 16px 20px 20px;
 }
 
+.image {
+  display: block;
+  width: 100%;
+  max-height: 300px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
 .section {
   margin-bottom: 18px;
 }

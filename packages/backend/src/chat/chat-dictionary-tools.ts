@@ -6,15 +6,21 @@ import {
   InvalidDictionaryWordError,
 } from '../dictionary/dictionary.errors';
 import { DictionaryService } from '../dictionary/dictionary.service';
+import { ImageGenerationError } from '../images/image-generation.service';
+import type { ImageService } from '../images/image.service';
 import type { ChatTools } from './chat-tools.types';
 
 /**
- * Ferramenta que salva uma palavra no dicionário pessoal. O livro é sempre o
- * da conversa; o capítulo/trecho são opcionais e servem para lembrar onde a
- * palavra apareceu.
+ * Ferramentas do dicionário: salvar a palavra e, quando o leitor pedir,
+ * gerar uma imagem para ela. O livro é sempre o da conversa.
  */
 export class ChatDictionaryTools {
-  static build(dictionary: DictionaryService, bookId: string): ChatTools {
+  static build(
+    dictionary: DictionaryService,
+    imageService: ImageService,
+    bookId: string,
+    conversationId: string,
+  ): ChatTools {
     const tools = new AITools();
 
     const addWordTool = tools.createTool({
@@ -64,6 +70,70 @@ export class ChatDictionaryTools {
       },
     });
 
-    return [addWordTool];
+    const imageTool = tools.createTool({
+      name: 'gerar_imagem_para_palavra',
+      description:
+        'Gera uma imagem ilustrativa para uma palavra que já está no dicionário pessoal e vincula a imagem à entrada. Use SOMENTE quando o leitor pedir explicitamente uma imagem/ilustração da palavra; não gere imagens por conta própria. A palavra precisa existir no dicionário; se não existir, adicione primeiro com adicionar_ao_dicionario.',
+      schema: z.object({
+        palavra: z.string().trim().min(1).max(120),
+        descricao: z.string().trim().min(1).max(600).optional(),
+      }),
+      toolFunction: async ({ palavra, descricao }) => {
+        try {
+          const entry = await dictionary.findByWord(palavra);
+          if (entry === null) {
+            return `A palavra "${palavra}" ainda não está no dicionário. Adicione primeiro com adicionar_ao_dicionario.`;
+          }
+
+          const prompt = buildDictionaryImagePrompt(
+            entry.word,
+            entry.meaning,
+            descricao,
+          );
+          const image = await imageService.generate({
+            bookId,
+            conversationId,
+            prompt,
+          });
+          const updated = await dictionary.attachImage(entry.id, image.id);
+
+          return `Imagem gerada para "${updated.word}" e vinculada ao dicionário.`;
+        } catch (error) {
+          if (error instanceof ImageGenerationError) {
+            return 'Não foi possível gerar a imagem agora. Tente de novo em instantes.';
+          }
+          if (error instanceof InvalidDictionaryWordError) {
+            return 'Não consegui identificar uma palavra válida para gerar a imagem.';
+          }
+          if (error instanceof EbookNotFoundError) {
+            return 'Não encontrei o livro desta conversa para gerar a imagem.';
+          }
+          if (error instanceof Error) return error.message;
+
+          return 'Não foi possível gerar a imagem para esta palavra.';
+        }
+      },
+    });
+
+    return [addWordTool, imageTool];
   }
+}
+
+function buildDictionaryImagePrompt(
+  word: string,
+  meaning: string,
+  description?: string,
+): string {
+  const visualDescription =
+    description === undefined
+      ? `Represente o objeto ou conceito de forma visual, coerente com o significado.`
+      : `Descrição visual: ${description}.`;
+
+  return [
+    `Ilustração editorial para um dicionário, da palavra "${word}".`,
+    `Significado: ${meaning}.`,
+    visualDescription,
+    'Sem texto, letras, legendas ou marcas d’água na imagem.',
+    'Objeto centralizado, iluminação natural, fundo neutro claro, estilo realista e limpo.',
+  ].join(' ');
 }

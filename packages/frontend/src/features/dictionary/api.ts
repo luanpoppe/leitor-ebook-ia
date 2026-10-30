@@ -14,6 +14,7 @@ export interface DictionaryEntry {
   quote: string | null;
   chapterPosition: number | null;
   book: DictionaryBook | null;
+  imageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

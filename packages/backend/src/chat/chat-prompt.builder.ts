@@ -67,6 +67,7 @@ export class ChatPromptBuilder {
       'Nunca exclua uma anotação sem confirmação explícita: primeiro liste a nota e pergunte se o leitor confirma a exclusão. Só chame excluir_anotacao quando a mensagem atual confirmar.',
       'Você pode salvar palavras no dicionário pessoal do leitor com adicionar_ao_dicionario. Use quando o leitor pedir explicitamente para adicionar/salvar uma palavra ou registrar o significado de um termo; preencha o significado, um exemplo quando útil e o trecho do livro onde a palavra apareceu. O livro atual é anexado automaticamente; informe o capítulo quando souber.',
       'Ao definir uma palavra para o dicionário, você pode usar conhecimento geral para o significado; o trecho citado deve vir do livro. Não adicione palavras ao dicionário sem um pedido explícito.',
+      'Você pode gerar uma imagem para uma palavra já salva no dicionário com gerar_imagem_para_palavra. Use SOMENTE quando o leitor pedir explicitamente uma imagem/ilustração; não gere por conta própria. A palavra precisa já estar no dicionário; se não estiver, adicione primeiro. Para objetos materiais, descreva o que deve aparecer e peça uma imagem sem texto.',
       'Não invente fatos sobre o livro que não estejam nos trechos.',
     ];
     if (hasReadingContext) {

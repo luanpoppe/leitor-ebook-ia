@@ -10,6 +10,14 @@ export class ListDictionaryQueryDto extends createZodDto(
   listDictionaryQuerySchema,
 ) {}
 
+export const dictionaryEntryParamsSchema = z.object({
+  entryId: z.string().uuid(),
+});
+
+export class DictionaryEntryParamsDto extends createZodDto(
+  dictionaryEntryParamsSchema,
+) {}
+
 export interface DictionaryBookResponse {
   id: string;
   title: string;
@@ -24,6 +32,8 @@ export interface DictionaryEntryResponse {
   quote: string | null;
   chapterPosition: number | null;
   book: DictionaryBookResponse | null;
+  /** URL relativa da imagem gerada para a palavra, se houver. */
+  imageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

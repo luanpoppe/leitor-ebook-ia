@@ -15,7 +15,7 @@ export class ImageRepository {
 
   async create(input: {
     bookId: string;
-    conversationId: string;
+    conversationId: string | null;
     prompt: string;
     model: string;
     storageKey: string;
@@ -34,7 +34,7 @@ export class ImageRepository {
 
   async listByBook(bookId: string): Promise<StoredImage[]> {
     return this.prisma.generatedImage.findMany({
-      where: { bookId },
+      where: { bookId, dictionaryEntry: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -49,6 +49,19 @@ export class ImageRepository {
   async findById(bookId: string, imageId: string): Promise<StoredImage | null> {
     return this.prisma.generatedImage.findFirst({
       where: { id: imageId, bookId },
+      select: {
+        id: true,
+        prompt: true,
+        model: true,
+        storageKey: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async findByIdAny(imageId: string): Promise<StoredImage | null> {
+    return this.prisma.generatedImage.findUnique({
+      where: { id: imageId },
       select: {
         id: true,
         prompt: true,
