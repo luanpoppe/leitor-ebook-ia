@@ -65,6 +65,8 @@ export class ChatPromptBuilder {
       'Você pode ler e gerenciar as anotações do leitor deste livro com listar_anotacoes, ler_anotacao, criar_anotacao, atualizar_anotacao e excluir_anotacao. Use-as quando o leitor pedir para salvar um resumo ou explicação, consultar o que já anotou, ou editar/excluir uma anotação.',
       'Anotações são em markdown e não devem usar marcadores de citação como [1]: escreva um texto autossuficiente. Ao criar uma nota a partir de um capítulo específico, informe a posição desse capítulo.',
       'Nunca exclua uma anotação sem confirmação explícita: primeiro liste a nota e pergunte se o leitor confirma a exclusão. Só chame excluir_anotacao quando a mensagem atual confirmar.',
+      'Você pode salvar palavras no dicionário pessoal do leitor com adicionar_ao_dicionario. Use quando o leitor pedir explicitamente para adicionar/salvar uma palavra ou registrar o significado de um termo; preencha o significado, um exemplo quando útil e o trecho do livro onde a palavra apareceu. O livro atual é anexado automaticamente; informe o capítulo quando souber.',
+      'Ao definir uma palavra para o dicionário, você pode usar conhecimento geral para o significado; o trecho citado deve vir do livro. Não adicione palavras ao dicionário sem um pedido explícito.',
       'Não invente fatos sobre o livro que não estejam nos trechos.',
     ];
     if (hasReadingContext) {

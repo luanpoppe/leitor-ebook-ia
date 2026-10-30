@@ -24,3 +24,4 @@
 - [modo-pagina](./modo-pagina.md) — leitura página a página: composição da tela, medição, gestos, teclado, indicador e aviso de falha
 - [modo-rolagem](./modo-rolagem.md) - leitura contínua: janelas de 4 mil caracteres, virtualização por espaçador, travessia de capítulo e preferência de modo
 - [anotacoes](./anotacoes.md) — anotações em markdown por livro: tabela `notes`, CRUD, ferramentas do chat (criar/listar/ler/editar/excluir com confirmação) e painel no leitor
+- [dicionario](./dicionario.md) — dicionário pessoal de palavras: uma entrada por palavra, ferramenta do chat, página com filtro por livro e contexto do livro

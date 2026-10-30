@@ -14,7 +14,9 @@ import { EmbeddingService } from '../indexing/embedding.service';
 import { EmbeddingUnavailableError } from '../indexing/indexing.errors';
 import { SearchService } from '../search/search.service';
 import { NotesService } from '../notes/notes.service';
+import { DictionaryService } from '../dictionary/dictionary.service';
 import { ChatNotesTools, type ChatNoteAction } from './chat-notes-tools';
+import { ChatDictionaryTools } from './chat-dictionary-tools';
 import {
   ChatPromptBuilder,
   MAX_SEARCH_EXCERPTS,
@@ -103,6 +105,7 @@ export class ChatService {
     private readonly queryPlanner: ChatQueryPlanner,
     private readonly searchService: SearchService,
     private readonly notesService: NotesService,
+    private readonly dictionaryService: DictionaryService,
     private readonly imageService: ImageService,
     @Inject(AI_CLIENT) private readonly client: AiClient,
   ) {}
@@ -418,6 +421,7 @@ export class ChatService {
       ...ChatNotesTools.build(this.notesService, bookId, (action) => {
         noteActions.set(action.noteId, action);
       }),
+      ...ChatDictionaryTools.build(this.dictionaryService, bookId),
     ];
   }
 

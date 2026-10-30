@@ -45,6 +45,7 @@ model Book {
   conversations Conversation[]
   images GeneratedImage[]
   notes Note[]
+  dictionaryEntries DictionaryEntry[]
 
   @@index([createdAt(sort: Desc), id(sort: Desc)], map: "books_created_at_idx")
   @@map("books")
@@ -185,4 +186,25 @@ model Note {
 
   @@index([bookId, updatedAt(sort: Desc)], map: "notes_book_updated_idx")
   @@map("notes")
+}
+
+/**
+ * Dicionário pessoal: uma entrada por palavra (normalizada), com o significado
+ * e, quando houver, o livro/trecho onde ela apareceu.
+ */
+model DictionaryEntry {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  word            String   @db.VarChar(120)
+  normalizedWord  String   @unique @map("normalized_word") @db.VarChar(120)
+  meaning         String
+  example         String?
+  quote           String?
+  bookId          String?  @map("book_id") @db.Uuid
+  chapterPosition Int?     @map("chapter_position")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  book            Book?    @relation(fields: [bookId], references: [id], onDelete: SetNull)
+
+  @@index([updatedAt(sort: Desc)], map: "dictionary_entries_updated_idx")
+  @@map("dictionary_entries")
 }

@@ -5,7 +5,7 @@ import { BrandMark } from "./brand-mark";
 import styles from "./app-shell.module.css";
 
 interface AppShellProps {
-  active?: "shelf" | "notes" | "conversations" | "settings";
+  active?: "shelf" | "notes" | "dictionary" | "conversations" | "settings";
   bookCount?: number;
   children: ReactNode;
 }
@@ -13,6 +13,7 @@ interface AppShellProps {
 export function AppShell({ active, bookCount, children }: AppShellProps) {
   const isShelfActive = active === "shelf";
   const isNotesActive = active === "notes";
+  const isDictionaryActive = active === "dictionary";
   const isConversationsActive = active === "conversations";
   const isSettingsActive = active === "settings";
 
@@ -57,6 +58,16 @@ export function AppShell({ active, bookCount, children }: AppShellProps) {
             aria-current={isNotesActive ? "page" : undefined}
           >
             Anotações
+          </Link>
+
+          <Link
+            href="/dicionario"
+            className={`${styles.navItem} ${
+              isDictionaryActive ? styles.navItemActive : ""
+            }`}
+            aria-current={isDictionaryActive ? "page" : undefined}
+          >
+            Dicionário
           </Link>
 
           <Link

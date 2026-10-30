@@ -13,6 +13,7 @@ import { ChatModule } from './chat/chat.module';
 import { ImagesModule } from './images/images.module';
 import { SearchModule } from './search/search.module';
 import { NotesModule } from './notes/notes.module';
+import { DictionaryModule } from './dictionary/dictionary.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { NotesModule } from './notes/notes.module';
     SearchModule,
     ImagesModule,
     NotesModule,
+    DictionaryModule,
   ],
   controllers: [AppController],
 })

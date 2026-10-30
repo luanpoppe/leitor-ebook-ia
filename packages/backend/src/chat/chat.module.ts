@@ -5,6 +5,7 @@ import { ImagesModule } from '../images/images.module';
 import { IndexingModule } from '../indexing/indexing.module';
 import { SearchModule } from '../search/search.module';
 import { NotesModule } from '../notes/notes.module';
+import { DictionaryModule } from '../dictionary/dictionary.module';
 import { ChatController } from './chat.controller';
 import { ConversationsController } from './conversations.controller';
 import { ChatQueryPlanner } from './chat-query-planner';
@@ -13,7 +14,14 @@ import { ChunkSearchRepository } from './chunk-search.repository';
 import { ConversationRepository } from './conversation.repository';
 
 @Module({
-  imports: [CatalogModule, IndexingModule, SearchModule, ImagesModule, NotesModule],
+  imports: [
+    CatalogModule,
+    IndexingModule,
+    SearchModule,
+    ImagesModule,
+    NotesModule,
+    DictionaryModule,
+  ],
   controllers: [ChatController, ConversationsController],
   providers: [
     ChatService,
