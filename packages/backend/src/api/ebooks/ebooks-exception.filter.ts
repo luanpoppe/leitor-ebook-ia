@@ -23,6 +23,12 @@ import {
   NoteNotFoundError,
 } from '../../notes/notes.errors';
 import {
+  HighlightNotFoundError,
+  HighlightOverlapError,
+  InvalidHighlightChapterError,
+  InvalidHighlightRangeError,
+} from '../../highlights/highlights.errors';
+import {
   InvalidStorageInputError,
   StorageObjectNotFoundError,
   StorageUnavailableError,
@@ -67,6 +73,10 @@ interface ErrorBody {
   ChatContextUnavailableError,
   NoteNotFoundError,
   InvalidNoteChapterError,
+  HighlightNotFoundError,
+  InvalidHighlightChapterError,
+  InvalidHighlightRangeError,
+  HighlightOverlapError,
   MulterError,
 )
 export class EbooksExceptionFilter extends BaseExceptionFilter {
@@ -156,6 +166,18 @@ export class EbooksExceptionFilter extends BaseExceptionFilter {
     }
     if (exception instanceof InvalidNoteChapterError) {
       return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof HighlightNotFoundError) {
+      return HttpStatus.NOT_FOUND;
+    }
+    if (exception instanceof InvalidHighlightChapterError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof InvalidHighlightRangeError) {
+      return HttpStatus.UNPROCESSABLE_ENTITY;
+    }
+    if (exception instanceof HighlightOverlapError) {
+      return HttpStatus.CONFLICT;
     }
     if (exception instanceof ChatContextUnavailableError) {
       return HttpStatus.UNPROCESSABLE_ENTITY;

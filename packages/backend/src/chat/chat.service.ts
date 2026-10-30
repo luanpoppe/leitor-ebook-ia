@@ -15,8 +15,10 @@ import { EmbeddingUnavailableError } from '../indexing/indexing.errors';
 import { SearchService } from '../search/search.service';
 import { NotesService } from '../notes/notes.service';
 import { DictionaryService } from '../dictionary/dictionary.service';
+import { HighlightsService } from '../highlights/highlights.service';
 import { ChatNotesTools, type ChatNoteAction } from './chat-notes-tools';
 import { ChatDictionaryTools } from './chat-dictionary-tools';
+import { ChatHighlightsTools } from './chat-highlights-tools';
 import {
   ChatPromptBuilder,
   MAX_SEARCH_EXCERPTS,
@@ -106,6 +108,7 @@ export class ChatService {
     private readonly searchService: SearchService,
     private readonly notesService: NotesService,
     private readonly dictionaryService: DictionaryService,
+    private readonly highlightsService: HighlightsService,
     private readonly imageService: ImageService,
     @Inject(AI_CLIENT) private readonly client: AiClient,
   ) {}
@@ -428,6 +431,7 @@ export class ChatService {
         bookId,
         conversationId,
       ),
+      ...ChatHighlightsTools.build(this.highlightsService, bookId),
     ];
   }
 

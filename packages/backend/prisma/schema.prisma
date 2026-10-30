@@ -46,6 +46,7 @@ model Book {
   images GeneratedImage[]
   notes Note[]
   dictionaryEntries DictionaryEntry[]
+  highlights Highlight[]
 
   @@index([createdAt(sort: Desc), id(sort: Desc)], map: "books_created_at_idx")
   @@map("books")
@@ -210,4 +211,35 @@ model DictionaryEntry {
 
   @@index([updatedAt(sort: Desc)], map: "dictionary_entries_updated_idx")
   @@map("dictionary_entries")
+}
+
+/** Cores claras disponíveis para marcar passagens do livro. */
+enum HighlightColor {
+  YELLOW @map("yellow")
+  GREEN  @map("green")
+  BLUE   @map("blue")
+  PINK   @map("pink")
+
+  @@map("highlight_color")
+}
+
+/**
+ * Marcação de texto do leitor. Os offsets são code points dentro do texto do
+ * capítulo, os mesmos usados pelo progresso e pela paginação.
+ */
+model Highlight {
+  id              String         @id @default(uuid(7)) @db.Uuid
+  bookId          String         @map("book_id") @db.Uuid
+  chapterPosition Int            @map("chapter_position")
+  startOffset     Int            @map("start_offset")
+  endOffset       Int            @map("end_offset")
+  quote           String
+  color           HighlightColor
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  book            Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, chapterPosition, startOffset], map: "highlights_book_position_idx")
+  @@index([bookId, color], map: "highlights_book_color_idx")
+  @@map("highlights")
 }

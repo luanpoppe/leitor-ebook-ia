@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import type { CSSProperties, JSX } from "react";
+import type { HighlightColor } from "@/features/highlights/api";
+import { HighlightColorPicker } from "@/features/highlights/components/highlight-color-picker";
 import type { ReaderAlignment, ReaderMode, ReaderTheme } from "../reader-preferences";
 import styles from "./reader-toolbar.module.css";
 
@@ -20,6 +22,8 @@ interface ReaderToolbarProps {
   onToggleToc: () => void;
   onOpenSearch: () => void;
   onOpenNotes: () => void;
+  isHighlightsOpen: boolean;
+  onOpenHighlights: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
   onPrevious: () => void;
@@ -37,9 +41,12 @@ interface ReaderToolbarProps {
   onToggleMode: () => void;
   isChatOpen: boolean;
   onToggleChat: () => void;
-  /** Seleção ativa: no toque a ação aparece na barra, não sobre a seleção. */
+  /** Seleção ativa: no toque as ações aparecem na barra, não sobre a seleção. */
   hasTextSelection: boolean;
+  isMultiPagePending: boolean;
   onAskSelection: () => void;
+  onHighlightSelection: (color: HighlightColor) => void;
+  onStartMultiPage: () => void;
 }
 
 const BACK_LABEL = "Voltar para a ficha do livro";
@@ -49,6 +56,7 @@ const TOC_LABEL = "Sumário";
 const SEARCH_LABEL = "Buscar";
 const CHAT_LABEL = "Chat";
 const NOTES_LABEL = "Anotações";
+const HIGHLIGHTS_LABEL = "Marcações";
 const DECREASE_FONT_LABEL = "Diminuir fonte";
 const INCREASE_FONT_LABEL = "Aumentar fonte";
 const LIGHT_THEME_ACTION_LABEL = "Usar tema sépia";
@@ -103,6 +111,12 @@ function resolveIsChatButtonActive(isChatOpen: boolean): string {
   return `${styles.button} ${styles.buttonActive}`;
 }
 
+function resolveIsHighlightsButtonActive(isOpen: boolean): string {
+  if (!isOpen) return styles.button;
+
+  return `${styles.button} ${styles.buttonActive}`;
+}
+
 export function ReaderToolbar({
   bookTitle,
   backHref,
@@ -116,6 +130,8 @@ export function ReaderToolbar({
   onToggleToc,
   onOpenSearch,
   onOpenNotes,
+  isHighlightsOpen,
+  onOpenHighlights,
   hasPrevious,
   hasNext,
   onPrevious,
@@ -134,7 +150,10 @@ export function ReaderToolbar({
   isChatOpen,
   onToggleChat,
   hasTextSelection,
+  isMultiPagePending,
   onAskSelection,
+  onHighlightSelection,
+  onStartMultiPage,
 }: ReaderToolbarProps): JSX.Element {
   const progressPercent = resolveProgress(chapterProgress);
   const bookPercent =
@@ -219,14 +238,29 @@ export function ReaderToolbar({
 
       <div className={styles.controls}>
         {hasTextSelection && (
-          <button
-            type="button"
-            data-reader-selection-action=""
-            onClick={onAskSelection}
-            className={styles.selectionButton}
-          >
-            Perguntar à IA
-          </button>
+          <div className={styles.selectionTools} data-reader-selection-action="">
+            <HighlightColorPicker
+              onSelect={onHighlightSelection}
+              label={isMultiPagePending ? "Concluir" : "Marcar"}
+              actionLabel={isMultiPagePending ? "Concluir em" : "Marcar em"}
+            />
+            {!isMultiPagePending && (
+              <button
+                type="button"
+                onClick={onStartMultiPage}
+                className={styles.multiPageButton}
+              >
+                Várias páginas
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onAskSelection}
+              className={styles.selectionButton}
+            >
+              Perguntar à IA
+            </button>
+          </div>
         )}
 
         <div className={styles.controlGroup}>
@@ -288,6 +322,16 @@ export function ReaderToolbar({
           className={styles.button}
         >
           {NOTES_LABEL}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenHighlights}
+          aria-expanded={isHighlightsOpen}
+          aria-label={HIGHLIGHTS_LABEL}
+          className={resolveIsHighlightsButtonActive(isHighlightsOpen)}
+        >
+          {HIGHLIGHTS_LABEL}
         </button>
 
         <div className={styles.controlGroup}>

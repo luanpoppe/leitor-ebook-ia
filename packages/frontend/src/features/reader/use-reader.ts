@@ -51,7 +51,8 @@ export interface UseReaderResult {
 
 export function useReader(
   bookId: string,
-  initialChapterPosition: number | null
+  initialChapterPosition: number | null,
+  initialOffset: number | null = null
 ): UseReaderResult {
   const router = useRouter();
   const [navigatedPosition, setNavigatedPosition] = useState<number | null>(
@@ -122,8 +123,18 @@ export function useReader(
   const isAtSavedChapter =
     openingProgress !== null &&
     resolvedPosition === openingProgress.chapterPosition;
-  const resumeOffset =
-    isOpeningAtSavedChapter && isAtSavedChapter ? openingProgress.offset : 0;
+  // Um link com capítulo + offset (marcação, por exemplo) abre no offset exato
+  // na primeira montagem. Depois de qualquer navegação o parâmetro não volta a
+  // valer, senão voltar ao capítulo original puxaria a leitura para o destaque.
+  const isOpeningAtUrlOffset =
+    navigatedPosition === null &&
+    initialOffset !== null &&
+    initialChapterPosition !== null;
+  const resumeOffset = isOpeningAtUrlOffset
+    ? initialOffset
+    : isOpeningAtSavedChapter && isAtSavedChapter
+      ? openingProgress.offset
+      : 0;
 
   const hasPrevious = chapter?.previousPosition != null;
   const hasNext = chapter?.nextPosition != null;

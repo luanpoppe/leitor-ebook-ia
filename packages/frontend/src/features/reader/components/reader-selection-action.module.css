@@ -1,37 +1,75 @@
-.action {
+.menu {
   position: fixed;
   z-index: 68;
-  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
   border: 1px solid rgb(0 0 0 / 0.08);
   border-radius: 999px;
   background: var(--accent-ink);
   color: #fff;
+  box-shadow: 0 6px 18px rgb(17 24 39 / 0.28);
+}
+
+.separator {
+  width: 1px;
+  height: 20px;
+  background: rgb(255 255 255 / 0.25);
+}
+
+.multiPage {
+  padding: 4px 6px;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.multiPage:hover {
+  border-color: #fff;
+}
+
+.multiPage:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.ask {
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgb(17 24 39 / 0.28);
 }
 
-.action:hover {
+.ask:hover {
   background: var(--accent);
+  color: var(--on-accent);
 }
 
-.action:focus-visible {
-  outline: 2px solid var(--accent-ink);
+.ask:focus-visible {
+  outline: 2px solid #fff;
   outline-offset: 2px;
 }
 
-/* No toque, a ação vive na barra superior (ReaderToolbar). */
+/* No toque, as ações vivem na barra superior (ReaderToolbar). */
 @media (pointer: coarse) {
-  .action {
+  .menu {
     display: none;
   }
 }
 
 @media (max-width: 720px) {
-  .action {
-    padding: 8px 14px;
-    font-size: 13px;
+  .menu {
+    padding: 7px 12px;
   }
 }

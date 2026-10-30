@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, JSX } from "react";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
+import { getApiErrorInfo } from "@/features/ebooks/api";
 import { useEbookDetail } from "@/features/ebooks/use-ebook-detail";
+import type {
+  BookHighlight,
+  HighlightColor,
+} from "@/features/highlights/api";
+import { HighlightActionPopover } from "@/features/highlights/components/highlight-action-popover";
+import { ReaderHighlightsDrawer } from "@/features/highlights/components/reader-highlights-drawer";
+import { useBookHighlights } from "@/features/highlights/use-book-highlights";
 import { useReader } from "../use-reader";
 import { useReaderKeyboard } from "../use-reader-keyboard";
 import { useReaderMode } from "../use-reader-mode";
@@ -49,6 +58,8 @@ const PAGE_LOADING_STYLE: CSSProperties = {
 interface ReaderScreenProps {
   bookId: string;
   initialChapterPosition: number | null;
+  /** Offset exato ao abrir por link (ex.: uma marcação da página global). */
+  initialOffset: number | null;
   /** Conversa aberta ao entrar pela página de conversas. */
   initialConversationId: string | null;
 }
@@ -59,9 +70,17 @@ interface ReaderPoint {
   offset: number;
 }
 
+// Início já escolhido de uma marcação que continua em outra página.
+interface PendingHighlightStart {
+  chapterPosition: number;
+  startOffset: number;
+  text: string;
+}
+
 export function ReaderScreen({
   bookId,
   initialChapterPosition,
+  initialOffset,
   initialConversationId,
 }: ReaderScreenProps): JSX.Element {
   const {
@@ -77,7 +96,7 @@ export function ReaderScreen({
     goNext,
     goPrevious,
     retry,
-  } = useReader(bookId, initialChapterPosition);
+  } = useReader(bookId, initialChapterPosition, initialOffset);
   const {
     fontSize,
     theme,
@@ -92,6 +111,15 @@ export function ReaderScreen({
   const { mode, toggleMode } = useReaderMode();
   const { scheduleSave } = useReadingProgressWriter(bookId, savedProgress);
   const { ebook } = useEbookDetail(bookId);
+  const {
+    highlights,
+    isLoading: areHighlightsLoading,
+    error: highlightsError,
+    reload: reloadHighlights,
+    create: createHighlight,
+    updateColor: updateHighlightColor,
+    remove: removeHighlight,
+  } = useBookHighlights(bookId);
 
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(
@@ -99,6 +127,7 @@ export function ReaderScreen({
   );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [notesInitialNoteId, setNotesInitialNoteId] = useState<string | null>(
     null
   );
@@ -128,6 +157,13 @@ export function ReaderScreen({
   const [returnPoint, setReturnPoint] = useState<ReaderPoint | null>(null);
   // Trecho selecionado que o chat vai usar como foco da pergunta.
   const [chatSelection, setChatSelection] = useState<ChatSelection | null>(null);
+  // Marcação clicada no texto: o popover permite removê-la.
+  const [highlightAction, setHighlightAction] = useState<{
+    highlight: BookHighlight;
+    anchor: DOMRect;
+  } | null>(null);
+  const [pendingHighlightStart, setPendingHighlightStart] =
+    useState<PendingHighlightStart | null>(null);
 
   const scrollRef = useRef<ReaderScrollViewHandle>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -141,7 +177,8 @@ export function ReaderScreen({
       citationPreview === null &&
       !isTocOpen &&
       !isSearchOpen &&
-      !isNotesOpen
+      !isNotesOpen &&
+      !isHighlightsOpen
   );
 
   // A view mede a área e publica a régua; uma identidade nova a cada render
@@ -161,7 +198,7 @@ export function ReaderScreen({
   const isLandingAtChapterEnd =
     chapter !== null && landAtEndPosition === chapter.position;
   const openingPageOffset = pageOffset ?? resumeOffset;
-  const initialOffset = isLandingAtChapterEnd
+  const openingPageStartOffset = isLandingAtChapterEnd
     ? chapter.totalLength
     : openingPageOffset;
 
@@ -200,7 +237,7 @@ export function ReaderScreen({
   } = useReaderPage({
     bookId,
     position: currentPosition ?? FIRST_CHAPTER_POSITION,
-    initialOffset,
+    initialOffset: openingPageStartOffset,
     metrics,
     enabled:
       !isScrollMode &&
@@ -212,14 +249,25 @@ export function ReaderScreen({
     onPageChange: handlePageChange,
   });
 
+  // O popover é ancorado em pixels: qualquer virada de página o invalida.
+  useEffect(() => {
+    setHighlightAction(null);
+  }, [currentPosition, mode, pageIndex]);
+
   // Lista estável: uma array nova a cada render recriaria as cargas da rolagem.
   const chapterPositions = useMemo(
     () => chapters.map((chapterSummary) => chapterSummary.position),
     [chapters]
   );
 
+  const highlightsByChapter = useMemo(
+    () => groupHighlightsByChapter(highlights),
+    [highlights]
+  );
+
   const handleScrollPositionChange = useCallback(
     (position: number, offset: number) => {
+      setHighlightAction(null);
       setVisiblePoint({ position, offset });
       scheduleSave(position, offset);
     },
@@ -248,6 +296,7 @@ export function ReaderScreen({
     loadPrevious,
     retry: retryScroll,
     reportVisible,
+    jumpToPoint,
   } = useReaderScroll({
     bookId,
     position: currentPosition ?? FIRST_CHAPTER_POSITION,
@@ -314,6 +363,7 @@ export function ReaderScreen({
     setIsChatOpen(false);
     setIsSearchOpen(false);
     setIsNotesOpen(false);
+    setIsHighlightsOpen(false);
     setChatSelection(null);
     setIsTocOpen((isOpen) => !isOpen);
   }, []);
@@ -326,6 +376,7 @@ export function ReaderScreen({
     setIsTocOpen(false);
     setIsChatOpen(false);
     setIsNotesOpen(false);
+    setIsHighlightsOpen(false);
     setChatSelection(null);
     setIsSearchOpen(true);
   }, []);
@@ -338,6 +389,7 @@ export function ReaderScreen({
     setIsTocOpen(false);
     setIsSearchOpen(false);
     setIsNotesOpen(false);
+    setIsHighlightsOpen(false);
     setChatSelection(null);
     setIsChatOpen((isOpen) => !isOpen);
   }, []);
@@ -351,6 +403,7 @@ export function ReaderScreen({
     setIsTocOpen(false);
     setIsSearchOpen(false);
     setIsChatOpen(false);
+    setIsHighlightsOpen(false);
     setChatSelection(null);
     setCitationPreview(null);
     setNotesInitialNoteId(null);
@@ -361,6 +414,7 @@ export function ReaderScreen({
     setIsTocOpen(false);
     setIsSearchOpen(false);
     setIsChatOpen(false);
+    setIsHighlightsOpen(false);
     setChatSelection(null);
     setCitationPreview(null);
     setNotesInitialNoteId(noteId);
@@ -369,6 +423,20 @@ export function ReaderScreen({
 
   const handleCloseNotes = useCallback(() => {
     setIsNotesOpen(false);
+  }, []);
+
+  const handleOpenHighlights = useCallback(() => {
+    setIsTocOpen(false);
+    setIsSearchOpen(false);
+    setIsChatOpen(false);
+    setIsNotesOpen(false);
+    setChatSelection(null);
+    setCitationPreview(null);
+    setIsHighlightsOpen(true);
+  }, []);
+
+  const handleCloseHighlights = useCallback(() => {
+    setIsHighlightsOpen(false);
   }, []);
 
   // Pular para um ponto do livro nos dois modos. A citação usa isto e o
@@ -381,6 +449,7 @@ export function ReaderScreen({
       if (isScrollMode) {
         setScrollOffset(point.offset);
         setScrollAnchor(point);
+        jumpToPoint(point.position, point.offset);
       } else {
         setPageOffset(point.offset);
       }
@@ -390,7 +459,7 @@ export function ReaderScreen({
 
       goToChapter(point.position);
     },
-    [currentPosition, goToChapter, isScrollMode]
+    [currentPosition, goToChapter, isScrollMode, jumpToPoint]
   );
 
   const handleSearchSelect = useCallback(
@@ -399,6 +468,22 @@ export function ReaderScreen({
       navigateToPoint({ position, offset });
     },
     [navigateToPoint]
+  );
+
+  const handleHighlightSelect = useCallback(
+    (highlight: BookHighlight) => {
+      const origin = {
+        position: currentPosition ?? FIRST_CHAPTER_POSITION,
+        offset: isScrollMode ? visiblePoint.offset : page?.startOffset ?? 0,
+      };
+      setReturnPoint(origin);
+      setIsHighlightsOpen(false);
+      navigateToPoint({
+        position: highlight.chapterPosition,
+        offset: highlight.startOffset,
+      });
+    },
+    [currentPosition, isScrollMode, navigateToPoint, page, visiblePoint.offset]
   );
 
   // Citação do chat: abre a prévia sem mover a leitura principal.
@@ -434,6 +519,117 @@ export function ReaderScreen({
   const handleClearChatSelection = useCallback(() => {
     setChatSelection(null);
   }, []);
+
+  const handleHighlightSelection = useCallback(
+    async (color: HighlightColor): Promise<void> => {
+      if (textSelection === null) return;
+
+      const { chapterPosition, startOffset, endOffset } = textSelection;
+      if (
+        chapterPosition === null ||
+        startOffset === null ||
+        endOffset === null
+      ) {
+        toast.error("Não foi possível identificar o trecho selecionado.");
+        return;
+      }
+
+      let highlightStart = startOffset;
+
+      if (pendingHighlightStart !== null) {
+        const isOtherChapter =
+          pendingHighlightStart.chapterPosition !== chapterPosition;
+        if (isOtherChapter) {
+          toast.error(
+            "A marcação iniciada precisa terminar no mesmo capítulo. Volte ao capítulo e selecione o fim."
+          );
+          return;
+        }
+
+        const isEndBeforeStart = endOffset <= pendingHighlightStart.startOffset;
+        if (isEndBeforeStart) {
+          toast.error("Selecione um trecho depois do início da marcação.");
+          return;
+        }
+
+        highlightStart = pendingHighlightStart.startOffset;
+      }
+
+      try {
+        await createHighlight({
+          chapterPosition,
+          startOffset: highlightStart,
+          endOffset,
+          color,
+        });
+        window.getSelection()?.removeAllRanges();
+        setPendingHighlightStart(null);
+        toast.success("Marcação criada.");
+      } catch (cause) {
+        toast.error(getApiErrorInfo(cause).message);
+      }
+    },
+    [createHighlight, pendingHighlightStart, textSelection]
+  );
+
+  const handleStartMultiPageHighlight = useCallback(() => {
+    if (textSelection === null) return;
+
+    const { chapterPosition, startOffset, text } = textSelection;
+    if (chapterPosition === null || startOffset === null) {
+      toast.error("Não foi possível identificar o início da marcação.");
+      return;
+    }
+
+    setPendingHighlightStart({
+      chapterPosition,
+      startOffset,
+      text: text.slice(0, 80),
+    });
+    window.getSelection()?.removeAllRanges();
+    toast.success("Marcação iniciada. Selecione o fim em outra página.");
+  }, [textSelection]);
+
+  const handleCancelPendingHighlight = useCallback(() => {
+    setPendingHighlightStart(null);
+  }, []);
+
+  const handleChangeHighlightColor = useCallback(
+    async (highlightId: string, color: HighlightColor): Promise<void> => {
+      await updateHighlightColor(highlightId, color);
+      toast.success("Cor da marcação atualizada.");
+    },
+    [updateHighlightColor]
+  );
+
+  const handleRemoveHighlight = useCallback(
+    async (highlightId: string): Promise<void> => {
+      await removeHighlight(highlightId);
+      setHighlightAction((current) =>
+        current?.highlight.id === highlightId ? null : current
+      );
+      toast.success("Marcação removida.");
+    },
+    [removeHighlight]
+  );
+
+  const handleHighlightClick = useCallback(
+    (highlight: BookHighlight, anchor: DOMRect) => {
+      setHighlightAction({ highlight, anchor });
+    },
+    []
+  );
+
+  const handleRemoveHighlightFromPopover = useCallback(
+    async (highlight: BookHighlight): Promise<void> => {
+      try {
+        await handleRemoveHighlight(highlight.id);
+      } catch (cause) {
+        toast.error(getApiErrorInfo(cause).message);
+      }
+    },
+    [handleRemoveHighlight]
+  );
 
   const handleGoToReadingFromPreview = useCallback(
     (citation: ChatCitation) => {
@@ -564,6 +760,8 @@ export function ReaderScreen({
     []
   );
 
+  const currentChapterHighlights =
+    chapter === null ? [] : highlightsByChapter.get(chapter.position) ?? [];
   const readerTitle = ebook?.title ?? "Leitura";
   const backHref =
     initialConversationId === null
@@ -693,6 +891,7 @@ export function ReaderScreen({
     isChatOpen ||
     isSearchOpen ||
     isNotesOpen ||
+    isHighlightsOpen ||
     citationPreview !== null;
   const isChunkErrorVisible =
     !isScrollMode && pageError !== null && errorKind === null && !hasReachedEnd;
@@ -746,6 +945,8 @@ export function ReaderScreen({
           fontSize={fontSize}
           theme={theme}
           alignment={alignment}
+          highlightsByChapter={highlightsByChapter}
+          onHighlightClick={handleHighlightClick}
           anchor={scrollAnchor}
           onLoadMore={loadMore}
           onLoadPrevious={loadPrevious}
@@ -795,6 +996,9 @@ export function ReaderScreen({
       >
         <ReaderPageView
           page={page}
+          position={chapter.position}
+          highlights={currentChapterHighlights}
+          onHighlightClick={handleHighlightClick}
           pageKey={`${chapter.position}:${pageIndex}`}
           direction={direction}
           fontSize={fontSize}
@@ -831,6 +1035,8 @@ export function ReaderScreen({
         onToggleToc={handleToggleToc}
         onOpenSearch={handleOpenSearch}
         onOpenNotes={handleOpenNotes}
+        isHighlightsOpen={isHighlightsOpen}
+        onOpenHighlights={handleOpenHighlights}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
         onPrevious={handlePreviousChapter}
@@ -849,7 +1055,10 @@ export function ReaderScreen({
         isChatOpen={isChatOpen}
         onToggleChat={handleToggleChat}
         hasTextSelection={textSelection !== null && !isChatOpen}
+        isMultiPagePending={pendingHighlightStart !== null}
         onAskSelection={handleAskSelection}
+        onHighlightSelection={(color) => void handleHighlightSelection(color)}
+        onStartMultiPage={handleStartMultiPageHighlight}
       />
 
       <main ref={mainRef} className={styles.main}>
@@ -862,6 +1071,17 @@ export function ReaderScreen({
           />
         )}
       </main>
+
+      {highlightAction !== null && (
+        <HighlightActionPopover
+          highlight={highlightAction.highlight}
+          anchor={highlightAction.anchor}
+          onRemove={() =>
+            void handleRemoveHighlightFromPopover(highlightAction.highlight)
+          }
+          onClose={() => setHighlightAction(null)}
+        />
+      )}
 
       {isTocOpen && (
         <ReaderTocDrawer
@@ -911,6 +1131,19 @@ export function ReaderScreen({
         />
       )}
 
+      {isHighlightsOpen && (
+        <ReaderHighlightsDrawer
+          highlights={highlights}
+          isLoading={areHighlightsLoading}
+          error={highlightsError}
+          onClose={handleCloseHighlights}
+          onReload={reloadHighlights}
+          onSelect={handleHighlightSelect}
+          onChangeColor={handleChangeHighlightColor}
+          onRemove={handleRemoveHighlight}
+        />
+      )}
+
       {citationPreview !== null && (
         <ReaderCitationPreview
           bookId={bookId}
@@ -926,12 +1159,37 @@ export function ReaderScreen({
       {textSelection !== null && !isChatOpen && (
         <ReaderSelectionAction
           selection={textSelection}
+          isMultiPagePending={pendingHighlightStart !== null}
           onAsk={handleAskSelection}
+          onHighlight={(color) => void handleHighlightSelection(color)}
+          onStartMultiPage={handleStartMultiPageHighlight}
         />
       )}
 
+      {pendingHighlightStart !== null && (
+        <div className={styles.pendingBar} role="status">
+          <span className={styles.pendingText}>
+            Marcação iniciada em “{pendingHighlightStart.text}”. Selecione o fim
+            em outra página e escolha a cor.
+          </span>
+          <button
+            type="button"
+            className={styles.pendingCancel}
+            onClick={handleCancelPendingHighlight}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {returnPoint !== null && (
-        <div className={styles.returnBar} role="status">
+        <div
+          className={styles.returnBar}
+          style={
+            pendingHighlightStart === null ? undefined : { bottom: 76 }
+          }
+          role="status"
+        >
           <button
             type="button"
             className={styles.returnButton}
@@ -959,4 +1217,22 @@ function resolveChapterProgress(offset: number, totalLength: number): number {
   const ratio = offset / totalLength;
   const lowerBoundedRatio = Math.max(ratio, 0);
   return Math.min(lowerBoundedRatio, 1);
+}
+
+function groupHighlightsByChapter(
+  highlights: BookHighlight[]
+): ReadonlyMap<number, BookHighlight[]> {
+  const byChapter = new Map<number, BookHighlight[]>();
+
+  for (const highlight of highlights) {
+    const current = byChapter.get(highlight.chapterPosition);
+    if (current === undefined) {
+      byChapter.set(highlight.chapterPosition, [highlight]);
+      continue;
+    }
+
+    current.push(highlight);
+  }
+
+  return byChapter;
 }

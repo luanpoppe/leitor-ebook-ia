@@ -7,17 +7,23 @@ import type { ReaderAlignment } from "../reader-preferences";
 import { ReaderHeading } from "../heading";
 import type { ReaderPageMetrics } from "../use-reader-page";
 import type { TextPage } from "../window/page-paginator";
+import { TextParagraphs } from "../window/text-paragraphs";
+import { HighlightedText } from "@/features/highlights/components/highlighted-text";
+import type { BookHighlight } from "@/features/highlights/api";
 import {
   ReaderMeasureLayer,
   type ReaderMeasureLayerHandle,
 } from "./reader-measure-layer";
 import styles from "./reader-page-view.module.css";
 
-const PARAGRAPH_SEPARATOR = "\n\n";
 const EMPTY_SIZE = { pageHeight: 0, width: 0 };
 
 export interface ReaderPageViewProps {
   page: TextPage | null;
+  /** Posição do capítulo da página, usada para localizar as marcações. */
+  position: number;
+  highlights: BookHighlight[];
+  onHighlightClick?(highlight: BookHighlight, rect: DOMRect): void;
   /** Muda a cada página (ex.: `${position}:${pageIndex}`) para animar a entrada. */
   pageKey: string;
   direction: "next" | "previous" | null;
@@ -35,6 +41,9 @@ interface ContentSize {
 
 export function ReaderPageView({
   page,
+  position,
+  highlights,
+  onHighlightClick,
   pageKey,
   direction,
   fontSize,
@@ -114,7 +123,10 @@ export function ReaderPageView({
     onMetricsChange({ pageHeight, measure });
   }, [measure, onMetricsChange, pageHeight]);
 
-  const paragraphs = splitParagraphs(page?.text ?? "");
+  const paragraphs = TextParagraphs.split(
+    page?.text ?? "",
+    page?.startOffset ?? 0
+  );
   const containerStyle = {
     "--reader-font-size": `${fontSize}px`,
   } as CSSProperties;
@@ -138,17 +150,24 @@ export function ReaderPageView({
           key={pageKey}
           className={styles.page}
           data-direction={direction ?? "none"}
+          data-position={position}
         >
-          {paragraphs.map((paragraph, index) => (
+          {paragraphs.map((paragraph) => (
             <p
-              key={index}
+              key={paragraph.offset}
               className={
-                ReaderHeading.isHeading(paragraph)
+                ReaderHeading.isHeading(paragraph.text)
                   ? styles.heading
                   : styles.paragraph
               }
+              data-offset={paragraph.offset}
             >
-              {paragraph}
+              <HighlightedText
+                text={paragraph.text}
+                startOffset={paragraph.offset}
+                highlights={highlights}
+                onHighlightClick={onHighlightClick}
+              />
             </p>
           ))}
         </div>
@@ -163,21 +182,6 @@ export function ReaderPageView({
       />
     </div>
   );
-}
-
-// Mesma regra da camada de medição: parágrafo vazio não vira elemento.
-function splitParagraphs(text: string): string[] {
-  const rawParagraphs = text.split(PARAGRAPH_SEPARATOR);
-  const paragraphs: string[] = [];
-
-  for (const paragraph of rawParagraphs) {
-    const isEmpty = paragraph.length === 0;
-    if (isEmpty) continue;
-
-    paragraphs.push(paragraph);
-  }
-
-  return paragraphs;
 }
 
 // `clientWidth`/`clientHeight` incluem o padding; o texto só ocupa o miolo.

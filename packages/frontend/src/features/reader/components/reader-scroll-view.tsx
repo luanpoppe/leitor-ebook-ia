@@ -13,6 +13,8 @@ import type { CSSProperties, JSX } from "react";
 import { ReaderHeading } from "../heading";
 import type { ReaderAlignment, ReaderTheme } from "../reader-preferences";
 import type { ScrollErrorDirection, ScrollSegment } from "../use-reader-scroll";
+import type { BookHighlight } from "@/features/highlights/api";
+import { HighlightedText } from "@/features/highlights/components/highlighted-text";
 import styles from "./reader-scroll-view.module.css";
 
 const SEGMENT_KEY_ATTRIBUTE = "data-segment-key";
@@ -54,6 +56,9 @@ export interface ReaderScrollViewProps {
   fontSize: number;
   theme: ReaderTheme;
   alignment: ReaderAlignment;
+  /** Marcações indexadas pela posição do capítulo. */
+  highlightsByChapter: ReadonlyMap<number, BookHighlight[]>;
+  onHighlightClick?(highlight: BookHighlight, rect: DOMRect): void;
   /** Quando muda (troca de modo ou de capítulo pelo sumário), a view rola até ali. */
   anchor: { position: number; offset: number } | null;
   onLoadMore(): void;
@@ -69,7 +74,8 @@ export const ReaderScrollView = forwardRef<
 >(function ReaderScrollView(props, ref): JSX.Element {
   const {
     segments, isLoading, error, errorDirection, hasReachedEnd, fontSize, theme,
-    alignment, anchor, onLoadMore, onLoadPrevious, onRetry, onVisibleChange,
+    alignment, highlightsByChapter, onHighlightClick, anchor, onLoadMore,
+    onLoadPrevious, onRetry, onVisibleChange,
   } = props;
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -370,6 +376,7 @@ export const ReaderScrollView = forwardRef<
       previousSegment !== undefined &&
       previousSegment.lastChar !== PARAGRAPH_BREAK;
     const endsInsideParagraph = segment.lastChar !== PARAGRAPH_BREAK;
+    const highlights = highlightsByChapter.get(segment.position) ?? [];
 
     return (
       <div key={segment.key} className={styles.segment} data-segment
@@ -386,7 +393,12 @@ export const ReaderScrollView = forwardRef<
             )}
             data-offset={paragraph.offset}
           >
-            {paragraph.text}
+            <HighlightedText
+              text={paragraph.text}
+              startOffset={paragraph.offset}
+              highlights={highlights}
+              onHighlightClick={onHighlightClick}
+            />
           </p>
         ))}
       </div>

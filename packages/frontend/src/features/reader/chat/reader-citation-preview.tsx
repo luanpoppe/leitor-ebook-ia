@@ -139,6 +139,8 @@ export function ReaderCitationPreview({
         <div className={styles.pageArea}>
           <ReaderPageView
             page={page}
+            position={citation.chapterPosition}
+            highlights={[]}
             pageKey={`${citation.chapterPosition}:${pageIndex}`}
             direction={direction}
             fontSize={fontSize}

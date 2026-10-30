@@ -1,0 +1,25 @@
+.highlight {
+  /* Sem padding: a marcação não pode mudar a quebra de linha já paginada. */
+  padding: 0;
+  border-radius: 2px;
+  color: inherit;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.highlight[data-color="yellow"] {
+  background: #f9edaa;
+}
+
+.highlight[data-color="green"] {
+  background: #d8efcf;
+}
+
+.highlight[data-color="blue"] {
+  background: #d7e8f7;
+}
+
+.highlight[data-color="pink"] {
+  background: #f6d7e1;
+}
