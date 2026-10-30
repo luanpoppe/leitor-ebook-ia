@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { JSX } from "react";
 import { formatDate } from "@/features/ebooks/format";
+import { CopyNoteButton } from "@/features/notes/components/copy-note-button";
 import type { BookNote } from "./api";
 import { noteChapterLabel } from "./note-format";
 import { NoteMarkdown } from "./note-markdown";
@@ -81,6 +82,7 @@ export function NoteDetail({
         </div>
       ) : (
         <div className={styles.actionsRow}>
+          <CopyNoteButton content={note.content} />
           <button
             type="button"
             className={styles.primaryButton}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { formatDate } from "@/features/ebooks/format";
 import { useDialogPanel } from "@/features/shelf/hooks/use-dialog-panel";
+import { CopyNoteButton } from "@/features/notes/components/copy-note-button";
 import type { AllBookNote } from "@/features/reader/notes/api";
 import { noteChapterLabel } from "@/features/reader/notes/note-format";
 import { NoteMarkdown } from "@/features/reader/notes/note-markdown";
@@ -61,6 +62,7 @@ export function NotePreviewDialog({
         </div>
 
         <footer className={styles.footer}>
+          <CopyNoteButton content={note.content} />
           <Link href={readingHref} className={styles.readButton}>
             {chapter === null
               ? "Abrir no livro"
