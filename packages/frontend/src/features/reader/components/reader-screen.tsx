@@ -760,6 +760,26 @@ export function ReaderScreen({
     []
   );
 
+  // O chat cobre as faixas laterais de virada: os botões do painel usam o mesmo
+  // caminho da leitura normal, seja página ou rolagem.
+  const handleChatPreviousPage = useCallback(() => {
+    if (isScrollMode) {
+      handleScrollPage(-1);
+      return;
+    }
+
+    goToPreviousPage();
+  }, [goToPreviousPage, handleScrollPage, isScrollMode]);
+
+  const handleChatNextPage = useCallback(() => {
+    if (isScrollMode) {
+      handleScrollPage(1);
+      return;
+    }
+
+    goToNextPage();
+  }, [goToNextPage, handleScrollPage, isScrollMode]);
+
   const currentChapterHighlights =
     chapter === null ? [] : highlightsByChapter.get(chapter.position) ?? [];
   const readerTitle = ebook?.title ?? "Leitura";
@@ -1107,6 +1127,9 @@ export function ReaderScreen({
           selection={chatSelection}
           onClearSelection={handleClearChatSelection}
           isSuspended={citationPreview !== null}
+          pageLabel={pageLabel}
+          onPreviousPage={handleChatPreviousPage}
+          onNextPage={handleChatNextPage}
           onClose={handleCloseChat}
           onOpenNotes={handleOpenNotes}
           onOpenNote={handleOpenNote}

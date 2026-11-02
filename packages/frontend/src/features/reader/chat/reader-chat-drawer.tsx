@@ -29,6 +29,10 @@ interface ReaderChatDrawerProps {
   onClearSelection(): void;
   /** Um modal está por cima: o Esc é dele, não do chat. */
   isSuspended?: boolean;
+  /** Rótulo do progresso da página atual, quando houver. */
+  pageLabel?: string | null;
+  onPreviousPage(): void;
+  onNextPage(): void;
   onClose(): void;
   onOpenNotes(): void;
   onOpenNote(noteId: string): void;
@@ -63,6 +67,9 @@ export function ReaderChatDrawer({
   selection,
   onClearSelection,
   isSuspended = false,
+  pageLabel = null,
+  onPreviousPage,
+  onNextPage,
   onClose,
   onOpenNotes,
   onOpenNote,
@@ -275,6 +282,28 @@ export function ReaderChatDrawer({
             </button>
           </div>
         </header>
+
+        {/* O painel cobre as faixas laterais do leitor; estes botões mantêm a
+            virada de página acessível com o chat aberto. */}
+        <div className={styles.pageNav} aria-label="Navegação de página">
+          <button
+            type="button"
+            className={styles.pageNavButton}
+            onClick={onPreviousPage}
+            aria-label="Página anterior"
+          >
+            ← Anterior
+          </button>
+          <span className={styles.pageNavLabel}>{pageLabel ?? "Leitura"}</span>
+          <button
+            type="button"
+            className={styles.pageNavButton}
+            onClick={onNextPage}
+            aria-label="Próxima página"
+          >
+            Próxima →
+          </button>
+        </div>
 
         {isGalleryOpen && (
           <section
