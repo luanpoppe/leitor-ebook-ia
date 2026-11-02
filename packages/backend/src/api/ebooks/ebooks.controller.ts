@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   Res,
   UploadedFile,
   UseInterceptors,
@@ -19,9 +20,10 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { diskStorage } from 'multer';
 import { tmpdir } from 'node:os';
+import { EbookCoverService } from './ebook-cover.service';
 import { EbookQueryService } from './ebook-query.service';
 import type { UploadedEbookFile } from './ebook-upload.service';
 import { EbookUploadService } from './ebook-upload.service';
@@ -32,6 +34,7 @@ import {
   type ReprocessEbookResponse,
   type UploadEbookResponse,
 } from './ebooks.schemas';
+import { RequestOrigin } from './request-origin';
 
 const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
 
@@ -60,6 +63,7 @@ export class EbooksController {
   constructor(
     private readonly uploadService: EbookUploadService,
     private readonly queryService: EbookQueryService,
+    private readonly coverService: EbookCoverService,
   ) {}
 
   @Post()
@@ -93,19 +97,44 @@ export class EbooksController {
   @Get()
   @ApiOperation({ summary: 'Lista a estante de forma paginada' })
   @ApiResponse({ status: 200, description: 'Página da estante.' })
-  list(@Query() query: ListEbooksQueryDto): Promise<PagedEbooks> {
-    return this.queryService.list({
-      page: query.page,
-      pageSize: query.pageSize,
-    });
+  list(
+    @Query() query: ListEbooksQueryDto,
+    @Req() request: Request,
+  ): Promise<PagedEbooks> {
+    return this.queryService.list(
+      {
+        page: query.page,
+        pageSize: query.pageSize,
+      },
+      RequestOrigin.resolve(request),
+    );
+  }
+
+  @Get(`${BOOK_ID_PARAM}/cover`)
+  @ApiOperation({ summary: 'Serve a capa do ebook' })
+  @ApiResponse({ status: 200, description: 'Imagem da capa.' })
+  @ApiResponse({ status: 404, description: 'Livro ou capa não encontrada.' })
+  async cover(
+    @Param('id') id: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const cover = await this.coverService.open(id);
+    response.setHeader('Content-Type', cover.contentType);
+    response.setHeader('Content-Length', cover.size);
+    response.setHeader('Cache-Control', 'private, max-age=3600');
+    cover.stream.on('error', () => response.destroy());
+    cover.stream.pipe(response);
   }
 
   @Get(BOOK_ID_PARAM)
   @ApiOperation({ summary: 'Detalha um ebook pelo id' })
   @ApiResponse({ status: 200, description: 'Detalhe do ebook.' })
   @ApiResponse({ status: 404, description: 'Ebook não encontrado.' })
-  findById(@Param('id') id: string): Promise<EbookDetail> {
-    return this.queryService.findById(id);
+  findById(
+    @Param('id') id: string,
+    @Req() request: Request,
+  ): Promise<EbookDetail> {
+    return this.queryService.findById(id, RequestOrigin.resolve(request));
   }
 
   @Post(`${BOOK_ID_PARAM}/reprocess`)
