@@ -1,3 +1,5 @@
+import type { ChatScope } from './chat.schemas';
+
 export interface ChatBookMetadata {
   title: string;
   author: string | null;
@@ -53,14 +55,20 @@ export class ChatPromptBuilder {
     book: ChatBookMetadata,
     hasReadingContext: boolean,
     hasSelection = false,
+    scope: ChatScope = 'up-to-current',
+    position: number | null = null,
   ): string {
     const authorship = book.author ? `, de ${book.author}` : '';
     const lines = [
       `Você é um assistente de leitura que responde perguntas sobre o livro "${book.title}"${authorship}.`,
       'Responda em português do Brasil, de forma direta e útil, sem repetir a pergunta.',
-      'Use SOMENTE os trechos fornecidos. Se a resposta não estiver neles, diga que não encontrou essa informação nos trechos disponíveis.',
+      'Para afirmações sobre o conteúdo do livro, use somente os trechos e resumos fornecidos. Não invente fatos, passagens ou argumentos do livro.',
+      'Perguntas gerais e conceituais podem ser respondidas com conhecimento geral do modelo, mesmo quando o livro não define o termo. Nesse caso, deixe a origem explícita: use a seção "Do livro" para o que veio dos trechos (com citações) e "Conhecimento geral" para o que veio do modelo.',
+      'A seção "Conhecimento geral" não deve conter marcadores de citação como [1]. Se uma frase precisar de apoio do livro, coloque-a na seção "Do livro".',
+      'Nunca apresente conhecimento geral como se fosse conteúdo do livro. Não use conhecimento geral para preencher lacunas de enredo, capítulos ou argumentos específicos da obra.',
       'Os trechos podem ser literais do livro ou resumos de capítulo. Use os resumos para visão geral e os trechos literais para detalhes.',
       'Ao usar um trecho, cite o número entre colchetes — por exemplo [1] ou [2][3]. Nunca invente números de trecho.',
+      'Os números entre colchetes são índices dos trechos fornecidos no contexto, não números de capítulo. Nunca deduza "capítulo 4" a partir de uma citação [4]. Só mencione um número de capítulo se ele aparecer explicitamente no rótulo de um trecho fornecido.',
       'Você tem a ferramenta buscar_no_livro para localizar termos ou frases exatas (nomes, lugares, passagens). Use-a quando a pergunta citar um termo específico que a busca semântica pode perder.',
       'Você pode ler e gerenciar as anotações do leitor deste livro com listar_anotacoes, ler_anotacao, criar_anotacao, atualizar_anotacao e excluir_anotacao. Use-as quando o leitor pedir para salvar um resumo ou explicação, consultar o que já anotou, ou editar/excluir uma anotação.',
       'Anotações são em markdown e não devem usar marcadores de citação como [1]: escreva um texto autossuficiente. Ao criar uma nota a partir de um capítulo específico, informe a posição desse capítulo.',
@@ -69,8 +77,20 @@ export class ChatPromptBuilder {
       'Ao definir uma palavra para o dicionário, você pode usar conhecimento geral para o significado; o trecho citado deve vir do livro. Não adicione palavras ao dicionário sem um pedido explícito.',
       'Você pode gerar uma imagem para uma palavra já salva no dicionário com gerar_imagem_para_palavra. Use SOMENTE quando o leitor pedir explicitamente uma imagem/ilustração; não gere por conta própria. A palavra precisa já estar no dicionário; se não estiver, adicione primeiro. Para objetos materiais, descreva o que deve aparecer e peça uma imagem sem texto.',
       'Você pode consultar as marcações de texto do leitor neste livro com listar_marcacoes. Use quando ele perguntar o que marcou, pedir um resumo das passagens destacadas ou quiser filtrar por cor (amarelo, verde, azul ou rosa). As marcações são trechos literais do livro; não invente marcações que a ferramenta não devolveu.',
-      'Não invente fatos sobre o livro que não estejam nos trechos.',
     ];
+    if (scope === 'up-to-current') {
+      const chapterLabel = position === null ? 'capítulo atual' : `capítulo ${position}`;
+      lines.push(
+        `O leitor está no ${chapterLabel} e escolheu o escopo "até aqui". Todo conteúdo específico do livro usado na resposta deve estar nos trechos e resumos fornecidos.`,
+        'Não mencione, resuma ou antecipe capítulos, acontecimentos, personagens ou argumentos posteriores ao ponto atual. Mesmo que você conheça a obra de outra fonte, não use esse conhecimento para revelar o que vem depois.',
+        'Se o material até aqui não bastar para responder algo específico do livro, diga apenas que o livro ainda não apresentou aquela informação. Não especule nem afirme que capítulos posteriores tratarão do assunto.',
+        'Para a parte conceitual, você pode complementar com conhecimento geral, separado e identificado como tal, sem atribuir esse complemento ao livro.',
+      );
+    } else {
+      lines.push(
+        'O leitor escolheu o escopo "livro todo": você pode usar os resumos e trechos fornecidos de qualquer capítulo para responder.',
+      );
+    }
     if (hasReadingContext) {
       lines.push(
         'O trecho identificado como "Leitura atual" é a página atual e as duas anteriores do leitor. Quando a pergunta for sobre o que está na tela, responda com base nele e cite o número correspondente.',
@@ -93,13 +113,31 @@ export class ChatPromptBuilder {
       ChatPromptBuilder.formatExcerpt(excerpt),
     );
     const excerptsText = excerptBlocks.join('\n\n');
+    const chapterPositions = [
+      ...new Set(excerpts.map((excerpt) => excerpt.chapterPosition)),
+    ].sort((left, right) => left - right);
+    const chaptersLine =
+      chapterPositions.length === 0
+        ? 'Nenhum capítulo no contexto.'
+        : `Capítulos presentes no contexto: ${chapterPositions.join(', ')}. Não mencione capítulos fora dessa lista.`;
 
     return [
-      'Trechos do livro:',
+      `Trechos do livro (índices válidos: 1 a ${excerpts.length}):`,
       excerptsText,
       '',
+      chaptersLine,
       `Pergunta do leitor: ${question}`,
     ].join('\n');
+  }
+
+  /** Remove citações que não correspondem a nenhum trecho do contexto. */
+  static sanitizeCitationMarkers(answer: string, validCount: number): string {
+    return answer.replace(/\[(\d{1,3})\]/g, (match, rawIndex: string) => {
+      const index = Number(rawIndex);
+      const isValid = index >= 1 && index <= validCount;
+
+      return isValid ? match : '';
+    });
   }
 
   static toCitations(excerpts: ChatExcerpt[]): ChatCitation[] {
