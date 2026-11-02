@@ -235,6 +235,8 @@ export class ChatService {
       excerpts,
       history,
       this.buildTools(book.id, conversation.id, noteActions),
+      input.scope,
+      input.position,
     );
 
     const citations = ChatPromptBuilder.toCitations(excerpts);
@@ -610,16 +612,21 @@ export class ChatService {
     return { prompt: response.prompt, explanation: response.explanation };
   }
 
-  private async requestAnswer(    book: ChatBookMetadata,
+  private async requestAnswer(
+    book: ChatBookMetadata,
     question: string,
     excerpts: ChatExcerpt[],
     history: StoredMessage[],
     tools: ChatTools,
+    scope: ChatScope,
+    position: number,
   ): Promise<string> {
     const systemPrompt = ChatPromptBuilder.buildSystemPrompt(
       book,
       excerpts.some((excerpt) => excerpt.kind === 'reading'),
       excerpts.some((excerpt) => excerpt.kind === 'selection'),
+      scope,
+      position,
     );
     const userPrompt = ChatPromptBuilder.buildUserPrompt(question, excerpts);
     const historyMessages = history.map((message) =>
@@ -642,9 +649,19 @@ export class ChatService {
         aiModelsFallback: [CHAT_FALLBACK_MODEL],
       });
 
-      const answer = response?.text.trim() ?? '';
-      if (answer.length === 0) {
+      const rawAnswer = response?.text.trim() ?? '';
+      if (rawAnswer.length === 0) {
         throw new ChatUnavailableError('A IA respondeu vazio. Tente de novo.');
+      }
+
+      const answer = ChatPromptBuilder.sanitizeCitationMarkers(
+        rawAnswer,
+        excerpts.length,
+      );
+      if (answer !== rawAnswer) {
+        this.logger.warn(
+          `Resposta com citação fora do contexto; marcadores inválidos removidos (${excerpts.length} trechos).`,
+        );
       }
 
       return answer;
