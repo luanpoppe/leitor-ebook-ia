@@ -28,7 +28,10 @@ export interface PutObjectInput {
   size: number;
 }
 
-const PRESIGNED_URL_EXPIRES_IN_SECONDS = 3600;
+export interface StorageObjectInfo {
+  size: number;
+  contentType: string | null;
+}
 
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
 
@@ -124,22 +127,21 @@ export class FileStorageService {
     return stream;
   }
 
-  async getPresignedUrl(storageKey: string): Promise<string> {
+  /** Metadados suficientes para servir o objeto por streaming. */
+  async stat(storageKey: string): Promise<StorageObjectInfo> {
     this.assertValidStorageKey(storageKey);
     const client = this.requireClient();
 
-    await this.assertObjectExists(client, storageKey);
-    const url = await this.runReadOperation(
-      () =>
-        client.presignedGetObject(
-          this.bucket,
-          storageKey,
-          PRESIGNED_URL_EXPIRES_IN_SECONDS,
-        ),
-      storageKey,
-    );
+    const info = await this.runReadOperation<{
+      size: number;
+      metaData?: Record<string, unknown>;
+    }>(() => client.statObject(this.bucket, storageKey), storageKey);
+    const rawContentType =
+      info.metaData?.['content-type'] ?? info.metaData?.['Content-Type'];
+    const contentType =
+      typeof rawContentType === 'string' ? rawContentType : null;
 
-    return url;
+    return { size: info.size, contentType };
   }
 
   async remove(storageKey: string): Promise<void> {
@@ -268,16 +270,6 @@ export class FileStorageService {
       const isLatestOperation = this.putLocks.get(storageKey) === current;
       if (isLatestOperation) this.putLocks.delete(storageKey);
     }
-  }
-
-  private async assertObjectExists(
-    client: Client,
-    storageKey: string,
-  ): Promise<void> {
-    await this.runReadOperation(
-      () => client.statObject(this.bucket, storageKey),
-      storageKey,
-    );
   }
 
   private async runReadOperation<T>(

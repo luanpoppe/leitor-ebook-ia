@@ -6,6 +6,7 @@ import { ReadingProgressRepository } from '../../catalog/reading-progress.reposi
 import { IngestionModule } from '../../ingestion/ingestion.module';
 import { FileStorageModule } from '../../storage/file-storage.module';
 import { EbookChaptersController } from './ebook-chapters.controller';
+import { EbookCoverService } from './ebook-cover.service';
 import { EbookProgressController } from './ebook-progress.controller';
 import { EbookQueryService } from './ebook-query.service';
 import { EbookReadingService } from './ebook-reading.service';
@@ -29,6 +30,7 @@ import { ReadingProgressService } from './reading-progress.service';
   providers: [
     EbookUploadService,
     EbookQueryService,
+    EbookCoverService,
     EbookReadingService,
     ChapterReadingRepository,
     ReadingProgressService,

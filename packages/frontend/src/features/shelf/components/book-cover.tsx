@@ -66,8 +66,8 @@ export function BookCover({
 
   return (
     <div className={`${styles.frame} ${variantClassName}`}>
-      {/* URL pré-assinada de host variável: next/image exigiria remotePatterns
-          e quebraria com o cache de uma URL expirada. */}
+      {/* URL servida pela API no host atual: next/image exigiria remotePatterns
+          para cada host (localhost, IP da rede, Tailscale). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={coverUrl}

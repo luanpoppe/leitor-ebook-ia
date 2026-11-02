@@ -1,45 +1,38 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { EbookNotFoundError } from '../../catalog/catalog.errors';
 import { EbookRepository } from '../../catalog/ebook.repository';
 import { Book } from '../../generated/prisma/client';
-import { FileStorageService } from '../../storage/file-storage.service';
 import type { EbookDetail, EbookSummary, PagedEbooks } from './ebooks.schemas';
 
 /**
  * Leitura do catálogo para a API: listagem paginada da estante e detalhe de um
- * ebook, resolvendo a URL pré-assinada da capa quando existir.
+ * ebook, montando a URL da capa no host da requisição.
  */
 @Injectable()
 export class EbookQueryService {
-  private readonly logger = new Logger(EbookQueryService.name);
+  constructor(private readonly ebookRepository: EbookRepository) {}
 
-  constructor(
-    private readonly ebookRepository: EbookRepository,
-    private readonly storage: FileStorageService,
-  ) {}
-
-  async list(query: { page: number; pageSize: number }): Promise<PagedEbooks> {
+  async list(
+    query: { page: number; pageSize: number },
+    origin: string,
+  ): Promise<PagedEbooks> {
     const skip = (query.page - 1) * query.pageSize;
     const listParams = { take: query.pageSize, skip };
     const listPromise = this.ebookRepository.list(listParams);
     const countPromise = this.ebookRepository.count();
 
     const [books, total] = await Promise.all([listPromise, countPromise]);
-    // As capas são resolvidas em paralelo e cada falha vira `null` no item:
-    // a listagem nunca cai por causa do storage, e a ordem é preservada.
-    const items = await Promise.all(
-      books.map(async (book) => this.toSummaryWithCover(book)),
-    );
+    const items = books.map((book) => this.toSummaryWithCover(book, origin));
 
     return { items, page: query.page, pageSize: query.pageSize, total };
   }
 
-  async findById(bookId: string): Promise<EbookDetail> {
+  async findById(bookId: string, origin: string): Promise<EbookDetail> {
     const book = await this.ebookRepository.findById(bookId);
     if (!book) throw new EbookNotFoundError(bookId);
 
     const summary = this.toSummary(book);
-    const coverUrl = await this.resolveCoverUrl(book.coverStorageKey);
+    const coverUrl = this.resolveCoverUrl(book, origin);
 
     return {
       ...summary,
@@ -60,39 +53,22 @@ export class EbookQueryService {
     };
   }
 
-  private async toSummaryWithCover(book: Book): Promise<EbookSummary> {
+  private toSummaryWithCover(book: Book, origin: string): EbookSummary {
     const summary = this.toSummary(book);
-    const coverUrl = await this.resolveCoverUrl(book.coverStorageKey);
+    const coverUrl = this.resolveCoverUrl(book, origin);
 
     return { ...summary, coverUrl };
   }
 
   /**
-   * A capa é opcional: se o objeto sumiu do storage ou o storage está fora, o
-   * detalhe do livro continua respondendo, só sem `coverUrl`.
+   * A capa é servida pelo backend. O path é absoluto no host da requisição,
+   * então funciona igual em localhost, IP da rede ou Tailscale — sem depender
+   * do endpoint interno do MinIO nem de URL pré-assinada.
    */
-  private async resolveCoverUrl(
-    coverStorageKey: string | null,
-  ): Promise<string | null> {
-    const hasCoverKey =
-      coverStorageKey !== null && coverStorageKey.trim().length > 0;
-    if (!hasCoverKey) return null;
+  private resolveCoverUrl(book: Book, origin: string): string | null {
+    const coverStorageKey = book.coverStorageKey?.trim() ?? '';
+    if (coverStorageKey.length === 0) return null;
 
-    try {
-      return await this.storage.getPresignedUrl(coverStorageKey);
-    } catch (error) {
-      // Capa é opcional por contrato: qualquer falha (objeto ausente, storage
-      // fora, timeout do SDK) vira `coverUrl: null` em vez de derrubar o detalhe.
-      const message = this.errorMessage(error);
-      this.logger.warn(
-        `Capa indisponível para a chave ${coverStorageKey}: ${message}`,
-      );
-      return null;
-    }
-  }
-
-  private errorMessage(error: unknown): string {
-    if (error instanceof Error) return error.message;
-    return String(error);
+    return `${origin.replace(/\/$/, '')}/ebooks/${book.id}/cover`;
   }
 }
